@@ -2,6 +2,7 @@ from brue_base import BRUEBase
 from pyomo.environ import *
 from rich.console import Console
 from rich.table import Table
+import matplotlib.pyplot as plt
 
 
 class SimpleBRUE(BRUEBase):
@@ -13,7 +14,9 @@ class SimpleBRUE(BRUEBase):
     def initialize_parameters(self):
         # 初始化自由流时间
         free_flow_time = {1: 18, 2: 22.5, 3: 12, 4: 24, 5: 2.4, 6: 6, 7: 24, 8: 12}
+        link_money_cost = {1: 20, 2: 15, 3: 1, 4: 0, 5: 0, 6: 0, 7: 0, 8: 1}
         self.model.free_flow_time = Param(self.model.paths, initialize=free_flow_time)
+        self.model.link_money_cost = Param(self.model.paths, initialize=link_money_cost)
 
         # 初始化路径-链接矩阵
         path_link_matrix = {
@@ -88,7 +91,7 @@ class SimpleBRUE(BRUEBase):
                 for i in m.od_pairs) == 0
         )
 
-        # 可行路径约束 - 原来的版本
+        # 可行路径约束
         m.feasible_path_constraint = ConstraintList()
         m.feasible_path_constraint.add(
             10000 - sum(m.flow[i] for i in [1, 2, 3, 4, 5]) >= 0.01  # 原来包含了1-5的路径
@@ -114,6 +117,64 @@ class SimpleBRUE(BRUEBase):
             )
 
         self.console.print(table)
+
+    def calculate_money_cost(self):
+        """计算每条路径的金钱成本"""
+        m = self.model
+        money_costs = {}
+        for i in m.od_pairs:
+            money_costs[i] = sum(m.path_link_matrix[i, j] * m.link_money_cost[j] 
+                               for j in m.paths)
+        return money_costs
+
+    def plot_cost_analysis(self, is_effective_path):
+        """绘制路径成本与金钱成本的散点图"""
+        m = self.model
+        
+        # 计算金钱成本
+        money_costs = self.calculate_money_cost()
+        
+        # 获取路径成本
+        path_costs = {i: m.path_cost[i].value for i in m.od_pairs}
+        
+        # 获取最小成本和上界
+        min_cost = min(path_costs.values())
+        epsilon = m.epsilon.value
+        upper_bound = min_cost + epsilon
+
+        # 创建图形
+        plt.figure(figsize=(10, 6))
+        
+        # 绘制非有效路径点（红色）
+        non_effective_paths = [i for i in m.od_pairs if i not in is_effective_path]
+        plt.scatter([path_costs[i] for i in non_effective_paths],
+                   [money_costs[i] for i in non_effective_paths],
+                   color='red', label='Non-effective paths')
+        
+        # 绘制有效路径点（蓝色）
+        plt.scatter([path_costs[i] for i in is_effective_path],
+                   [money_costs[i] for i in is_effective_path],
+                   color='blue', label='Effective paths')
+        
+        # 添加路径标签
+        for i in m.od_pairs:
+            plt.annotate(f'Path {i}', 
+                        (path_costs[i], money_costs[i]),
+                        xytext=(5, 5), textcoords='offset points')
+        
+        # 绘制有效区间的竖线
+        plt.axvline(x=min_cost, color='green', linestyle='--', label='Min cost')
+        plt.axvline(x=upper_bound, color='red', linestyle='--', label='Upper bound')
+        
+        # 设置图形属性
+        plt.xlabel('Path Cost (Time)')
+        plt.ylabel('Money Cost')
+        plt.title('Path Cost Analysis')
+        plt.legend()
+        plt.grid(True)
+        
+        # 显示图形
+        plt.show()
 
     def analyze_path_costs(self):
         """分析路径成本并找出有效路径"""
@@ -156,7 +217,17 @@ class SimpleBRUE(BRUEBase):
 
         # return 有效路径 is_effective
         self.console.print("\n有效路径: ", is_effective_path)
+        
+        # 在函数末尾添加绘图
+        self.plot_cost_analysis(is_effective_path)
         return is_effective_path
+
+    def run(self):
+        """运行完整求解过程"""
+        # ...existing code...
+        super().run()
+        is_effective_path = self.analyze_path_costs()
+        self.plot_cost_analysis(is_effective_path)
 
 
 if __name__ == "__main__":

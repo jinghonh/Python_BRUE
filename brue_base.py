@@ -39,6 +39,16 @@ class BRUEBase(ABC):
         """分析路径成本并找出有效路径"""
         pass
 
+    @abstractmethod
+    def calculate_money_cost(self):
+        """计算每条路径的金钱成本"""
+        pass
+
+    @abstractmethod
+    def plot_cost_analysis(self, is_effective_path):
+        """绘制路径成本与金钱成本的散点图"""
+        pass
+
     def solve(self, solver_name='ipopt', tee=True):
         """求解模型"""
         solver = SolverFactory(solver_name)
