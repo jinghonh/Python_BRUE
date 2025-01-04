@@ -130,8 +130,35 @@ class SimpleBRUE(BRUEBase):
                                  for j in m.paths)
         return money_costs
 
-    def plot_cost_analysis(self, is_effective_path):
-        """绘制路径成本与金钱成本的散点图"""
+    def is_dominated(self, path_i, path_costs, money_costs, all_paths):
+        """
+        判断一个路径是否被其他路径支配
+        路径i被路径j支配的条件：
+        1. j的时间成本 <= i的时间成本
+        2. j的金钱成本 <= i的金钱成本
+        3. 至少有一个严格小于
+        """
+        cost_i = path_costs[path_i]
+        money_i = money_costs[path_i]
+
+        for path_j in all_paths:
+            if path_j != path_i:
+                cost_j = path_costs[path_j]
+                money_j = money_costs[path_j]
+
+                # 检查是否被支配
+                if (cost_j <= cost_i and money_j <= money_i and
+                        (cost_j < cost_i or money_j < money_i)):
+                    return True
+        return False
+
+    def plot_cost_analysis(self, is_effective_path, iteration_data=None):
+        """
+        绘制路径成本与金钱成本的散点图
+        Args:
+            is_effective_path: 有效路径列表
+            iteration_data: 包含当前迭代信息的字典，包括epsilon和restricted_paths
+        """
         m = self.model
 
         # 计算金钱成本
@@ -145,39 +172,101 @@ class SimpleBRUE(BRUEBase):
         epsilon = m.epsilon.value
         upper_bound = min_cost + epsilon
 
+        # 首先确定可行路径（在有效区间内的路径）
+        feasible_paths = [i for i in m.od_pairs
+                          if min_cost <= path_costs[i] <= upper_bound + 5e-2]
+        infeasible_paths = [i for i in m.od_pairs if i not in feasible_paths]
+
+        # 在可行路径中分析支配关系
+        dominated_paths = []
+        non_dominated_paths = []
+
+        # 首先找出非支配路径
+        for path in feasible_paths:
+            if not self.is_dominated(path, path_costs, money_costs, feasible_paths):
+                non_dominated_paths.append(path)
+            else:
+                dominated_paths.append(path)
+
         # 创建图形
         plt.figure(figsize=(10, 6))
 
-        # 绘制非有效路径点（红色）
-        non_effective_paths = [i for i in m.od_pairs if i not in is_effective_path]
-        plt.scatter([path_costs[i] for i in non_effective_paths],
-                    [money_costs[i] for i in non_effective_paths],
-                    color='red', label='Non-effective paths')
+        # 绘制不可行路径点（灰色）
+        if infeasible_paths:
+            plt.scatter([path_costs[i] for i in infeasible_paths],
+                        [money_costs[i] for i in infeasible_paths],
+                        color='grey', alpha=0.5, label='Infeasible paths')
 
-        # 绘制有效路径点（蓝色）
-        plt.scatter([path_costs[i] for i in is_effective_path],
-                    [money_costs[i] for i in is_effective_path],
-                    color='blue', label='Effective paths')
+        # 绘制被支配的可行路径点（红色）
+        if dominated_paths:
+            plt.scatter([path_costs[i] for i in dominated_paths],
+                        [money_costs[i] for i in dominated_paths],
+                        color='red', alpha=0.7, label='Dominated feasible paths')
 
-        # 添加路径标签
+        # 绘制非支配路径点（绿色）
+        if non_dominated_paths:
+            plt.scatter([path_costs[i] for i in non_dominated_paths],
+                        [money_costs[i] for i in non_dominated_paths],
+                        color='green', alpha=1.0, label='Non-dominated paths')
+
+        # 添加路径标签和成本值
         for i in m.od_pairs:
-            plt.annotate(f'Path {i}',
+            plt.annotate(f'P{i}\n({path_costs[i]:.1f}, {money_costs[i]:.1f})',
                          (path_costs[i], money_costs[i]),
-                         xytext=(5, 5), textcoords='offset points')
+                         xytext=(5, 5), textcoords='offset points',
+                         fontsize=8)
 
         # 绘制有效区间的竖线
-        plt.axvline(x=min_cost, color='green', linestyle='--', label='Min cost')
-        plt.axvline(x=upper_bound, color='red', linestyle='--', label='Upper bound')
+        plt.axvline(x=min_cost, color='blue', linestyle='--',
+                    alpha=0.5, label='Min cost')
+        plt.axvline(x=upper_bound, color='blue', linestyle='--',
+                    alpha=0.5, label='Max cost')
 
         # 设置图形属性
-        plt.xlabel('Path Cost (Time)')
+        plt.xlabel('Travel Time Cost')
         plt.ylabel('Money Cost')
-        plt.title('Path Cost Analysis')
-        plt.legend()
-        plt.grid(True)
+
+        # 添加迭代信息到标题
+        if iteration_data:
+            plt.title(f'Iteration {iteration_data["iteration"]}\n'
+                      f'Restricted Paths: {iteration_data["restricted_paths"]}\n'
+                      f'Epsilon: {epsilon:.2f}')
+        else:
+            plt.title('Path Cost Analysis with Dominance Relations')
+
+        plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        plt.grid(True, alpha=0.3)
+
+        # 添加说明文本
+        info_text = (
+            f'Feasible paths: {sorted(feasible_paths)}\n'
+            f'Non-dominated paths: {sorted(non_dominated_paths)}\n'
+            f'Dominated paths: {sorted(dominated_paths)}\n'
+            f'Infeasible paths: {sorted(infeasible_paths)}\n'
+            f'Current epsilon: {epsilon:.2f}'
+        )
+        plt.text(0.6, 1, info_text,
+                 transform=plt.gca().transAxes,
+                 verticalalignment='top',
+                 bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
+                 fontsize=8)
+
+        # 调整布局以适应文本
+        plt.tight_layout()
 
         # 显示图形
         plt.show()
+
+        # 返回分析结果
+        return {
+            'non_dominated_paths': non_dominated_paths,
+            'dominated_paths': dominated_paths,
+            'infeasible_paths': infeasible_paths,
+            'feasible_paths': feasible_paths,
+            'current_epsilon': epsilon,
+            'path_costs': path_costs,
+            'money_costs': money_costs
+        }
 
     def analyze_path_costs(self):
         """分析路径成本并找出有效路径"""
@@ -222,7 +311,7 @@ class SimpleBRUE(BRUEBase):
         self.console.print("\n有效路径: ", is_effective_path)
 
         # 在函数末尾添加绘图
-        self.plot_cost_analysis(is_effective_path)
+        # self.plot_cost_analysis(is_effective_path)
         return is_effective_path
 
     def run(self):
@@ -328,14 +417,8 @@ class SimpleBRUE(BRUEBase):
             self.initialize_sets()
             self.initialize_parameters()
             self.initialize_variables()
-
-            # 添加基本约束
             self.add_constraints()
-
-            # 添加可行路径约束
             self.add_feasible_path_constraints(current_paths, prev_epsilon)
-
-            # 设置目标函数和求解
             self.set_objective()
             self.solve()
 
@@ -343,14 +426,17 @@ class SimpleBRUE(BRUEBase):
             is_effective_path = self.analyze_path_costs()
             current_epsilon = self.model.epsilon.value
 
-            # 存储当前迭代结果
-            iteration_result = {
+            # 创建当前迭代的数据字典
+            iteration_data = {
                 'iteration': iteration,
                 'restricted_paths': current_paths,
                 'epsilon': current_epsilon,
                 'effective_paths': is_effective_path
             }
-            results.append(iteration_result)
+
+            # 存储结果并创建图表
+            results.append(iteration_data)
+            self.plot_cost_analysis(is_effective_path, iteration_data)
 
             # 检查是否所有有效路径都已包含在限制路径中
             new_paths = [p for p in is_effective_path if p not in current_paths]
@@ -361,7 +447,7 @@ class SimpleBRUE(BRUEBase):
 
             # 更新路径集合和epsilon
             current_paths.extend(new_paths)
-            current_paths.sort()  # 保持路径顺序
+            current_paths.sort()
             prev_epsilon = current_epsilon
             iteration += 1
 
@@ -369,16 +455,8 @@ class SimpleBRUE(BRUEBase):
             self.console.print(f"当前限制路径: {current_paths}")
             self.console.print(f"新增有效路径: {new_paths}")
 
-        # 显示迭代结果
+        # 显示迭代结果汇总
         self.display_iteration_results(results)
-
-        # 为每次迭代创建成本-金钱图
-        for result in results:
-            plt.figure(figsize=(10, 6))
-            self.plot_cost_analysis(result['effective_paths'])
-            plt.title(f'Iteration {result["iteration"]}: Restricted Paths {result["restricted_paths"]}')
-            plt.show()
-
         return results
 
     def display_iteration_results(self, results):
@@ -409,7 +487,110 @@ class SimpleBRUE(BRUEBase):
 
         self.console.print(table)
 
+    def plot_initial_costs(self):
+        """
+        绘制初始自由流时间和金钱成本的散点图，分析支配关系
+        """
+        m = self.model
+        
+        # 获取初始时间成本 (t0)
+        time_costs = {i: sum(m.path_link_matrix[i, j] * m.free_flow_time[j] 
+                           for j in m.paths) for i in m.od_pairs}
+        
+        # 获取金钱成本
+        money_costs = self.calculate_money_cost()
+        
+        # 分析支配关系
+        dominated_paths = []
+        non_dominated_paths = []
+        
+        # 检查每条路径是否被支配
+        for path_i in m.od_pairs:
+            is_dominated = False
+            time_i = time_costs[path_i]
+            money_i = money_costs[path_i]
+            
+            for path_j in m.od_pairs:
+                if path_j != path_i:
+                    time_j = time_costs[path_j]
+                    money_j = money_costs[path_j]
+                    
+                    if (time_j <= time_i and money_j <= money_i and 
+                        (time_j < time_i or money_j < money_i)):
+                        is_dominated = True
+                        break
+            
+            if is_dominated:
+                dominated_paths.append(path_i)
+            else:
+                non_dominated_paths.append(path_i)
+
+        # 创建图形
+        plt.figure(figsize=(10, 6))
+        
+        # 绘制被支配的路径点（红色）
+        if dominated_paths:
+            plt.scatter([time_costs[i] for i in dominated_paths],
+                       [money_costs[i] for i in dominated_paths],
+                       color='red', alpha=0.7, label='Dominated paths')
+        
+        # 绘制非支配路径点（绿色）
+        if non_dominated_paths:
+            plt.scatter([time_costs[i] for i in non_dominated_paths],
+                       [money_costs[i] for i in non_dominated_paths],
+                       color='green', alpha=1.0, label='Non-dominated paths')
+        
+        # 添加路径标签和成本值
+        for i in m.od_pairs:
+            plt.annotate(f'Path {i}\n({time_costs[i]:.1f}, {money_costs[i]:.1f})', 
+                        (time_costs[i], money_costs[i]),
+                        xytext=(5, 5), textcoords='offset points',
+                        fontsize=8)
+        
+        # 设置图形属性
+        plt.xlabel('Initial Travel Time (t0)')
+        plt.ylabel('Money Cost')
+        plt.title('Initial Path Costs Analysis with Dominance Relations')
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        
+        # 添加说明文本
+        info_text = (
+            f'Non-dominated paths: {sorted(non_dominated_paths)}\n'
+            f'Dominated paths: {sorted(dominated_paths)}'
+        )
+        plt.text(0.98, 0.98, info_text,
+                transform=plt.gca().transAxes,
+                verticalalignment='top',
+                bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
+                fontsize=8)
+        
+        # 调整布局以适应文本
+        plt.tight_layout()
+        
+        # 显示图形
+        plt.show()
+
+        # 返回分析结果
+        return {
+            'time_costs': time_costs,
+            'money_costs': money_costs,
+            'non_dominated_paths': non_dominated_paths,
+            'dominated_paths': dominated_paths
+        }
+
 
 if __name__ == "__main__":
     solver = SimpleBRUE()
     solver.run_path_iteration_analysis()
+
+    solver = SimpleBRUE()
+    # 初始化模型参数
+    solver.initialize_sets()
+    solver.initialize_parameters()
+    # 绘制初始成本分析图
+    initial_analysis = solver.plot_initial_costs()
+    # 打印详细结果
+    print("\n初始路径分析结果:")
+    print(f"非支配路径: {sorted(initial_analysis['non_dominated_paths'])}")
+    print(f"被支配路径: {sorted(initial_analysis['dominated_paths'])}")
