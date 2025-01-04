@@ -34,6 +34,11 @@ class BRUEBase(ABC):
         """设置目标函数"""
         pass
 
+    @abstractmethod
+    def analyze_path_costs(self):
+        """分析路径成本并找出有效路径"""
+        pass
+
     def solve(self, solver_name='ipopt', tee=True):
         """求解模型"""
         solver = SolverFactory(solver_name)
@@ -53,3 +58,4 @@ class BRUEBase(ABC):
         self.set_objective()
         self.solve()
         self.display_results()
+        self.analyze_path_costs()  # 添加新的分析步骤

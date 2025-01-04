@@ -101,9 +101,11 @@ model.path_cost = Constraint(model.i, rule=path_cost_rule)
 model.path_constraints = ConstraintList()
 model.path_constraints.add(3000 - model.f[7] >= 0.001)
 
+
 # 修改目标函数
 def objective_rule(model):
     return model.ep1 * 4 + model.ep2 * 7
+
 
 model.obj = Objective(rule=objective_rule, sense=minimize)
 
