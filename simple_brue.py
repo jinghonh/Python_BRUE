@@ -94,7 +94,10 @@ class SimpleBRUE(BRUEBase):
         # 可行路径约束
         m.feasible_path_constraint = ConstraintList()
         m.feasible_path_constraint.add(
-            10000 - sum(m.flow[i] for i in [1, 2, 3, 4, 5]) >= 0.01  # 原来包含了1-5的路径
+            10000 - sum(m.flow[i] for i in [1, 2, 5]) >= 0.01  # 原来包含了1-5的路径
+        )
+        m.feasible_path_constraint.add(
+            m.epsilon >= 11  # 原来包含了1-5的路径
         )
 
     def set_objective(self):
@@ -123,20 +126,20 @@ class SimpleBRUE(BRUEBase):
         m = self.model
         money_costs = {}
         for i in m.od_pairs:
-            money_costs[i] = sum(m.path_link_matrix[i, j] * m.link_money_cost[j] 
-                               for j in m.paths)
+            money_costs[i] = sum(m.path_link_matrix[i, j] * m.link_money_cost[j]
+                                 for j in m.paths)
         return money_costs
 
     def plot_cost_analysis(self, is_effective_path):
         """绘制路径成本与金钱成本的散点图"""
         m = self.model
-        
+
         # 计算金钱成本
         money_costs = self.calculate_money_cost()
-        
+
         # 获取路径成本
         path_costs = {i: m.path_cost[i].value for i in m.od_pairs}
-        
+
         # 获取最小成本和上界
         min_cost = min(path_costs.values())
         epsilon = m.epsilon.value
@@ -144,35 +147,35 @@ class SimpleBRUE(BRUEBase):
 
         # 创建图形
         plt.figure(figsize=(10, 6))
-        
+
         # 绘制非有效路径点（红色）
         non_effective_paths = [i for i in m.od_pairs if i not in is_effective_path]
         plt.scatter([path_costs[i] for i in non_effective_paths],
-                   [money_costs[i] for i in non_effective_paths],
-                   color='red', label='Non-effective paths')
-        
+                    [money_costs[i] for i in non_effective_paths],
+                    color='red', label='Non-effective paths')
+
         # 绘制有效路径点（蓝色）
         plt.scatter([path_costs[i] for i in is_effective_path],
-                   [money_costs[i] for i in is_effective_path],
-                   color='blue', label='Effective paths')
-        
+                    [money_costs[i] for i in is_effective_path],
+                    color='blue', label='Effective paths')
+
         # 添加路径标签
         for i in m.od_pairs:
-            plt.annotate(f'Path {i}', 
-                        (path_costs[i], money_costs[i]),
-                        xytext=(5, 5), textcoords='offset points')
-        
+            plt.annotate(f'Path {i}',
+                         (path_costs[i], money_costs[i]),
+                         xytext=(5, 5), textcoords='offset points')
+
         # 绘制有效区间的竖线
         plt.axvline(x=min_cost, color='green', linestyle='--', label='Min cost')
         plt.axvline(x=upper_bound, color='red', linestyle='--', label='Upper bound')
-        
+
         # 设置图形属性
         plt.xlabel('Path Cost (Time)')
         plt.ylabel('Money Cost')
         plt.title('Path Cost Analysis')
         plt.legend()
         plt.grid(True)
-        
+
         # 显示图形
         plt.show()
 
@@ -217,19 +220,196 @@ class SimpleBRUE(BRUEBase):
 
         # return 有效路径 is_effective
         self.console.print("\n有效路径: ", is_effective_path)
-        
+
         # 在函数末尾添加绘图
         self.plot_cost_analysis(is_effective_path)
         return is_effective_path
 
     def run(self):
         """运行完整求解过程"""
-        # ...existing code...
         super().run()
         is_effective_path = self.analyze_path_costs()
         self.plot_cost_analysis(is_effective_path)
 
+    def add_feasible_path_constraints(self, restricted_paths, min_epsilon=None):
+        """
+        添加可行路径约束
+        Args:
+            restricted_paths: 限制的路径列表
+            min_epsilon: 最小epsilon值
+        """
+        m = self.model
+        m.feasible_path_constraint = ConstraintList()
+        m.feasible_path_constraint.add(
+            10000 - sum(m.flow[i] for i in restricted_paths) >= 0.01
+        )
+        if min_epsilon is not None:
+            m.feasible_path_constraint.add(
+                m.epsilon >= min_epsilon
+            )
+
+    def iterate_path_analysis(self, path_groups):
+        """
+        迭代分析不同路径组合的epsilon和有效路径
+        Args:
+            path_groups: 路径组列表的列表，例如 [[1,2,5], [1,2,5,3], [1,2,5,3,4]]
+        Returns:
+            list of dict: 每次迭代的结果，包含epsilon和有效路径
+        """
+        results = []
+        prev_epsilon = None
+
+        for paths in path_groups:
+            # 重新初始化模型
+            self.model = ConcreteModel()
+            self.initialize_sets()
+            self.initialize_parameters()
+            self.initialize_variables()
+
+            # 添加基本约束
+            self.add_constraints()
+
+            # 添加可行路径约束
+            self.add_feasible_path_constraints(paths, prev_epsilon)
+
+            # 设置目标函数和求解
+            self.set_objective()
+            self.solve()
+
+            # 分析结果
+            is_effective_path = self.analyze_path_costs()
+            current_epsilon = self.model.epsilon.value
+
+            # 存储结果
+            iteration_result = {
+                'restricted_paths': paths,
+                'epsilon': current_epsilon,
+                'effective_paths': is_effective_path
+            }
+            results.append(iteration_result)
+
+            # 更新前一次的epsilon
+            prev_epsilon = current_epsilon
+
+        return results
+
+    def display_iteration_results(self, results):
+        """
+        显示迭代结果
+        Args:
+            results: iterate_path_analysis的返回结果
+        """
+        table = Table(title="路径约束迭代分析结果")
+        table.add_column("迭代", style="cyan")
+        table.add_column("限制路径", style="magenta")
+        table.add_column("Epsilon", style="yellow")
+        table.add_column("有效路径", style="green")
+
+        for i, result in enumerate(results, 1):
+            table.add_row(
+                str(i),
+                str(result['restricted_paths']),
+                f"{result['epsilon']:.3f}",
+                str(result['effective_paths'])
+            )
+
+        self.console.print(table)
+
+    def run_path_iteration_analysis(self):
+        """运行路径迭代分析"""
+        results = []
+        current_paths = [1]  # 从路径1开始
+        prev_epsilon = None
+        iteration = 1
+
+        while True:
+            # 重新初始化模型
+            self.model = ConcreteModel()
+            self.initialize_sets()
+            self.initialize_parameters()
+            self.initialize_variables()
+
+            # 添加基本约束
+            self.add_constraints()
+
+            # 添加可行路径约束
+            self.add_feasible_path_constraints(current_paths, prev_epsilon)
+
+            # 设置目标函数和求解
+            self.set_objective()
+            self.solve()
+
+            # 分析结果
+            is_effective_path = self.analyze_path_costs()
+            current_epsilon = self.model.epsilon.value
+
+            # 存储当前迭代结果
+            iteration_result = {
+                'iteration': iteration,
+                'restricted_paths': current_paths,
+                'epsilon': current_epsilon,
+                'effective_paths': is_effective_path
+            }
+            results.append(iteration_result)
+
+            # 检查是否所有有效路径都已包含在限制路径中
+            new_paths = [p for p in is_effective_path if p not in current_paths]
+
+            # 如果没有新的有效路径，或者所有路径都已包含，则终止迭代
+            if not new_paths or set(current_paths) == set(range(1, 7)):
+                break
+
+            # 更新路径集合和epsilon
+            current_paths.extend(new_paths)
+            current_paths.sort()  # 保持路径顺序
+            prev_epsilon = current_epsilon
+            iteration += 1
+
+            self.console.print(f"\n迭代 {iteration}:")
+            self.console.print(f"当前限制路径: {current_paths}")
+            self.console.print(f"新增有效路径: {new_paths}")
+
+        # 显示迭代结果
+        self.display_iteration_results(results)
+
+        # 为每次迭代创建成本-金钱图
+        for result in results:
+            plt.figure(figsize=(10, 6))
+            self.plot_cost_analysis(result['effective_paths'])
+            plt.title(f'Iteration {result["iteration"]}: Restricted Paths {result["restricted_paths"]}')
+            plt.show()
+
+        return results
+
+    def display_iteration_results(self, results):
+        """
+        显示迭代结果
+        Args:
+            results: iterate_path_analysis的返回结果
+        """
+        table = Table(title="路径约束迭代分析结果")
+        table.add_column("迭代", style="cyan")
+        table.add_column("限制路径", style="magenta")
+        table.add_column("新增有效路径", style="blue")
+        table.add_column("Epsilon", style="yellow")
+        table.add_column("所有有效路径", style="green")
+
+        for i, result in enumerate(results):
+            # 计算新增的有效路径
+            prev_paths = set() if i == 0 else set(results[i - 1]['effective_paths'])
+            new_effective = set(result['effective_paths']) - prev_paths
+
+            table.add_row(
+                str(result['iteration']),
+                str(result['restricted_paths']),
+                str(sorted(list(new_effective))),
+                f"{result['epsilon']:.3f}",
+                str(result['effective_paths'])
+            )
+
+        self.console.print(table)
+
 
 if __name__ == "__main__":
     solver = SimpleBRUE()
-    solver.run()
+    solver.run_path_iteration_analysis()
