@@ -1,5 +1,8 @@
 from pyomo.environ import *
 from pyomo.opt import SolverFactory
+import rich
+from rich.console import Console
+from rich.table import Table
 
 # Define model
 model = ConcreteModel()
@@ -44,10 +47,6 @@ model.p2 = Var(domain=NonNegativeReals)
 model.ep1 = Var(domain=NonNegativeReals)
 model.ep2 = Var(domain=NonNegativeReals)
 
-# Objective function
-def objective_rule(model):
-    return model.ep1 * 10 + model.ep2 * 1
-model.obj = Objective(rule=objective_rule, sense=minimize)
 
 # Constraints
 def ep_constraints_rule(model, i):
@@ -57,7 +56,7 @@ def ep_constraints_rule(model, i):
         return model.ep2 >= model.r[i]
     else:
         return Constraint.Skip
-model.ep_constraints = Constraint(model.i, rule=ep_constraints_rule)
+
 
 # Flow balance constraints
 def balance_constraints_rule(model, i):
@@ -67,14 +66,8 @@ def balance_constraints_rule(model, i):
         return model.f[i] + model.c[i] + model.r[i] - model.p2 >= 0
     else:
         return Constraint.Skip
-model.balance_constraints = Constraint(model.i, rule=balance_constraints_rule)
 
-# Demand constraints
-model.demand_constraints = ConstraintList()
-model.demand_constraints.add(sum(model.f[i] for i in model.OD1) == 3000)
-model.demand_constraints.add(sum(model.f[i] for i in model.OD2) == 3000)
 
-model.path_cost_constraints = ConstraintList()
 def path_cost_constraints_rule(model, i):
     if i in model.OD1:
         return model.f[i] * (model.c[i] + model.r[i] - model.p1) == 0
@@ -82,23 +75,37 @@ def path_cost_constraints_rule(model, i):
         return model.f[i] * (model.c[i] + model.r[i] - model.p2) == 0
     else:
         return Constraint.Skip
-model.path_cost_constraints = Constraint(model.i, rule=path_cost_constraints_rule)
 
 
 # Travel time constraints
 def link_cost_rule(model, j):
     return model.t[j] == model.t0[j] * (1 + 0.15 * (sum(model.A[i, j] * model.f[i] for i in model.i) / 2500) ** 4)
-model.link_cost = Constraint(model.j, rule=link_cost_rule)
+
 
 # Path cost constraints
 def path_cost_rule(model, i):
     return model.c[i] == sum(model.A[i, j] * model.t[j] for j in model.j)
+
+
+# Demand constraints
+model.demand_constraints = ConstraintList()
+model.demand_constraints.add(sum(model.f[i] for i in model.OD1) == 3000)
+model.demand_constraints.add(sum(model.f[i] for i in model.OD2) == 3000)
+model.ep_constraints = Constraint(model.i, rule=ep_constraints_rule)
+model.balance_constraints = Constraint(model.i, rule=balance_constraints_rule)
+model.path_cost_constraints = Constraint(model.i, rule=path_cost_constraints_rule)
+model.link_cost = Constraint(model.j, rule=link_cost_rule)
 model.path_cost = Constraint(model.i, rule=path_cost_rule)
 
-# Path-specific constraints
-# model.path_constraints = ConstraintList()
-# model.path_constraints.add(3000 - model.f[1] >= 0)
-# model.path_constraints.add(3000 >= 0.001)
+# 添加路径约束条件
+model.path_constraints = ConstraintList()
+model.path_constraints.add(3000 - model.f[7] >= 0.001)
+
+# 修改目标函数
+def objective_rule(model):
+    return model.ep1 * 4 + model.ep2 * 7
+
+model.obj = Objective(rule=objective_rule, sense=minimize)
 
 # Solve the model
 solver = SolverFactory('ipopt')  # Using IPOPT as the solver
@@ -116,3 +123,29 @@ print("ep2 =", model.ep2.value)
 # p1与p2的值
 print("p1 =", model.p1.value)
 print("p2 =", model.p2.value)
+# 将结果显示在表格中
+console = Console()
+table = Table(title="Results")
+table.add_column("OD", style="cyan")
+table.add_column("Flow", style="magenta")
+table.add_column("Travel time", style="green")
+table.add_column("Cost", style="yellow")
+table.add_column("Cost+ep", style="blue")
+table.add_column("Residual", style="red")
+for i in model.i:
+    if i in model.OD1:
+        cost_plus_ep = model.c[i].value + model.ep1.value
+    else:
+        cost_plus_ep = model.c[i].value + model.ep2.value
+    table.add_row(
+        str(i),
+        str(model.f[i].value),
+        str(model.t[i].value if i in model.j else ""),
+        str(model.c[i].value),
+        str(cost_plus_ep),
+        str(model.r[i].value)
+    )
+
+console.print(table)
+# 显示目标函数的值
+console.print(f"Objective function value: {model.obj()}")
