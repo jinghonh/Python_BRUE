@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Dict, Set, List
 
+
 @dataclass
 class TrafficNetworkConfig:
     """交通网络配置类，用于存储和管理交通网络的所有参数"""
@@ -15,7 +16,7 @@ class TrafficNetworkConfig:
     free_flow_time: Dict[int, float]  # 自由流时间（无拥堵时的行程时间）
     link_money_cost: Dict[int, float]  # 道路费用（如过路费）
     link_capacity: Dict[int, float]  # 道路通行能力
-    
+
     # 路径-链接关系
     path_link_matrix: Dict[tuple, float]  # 路径与道路段的关联矩阵
 
@@ -54,7 +55,7 @@ class TrafficNetworkConfig:
             },
             od_demands={
                 'OD1': 3000,  # OD1组的需求
-                'OD2': 3000   # OD2组的需求
+                'OD2': 3000  # OD2组的需求
             },
             free_flow_time={
                 1: 10, 2: 10, 3: 10, 4: 40, 5: 10, 6: 10, 7: 10, 8: 20, 9: 10,
@@ -111,4 +112,4 @@ class TrafficNetworkConfig:
                 (7, 2): 1, (7, 8): 1, (7, 14): 1, (7, 15): 1, (7, 17): 1,
                 (8, 2): 1, (8, 11): 1, (8, 18): 1
             }
-        ) 
+        )
