@@ -336,6 +336,9 @@ class SimpleBRUE(BRUEBase):
             m.feasible_path_constraint.add(
                 m.epsilon >= min_epsilon
             )
+        # m.feasible_path_constraint.add(
+        #     sum(m.flow[i] for i in [1,2]) == 0
+        # )
 
     def iterate_path_analysis(self, path_groups):
         """
@@ -407,7 +410,7 @@ class SimpleBRUE(BRUEBase):
     def run_path_iteration_analysis(self):
         """运行路径迭代分析"""
         results = []
-        current_paths = [1]  # 从路径1开始
+        current_paths = [1, 2, 5]  # 从路径1开始
         prev_epsilon = None
         iteration = 1
 
@@ -489,94 +492,109 @@ class SimpleBRUE(BRUEBase):
 
     def plot_initial_costs(self):
         """
-        绘制初始自由流时间和金钱成本的散点图，分析支配关系
+        绘制三种情况下的时间和金钱成本的散点图：
+        1. 初始状态 (t0)
+        2. 无流量状态
+        3. 满容量状态
         """
         m = self.model
-        
-        # 获取初始时间成本 (t0)
-        time_costs = {i: sum(m.path_link_matrix[i, j] * m.free_flow_time[j] 
-                           for j in m.paths) for i in m.od_pairs}
-        
-        # 获取金钱成本
-        money_costs = self.calculate_money_cost()
-        
-        # 分析支配关系
-        dominated_paths = []
-        non_dominated_paths = []
-        
-        # 检查每条路径是否被支配
-        for path_i in m.od_pairs:
-            is_dominated = False
-            time_i = time_costs[path_i]
-            money_i = money_costs[path_i]
-            
-            for path_j in m.od_pairs:
-                if path_j != path_i:
-                    time_j = time_costs[path_j]
-                    money_j = money_costs[path_j]
-                    
-                    if (time_j <= time_i and money_j <= money_i and 
-                        (time_j < time_i or money_j < money_i)):
-                        is_dominated = True
-                        break
-            
-            if is_dominated:
-                dominated_paths.append(path_i)
-            else:
-                non_dominated_paths.append(path_i)
+        fig, axes = plt.subplots(1, 3, figsize=(18, 6))
 
-        # 创建图形
-        plt.figure(figsize=(10, 6))
-        
-        # 绘制被支配的路径点（红色）
-        if dominated_paths:
-            plt.scatter([time_costs[i] for i in dominated_paths],
-                       [money_costs[i] for i in dominated_paths],
-                       color='red', alpha=0.7, label='Dominated paths')
-        
-        # 绘制非支配路径点（绿色）
-        if non_dominated_paths:
-            plt.scatter([time_costs[i] for i in non_dominated_paths],
-                       [money_costs[i] for i in non_dominated_paths],
-                       color='green', alpha=1.0, label='Non-dominated paths')
-        
-        # 添加路径标签和成本值
-        for i in m.od_pairs:
-            plt.annotate(f'Path {i}\n({time_costs[i]:.1f}, {money_costs[i]:.1f})', 
-                        (time_costs[i], money_costs[i]),
-                        xytext=(5, 5), textcoords='offset points',
-                        fontsize=8)
-        
-        # 设置图形属性
-        plt.xlabel('Initial Travel Time (t0)')
-        plt.ylabel('Money Cost')
-        plt.title('Initial Path Costs Analysis with Dominance Relations')
-        plt.legend()
-        plt.grid(True, alpha=0.3)
-        
-        # 添加说明文本
-        info_text = (
-            f'Non-dominated paths: {sorted(non_dominated_paths)}\n'
-            f'Dominated paths: {sorted(dominated_paths)}'
-        )
-        plt.text(0.98, 0.98, info_text,
-                transform=plt.gca().transAxes,
-                verticalalignment='top',
-                bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
-                fontsize=8)
-        
-        # 调整布局以适应文本
+        # 计算三种情况下的时间成本
+        scenarios = {
+            'Initial State': {
+                i: sum(m.path_link_matrix[i, j] * m.free_flow_time[j]
+                       for j in m.paths) for i in m.od_pairs
+            },
+            'No Flow': {
+                i: sum(m.path_link_matrix[i, j] * m.free_flow_time[j]
+                       for j in m.paths) for i in m.od_pairs
+            },
+            'Full Capacity': {
+                i: sum(m.path_link_matrix[i, j] * m.free_flow_time[j] *
+                       (1 + 0.15 * (1.0) ** 4)  # 假设流量/容量比为1
+                       for j in m.paths) for i in m.od_pairs
+            }
+        }
+
+        # 获取金钱成本（对所有情况都相同）
+        money_costs = self.calculate_money_cost()
+
+        # 为每种情况分析和绘图
+        for idx, (scenario_name, time_costs) in enumerate(scenarios.items()):
+            # 分析支配关系
+            dominated_paths = []
+            non_dominated_paths = []
+
+            # 检查每条路径是否被支配
+            for path_i in m.od_pairs:
+                is_dominated = False
+                time_i = time_costs[path_i]
+                money_i = money_costs[path_i]
+
+                for path_j in m.od_pairs:
+                    if path_j != path_i:
+                        time_j = time_costs[path_j]
+                        money_j = money_costs[path_j]
+
+                        if (time_j <= time_i and money_j <= money_i and
+                                (time_j < time_i or money_j < money_i)):
+                            is_dominated = True
+                            break
+
+                if is_dominated:
+                    dominated_paths.append(path_i)
+                else:
+                    non_dominated_paths.append(path_i)
+
+            # 绘制散点图
+            ax = axes[idx]
+
+            # 绘制被支配的路径点（红色）
+            if dominated_paths:
+                ax.scatter([time_costs[i] for i in dominated_paths],
+                           [money_costs[i] for i in dominated_paths],
+                           color='red', alpha=0.7, label='Dominated paths')
+
+            # 绘制非支配路径点（绿色）
+            if non_dominated_paths:
+                ax.scatter([time_costs[i] for i in non_dominated_paths],
+                           [money_costs[i] for i in non_dominated_paths],
+                           color='green', alpha=1.0, label='Non-dominated paths')
+
+            # 添加路径标签和成本值
+            for i in m.od_pairs:
+                ax.annotate(f'P{i}\n({time_costs[i]:.1f}, {money_costs[i]:.1f})',
+                            (time_costs[i], money_costs[i]),
+                            xytext=(5, 5), textcoords='offset points',
+                            fontsize=8)
+
+            # 设置图形属性
+            ax.set_xlabel('Travel Time Cost')
+            ax.set_ylabel('Money Cost')
+            ax.set_title(f'{scenario_name}\n'
+                         f'Non-dominated: {sorted(non_dominated_paths)}\n'
+                         f'Dominated: {sorted(dominated_paths)}')
+            ax.legend()
+            ax.grid(True, alpha=0.3)
+
+        # 调整布局
         plt.tight_layout()
-        
-        # 显示图形
         plt.show()
 
         # 返回分析结果
         return {
-            'time_costs': time_costs,
-            'money_costs': money_costs,
-            'non_dominated_paths': non_dominated_paths,
-            'dominated_paths': dominated_paths
+            'scenarios': {
+                name: {
+                    'time_costs': costs,
+                    'money_costs': money_costs,
+                    'non_dominated_paths': [p for p in m.od_pairs
+                                            if not self.is_dominated(p, costs, money_costs, m.od_pairs)],
+                    'dominated_paths': [p for p in m.od_pairs
+                                        if self.is_dominated(p, costs, money_costs, m.od_pairs)]
+                }
+                for name, costs in scenarios.items()
+            }
         }
 
 
