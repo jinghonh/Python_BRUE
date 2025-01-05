@@ -19,6 +19,44 @@ class SimpleBRUE(BRUEBase):
         self.model.free_flow_time = Param(self.model.paths, initialize=free_flow_time)
         self.model.link_money_cost = Param(self.model.paths, initialize=link_money_cost)
 
+A_data = {
+    (1, 1): 1, (1, 5): 1, (1, 7): 1, (1, 9): 1, (1, 11): 1,
+    (2, 1): 1, (2, 5): 1, (2, 7): 1, (2, 10): 1, (2, 15): 1,
+    (3, 1): 1, (3, 5): 1, (3, 8): 1, (3, 14): 1, (3, 15): 1,
+    (4, 1): 1, (4, 6): 1, (4, 12): 1, (4, 14): 1, (4, 15): 1,
+    (5, 2): 1, (5, 7): 1, (5, 9): 1, (5, 11): 1, (5, 17): 1,
+    (6, 2): 1, (6, 7): 1, (6, 10): 1, (6, 15): 1, (6, 17): 1,
+    (7, 2): 1, (7, 8): 1, (7, 14): 1, (7, 15): 1, (7, 17): 1,
+    (8, 2): 1, (8, 11): 1, (8, 18): 1,
+    (9, 1): 1, (9, 5): 1, (9, 7): 1, (9, 10): 1, (9, 16): 1,
+    (10, 1): 1, (10, 5): 1, (10, 8): 1, (10, 14): 1, (10, 16): 1,
+    (11, 1): 1, (11, 6): 1, (11, 12): 1, (11, 14): 1, (11, 16): 1,
+    (12, 1): 1, (12, 13): 1, (12, 19): 1,
+    (13, 2): 1, (13, 7): 1, (13, 10): 1, (13, 16): 1, (13, 17): 1,
+    (14, 2): 1, (14, 8): 1, (14, 14): 1, (14, 16): 1, (14, 17): 1
+}
+
+from brue_base import BRUEBase
+from pyomo.environ import *
+from rich.console import Console
+from rich.table import Table
+import matplotlib.pyplot as plt
+
+
+class SimpleBRUE(BRUEBase):
+    def initialize_sets(self):
+        self.model.od_pairs = RangeSet(1, 8)
+        self.model.paths = RangeSet(1, 19)
+        self.model.od_demand = Set(initialize=range(1, 9))
+    def initialize_parameters(self):
+        # 初始化自由流时间
+        free_flow_time = {1: 10, 2: 10, 3: 10, 4: 40, 5: 10, 6: 10, 7: 10, 8: 20, 9: 10,
+      10: 25, 11: 10, 12: 10, 13: 40, 14: 10, 15: 10, 16: 10, 17: 10, 18: 80, 19: 10}
+        link_money_cost = {1: 10, 2: 10, 3: 10, 4: 20, 5: 10, 6: 10, 7: 10, 8: 20, 9: 10,
+      10: 25, 11: 10, 12: 10, 13: 20, 14: 10, 15: 10, 16: 10, 17: 10, 18: 30, 19: 10}
+        self.model.free_flow_time = Param(self.model.paths, initialize=free_flow_time)
+        self.model.link_money_cost = Param(self.model.paths, initialize=link_money_cost)
+
         # 初始化路径-链接矩阵
         path_link_matrix = {
             (1, 1): 1, (1, 5): 1, (1, 7): 1, (1, 9): 1, (1, 11): 1,
