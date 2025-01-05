@@ -241,15 +241,24 @@ class BRUESolver(BRUEBase):
         # Analyze each OD group
         for group_name, group_pairs in self.config.od_groups.items():
             epsilon = (m.epsilons[group_name].value if len(self.config.od_groups) > 1 
-                     else m.epsilon.value)
+                      else m.epsilon.value)
             min_cost = min(path_costs[i] for i in group_pairs)
-            upper_bound = min_cost + epsilon
+            upper_bound = min_cost + epsilon + 2e-2
 
-            # 修改判断可行路径的逻辑，使用 <= 而不是 < 来包含上界点
-            feasible_paths = [i for i in group_pairs 
-                            if min_cost - 1e-2 <= path_costs[i] <= upper_bound + 1e-2]
-            infeasible_paths = [i for i in group_pairs if i not in feasible_paths]
+            # 修改判断可行路径的逻辑
+            feasible_paths = []
+            infeasible_paths = []
+            for i in group_pairs:
+                cost = path_costs[i]
+                # 判断是否在可行范围内
+                if abs(cost - min_cost) <= 1e-2:  # 最小成本路径
+                    feasible_paths.append(i)
+                elif cost <= upper_bound + 1e-2:  # 在上界范围内的路径
+                    feasible_paths.append(i)
+                else:  # 超出上界的路径
+                    infeasible_paths.append(i)
             
+            # 在可行路径中判断支配关系
             dominated_paths = []
             non_dominated_paths = []
             for path in feasible_paths:
@@ -275,14 +284,42 @@ class BRUESolver(BRUEBase):
                           [money_costs[i] for i in non_dominated_paths],
                           color='green', alpha=1.0, label='Non-dominated Paths')
 
-            # Add path labels
+            # 添加带有调整位置的标签
+            label_positions = {}  # 用于存储已使用的标签位置
             for i in group_pairs:
-                plt.annotate(f'P{i}\n(t:{path_costs[i]:.1f}, m:{money_costs[i]:.1f})',
-                           (path_costs[i], money_costs[i]),
-                           xytext=(5, 5), textcoords='offset points',
-                           fontsize=8)
+                x, y = path_costs[i], money_costs[i]
+                
+                # 计算标签位置，避免重叠
+                offset_x = 5
+                offset_y = 5
+                label_x = x
+                label_y = y
+                
+                # 检查附近是否有其他标签
+                while any(abs(label_x - lx) < 10 and abs(label_y - ly) < 10 
+                         for lx, ly in label_positions.values()):
+                    offset_y += 5  # 逐渐增加垂直偏移
+                    if offset_y > 30:  # 如果垂直偏移太大，尝试水平偏移
+                        offset_y = 5
+                        offset_x += 10
+                    label_x = x + offset_x
+                    label_y = y + offset_y
+                
+                # 存储这个标签位置
+                label_positions[i] = (label_x, label_y)
+                
+                # 绘制带有连接线的标签
+                plt.annotate(
+                    f'P{i}\n(t:{path_costs[i]:.1f}, m:{money_costs[i]:.1f})',
+                    xy=(x, y),  # 点的位置
+                    xytext=(label_x, label_y),  # 标签的位置
+                    textcoords='offset points',
+                    fontsize=8,
+                    bbox=dict(facecolor='white', edgecolor='none', alpha=0.7),
+                    arrowprops=dict(arrowstyle='-', color='gray', alpha=0.5)
+                )
 
-            # Set plot properties
+            # 设置图表属性
             if iteration_data:
                 plt.title(f'Path Cost Analysis - {group_name}\n'
                          f'Iteration {iteration_data["iteration"]}, '
@@ -412,14 +449,16 @@ class BRUESolver(BRUEBase):
         """添加路径约束"""
         m = self.model
         
-        # 添加路径流量约束 - 修改为使用每个OD组独立的需求
+        # 添加路径流量约束
         m.path_constraint = ConstraintList()
         for group_name, group_pairs in self.config.od_groups.items():
             group_restricted_paths = [p for p in restricted_paths if p in group_pairs]
-            m.path_constraint.add(
-                self.config.od_demands[group_name] - 
-                sum(m.flow[i] for i in group_restricted_paths) >= 0.01
-            )
+            # 修改约束条件，确保返回的是 Pyomo 表达式而不是布尔值
+            if group_restricted_paths:  # 只在有受限路径时添加约束
+                m.path_constraint.add(
+                    sum(m.flow[i] for i in group_restricted_paths) <= 
+                    self.config.od_demands[group_name] - 0.01
+                )
         
         # 如果有前一次迭代的epsilon，添加epsilon下界约束
         if prev_epsilon is not None:
