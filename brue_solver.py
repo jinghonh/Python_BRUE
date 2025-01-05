@@ -1,5 +1,5 @@
 from brue_base import BRUEBase
-from network_config import NetworkConfig
+from traffic_network_config import TrafficNetworkConfig
 from pyomo.environ import *
 import matplotlib.pyplot as plt
 from rich.console import Console
@@ -7,7 +7,7 @@ from rich.table import Table
 
 
 class BRUESolver(BRUEBase):
-    def __init__(self, config: NetworkConfig):
+    def __init__(self, config: TrafficNetworkConfig):
         super().__init__()
         self.config = config
 
@@ -57,16 +57,11 @@ class BRUESolver(BRUEBase):
 
     def add_constraints(self):
         m = self.model
-        # 总需求约束
+        # 总需求约束 - 修改为使用每个OD组独立的需求
         m.demand_constraint = ConstraintList()
-        if len(self.config.od_groups) > 1:
-            for group_name, group_pairs in self.config.od_groups.items():
-                m.demand_constraint.add(
-                    sum(m.flow[i] for i in group_pairs) == self.config.total_demand
-                )
-        else:
+        for group_name, group_pairs in self.config.od_groups.items():
             m.demand_constraint.add(
-                sum(m.flow[i] for i in m.od_pairs) == self.config.total_demand
+                sum(m.flow[i] for i in group_pairs) == self.config.od_demands[group_name]
             )
 
         # 误差约束
@@ -185,7 +180,7 @@ class BRUESolver(BRUEBase):
                         else self.model.perception.value)
             
             for i in group_pairs:
-                money_cost = sum(self.model.path_link_matrix[i, j].value * 
+                money_cost = sum(self.model.path_link_matrix[i, j] * 
                                self.model.link_money_cost[j] for j in self.model.paths)
                 table.add_row(
                     f"{i} ({group_name})",
@@ -217,11 +212,11 @@ class BRUESolver(BRUEBase):
             table.add_column("流量", style="green")
             table.add_column("有效性", style="yellow")
 
-            # 分析每条路径
+            # 分析每条路径，修改判断有效路径的逻辑
             for i in group_pairs:
                 cost = m.path_cost[i].value
                 flow = m.flow[i].value
-                is_effective = min_cost <= cost <= upper_bound + 5e-1
+                is_effective = min_cost - 5e-2 <= cost <= upper_bound + 5e-2
 
                 table.add_row(
                     str(i),
@@ -250,9 +245,9 @@ class BRUESolver(BRUEBase):
             min_cost = min(path_costs[i] for i in group_pairs)
             upper_bound = min_cost + epsilon
 
-            # Analyze dominance relations
+            # 修改判断可行路径的逻辑，使用 <= 而不是 < 来包含上界点
             feasible_paths = [i for i in group_pairs 
-                            if min_cost <= path_costs[i] <= upper_bound + 1e-6]
+                            if min_cost - 1e-2 <= path_costs[i] <= upper_bound + 1e-2]
             infeasible_paths = [i for i in group_pairs if i not in feasible_paths]
             
             dominated_paths = []
@@ -417,12 +412,14 @@ class BRUESolver(BRUEBase):
         """添加路径约束"""
         m = self.model
         
-        # 添加路径流量约束
+        # 添加路径流量约束 - 修改为使用每个OD组独立的需求
         m.path_constraint = ConstraintList()
-        total_demand = self.config.total_demand
-        m.path_constraint.add(
-            total_demand - sum(m.flow[i] for i in restricted_paths) >= 0.01
-        )
+        for group_name, group_pairs in self.config.od_groups.items():
+            group_restricted_paths = [p for p in restricted_paths if p in group_pairs]
+            m.path_constraint.add(
+                self.config.od_demands[group_name] - 
+                sum(m.flow[i] for i in group_restricted_paths) >= 0.01
+            )
         
         # 如果有前一次迭代的epsilon，添加epsilon下界约束
         if prev_epsilon is not None:
@@ -539,15 +536,22 @@ class BRUESolver(BRUEBase):
         self.console.print(table)
 
 def main():
+    base_config = TrafficNetworkConfig.create_basic_network()
+    base_solver = BRUESolver(base_config)
+    base_solver.run_with_iterations()
+    base_solver.plot_initial_costs()
+    
     # 测试简单网络
-    simple_config = NetworkConfig.create_simple_network()
+    simple_config = TrafficNetworkConfig.create_single_od_network()
     simple_solver = BRUESolver(simple_config)
     simple_solver.run_with_iterations()
+    simple_solver.plot_initial_costs()
     
-    # # 测试路径网络
-    # path_config = NetworkConfig.create_path_network()
-    # path_solver = BRUESolver(path_config)
-    # path_solver.run()
+    # 测试路径网络
+    path_config = TrafficNetworkConfig.create_multi_od_network()
+    path_solver = BRUESolver(path_config)
+    path_solver.run_with_iterations()
+    path_solver.plot_initial_costs()
 
 if __name__ == "__main__":
     main()

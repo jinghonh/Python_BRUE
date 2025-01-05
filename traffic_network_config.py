@@ -2,26 +2,26 @@ from dataclasses import dataclass
 from typing import Dict, Set, List
 
 @dataclass
-class NetworkConfig:
-    """网络配置类，存储所有网络参数"""
+class TrafficNetworkConfig:
+    """交通网络配置类，用于存储和管理交通网络的所有参数"""
     # 基础参数
     num_paths: int  # 路径数量
-    num_od_pairs: int  # OD对数量
-    total_demand: float  # 总需求
-    od_groups: Dict[str, List[int]]  # OD组
-    od_demands: Dict[str, float]  # 每个OD组的需求量
+    num_od_pairs: int  # 起终点对数量
+    total_demand: float  # 总交通需求量
+    od_groups: Dict[str, List[int]]  # 起终点组
+    od_demands: Dict[str, float]  # 每个起终点组的需求量
 
     # 成本参数
-    free_flow_time: Dict[int, float]  # 自由流时间
-    link_money_cost: Dict[int, float]  # 链路金钱成本
-    link_capacity: Dict[int, float]  # 链路容量
+    free_flow_time: Dict[int, float]  # 自由流时间（无拥堵时的行程时间）
+    link_money_cost: Dict[int, float]  # 道路费用（如过路费）
+    link_capacity: Dict[int, float]  # 道路通行能力
     
     # 路径-链接关系
-    path_link_matrix: Dict[tuple, float]  # 路径-链接矩阵
+    path_link_matrix: Dict[tuple, float]  # 路径与道路段的关联矩阵
 
     @classmethod
-    def create_simple_network(cls):
-        """创建简单网络配置"""
+    def create_basic_network(cls):
+        """创建基础示例网络配置"""
         return cls(
             num_paths=8,
             num_od_pairs=6,
@@ -42,8 +42,8 @@ class NetworkConfig:
         )
 
     @classmethod
-    def create_path_network(cls):
-        """创建路径网络配置（双OD组）"""
+    def create_multi_od_network(cls):
+        """创建多起终点对网络配置"""
         return cls(
             num_paths=19,
             num_od_pairs=14,
@@ -85,7 +85,7 @@ class NetworkConfig:
 
     @classmethod
     def create_single_od_network(cls):
-        """创建路径网络配置（单OD组）"""
+        """创建单一起终点对网络配置"""
         return cls(
             num_paths=19,
             num_od_pairs=8,  # 只有OD1组的8个OD对
@@ -111,4 +111,4 @@ class NetworkConfig:
                 (7, 2): 1, (7, 8): 1, (7, 14): 1, (7, 15): 1, (7, 17): 1,
                 (8, 2): 1, (8, 11): 1, (8, 18): 1
             }
-        )
+        ) 
