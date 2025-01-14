@@ -27,7 +27,7 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index)
         [samplesMat, totalValidCost, totalValidFlow] = processIteration(ii, n, rangeMin, rangeMax, bound, relationMatrix, totalValidCost, totalValidFlow, zeta);
         
         % 更新搜索范围
-        [ff, sum_err] = evaluateObjective(samplesMat, relationMatrix, zeta);
+        [~, sum_err] = evaluateObjective(samplesMat, relationMatrix, zeta);
         valid = find(sum_err == 0);
         
         if ~isempty(valid)

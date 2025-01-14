@@ -7,3 +7,11 @@
 /dataSources/
 *.xml
 *.iml
+*.png
+*.jpg
+*.gif
+*.bmp
+*.tiff
+*.ico
+*.svg
+*.html
