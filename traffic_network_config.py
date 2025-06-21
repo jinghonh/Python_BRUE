@@ -20,6 +20,19 @@ class TrafficNetworkConfig:
     # 路径-链接关系
     path_link_matrix: Dict[tuple, float]  # 路径与道路段的关联矩阵
 
+    def get_path_link_array(self) -> "np.ndarray":
+        """以矩阵形式返回路径-道路段关系"""
+        import numpy as np
+
+        num_paths = self.num_od_pairs
+        num_links = self.num_paths
+        matrix = np.zeros((num_paths, num_links))
+
+        for (i, j), v in self.path_link_matrix.items():
+            matrix[i - 1, j - 1] = v
+
+        return matrix
+
     @classmethod
     def create_basic_network(cls):
         """创建基础示例网络配置"""

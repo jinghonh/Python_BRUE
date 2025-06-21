@@ -13,6 +13,8 @@ class BRUESetSolver(BRUESolver):
     def __init__(self, config: TrafficNetworkConfig):
         super().__init__(config)
         self.console = Console()
+        # 将路径-链接关系转换为矩阵，便于数值计算
+        self.path_link_matrix = config.get_path_link_array()
         
     def calculate_real_time(self, flows: np.ndarray) -> np.ndarray:
         """计算实际旅行时间
@@ -22,13 +24,19 @@ class BRUESetSolver(BRUESolver):
             实际旅行时间数组
         """
         # 计算每条路径的旅行时间
-        path_flows = flows @ self.config.path_link_matrix
-        free_flow_times = np.array(list(self.config.free_flow_time.values()))
-        capacities = np.array(list(self.config.link_capacity.values()))
+        path_flows = flows @ self.path_link_matrix
+        free_flow_times = np.array([
+            self.config.free_flow_time[i]
+            for i in range(1, self.config.num_paths + 1)
+        ])
+        capacities = np.array([
+            self.config.link_capacity[i]
+            for i in range(1, self.config.num_paths + 1)
+        ])
         
         # BPR函数计算时间
         link_times = free_flow_times * (1 + 0.15 * (path_flows / capacities) ** 4)
-        path_times = link_times @ self.config.path_link_matrix.T
+        path_times = link_times @ self.path_link_matrix.T
         
         # 添加感知误差项
         return path_times + 15 * (1 - np.exp(-0.02 * path_times))
@@ -40,8 +48,11 @@ class BRUESetSolver(BRUESolver):
         Returns:
             金钱成本数组
         """
-        money_costs = np.array(list(self.config.link_money_cost.values()))
-        return flows @ self.config.path_link_matrix @ money_costs
+        money_costs = np.array([
+            self.config.link_money_cost[i]
+            for i in range(1, self.config.num_paths + 1)
+        ])
+        return flows @ self.path_link_matrix @ money_costs
         
     def find_brue_set_grid(self, zeta: float, num_points: int = 50) -> List[Dict[str, Any]]:
         """使用网格搜索方法寻找BRUE集合
