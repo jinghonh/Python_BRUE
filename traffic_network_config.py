@@ -127,3 +127,32 @@ class TrafficNetworkConfig:
                 (8, 2): 1, (8, 11): 1, (8, 18): 1
             }
         )
+    
+    @classmethod
+    def create_two_od_network(cls):
+        """创建两起终点对网络配置"""
+        return cls(
+            num_paths=4,
+            num_od_pairs=6,
+            total_demand=3000,
+            od_groups={
+                'OD1': list(range(1, 5)),
+                'OD2': list(range(5, 7))
+                },
+            od_demands={
+                'OD1': 800, 
+                'OD2': 1200
+                },
+            free_flow_time={1: 10,2:20,3:15,4:10},
+            link_money_cost={1: 10,2:20,3:15,4:10},
+            link_capacity={1: 1000,2:1000,3:1000,4:1000},
+            path_link_matrix={
+                (1, 1): 1, (1, 3): 1,
+                (2, 1): 1, (2, 4): 1,
+                (3, 2): 1, (3, 3): 1,
+                (4, 2): 1, (4, 4): 1,
+                (5, 1): 1, 
+                (6, 2): 1,
+            }
+        )
+

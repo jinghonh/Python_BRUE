@@ -458,11 +458,12 @@ class BRUESolver(BRUEBase):
         m.path_constraint = ConstraintList()
         for group_name, group_pairs in self.config.od_groups.items():
             group_restricted_paths = [p for p in restricted_paths if p in group_pairs]
-            # 修改约束条件，确保返回的是 Pyomo 表达式而不是布尔值
+            # 修改约束条件，使其更加宽松
             if group_restricted_paths:  # 只在有受限路径时添加约束
+                # 修改约束：从严格限制改为更宽松的上限
                 m.path_constraint.add(
                     sum(m.flow[i] for i in group_restricted_paths) <=
-                    self.config.od_demands[group_name] - 0.01
+                    self.config.od_demands[group_name] * 0.99  # 允许99%的需求流经受限路径
                 )
 
         # 如果有前一次迭代的epsilon，添加epsilon下界约束
@@ -499,7 +500,9 @@ class BRUESolver(BRUEBase):
 
             # 设置目标函数并求解
             self.set_objective()
-            solve_status = self.solve()
+
+            # tee 为 False 时，不显示求解日志
+            solve_status = self.solve(tee=True)
 
             if solve_status.solver.status != SolverStatus.ok:
                 self.console.print(f"[red]迭代 {iteration} 求解失败[/red]")
@@ -581,22 +584,28 @@ class BRUESolver(BRUEBase):
 
 
 def main():
-    base_config = TrafficNetworkConfig.create_basic_network()
-    base_solver = BRUESolver(base_config)
-    base_solver.run_with_iterations()
-    base_solver.plot_initial_costs()
+    # base_config = TrafficNetworkConfig.create_basic_network()
+    # base_solver = BRUESolver(base_config)
+    # base_solver.run_with_iterations()
+    # base_solver.plot_initial_costs()
 
-    # 测试简单网络
-    simple_config = TrafficNetworkConfig.create_single_od_network()
-    simple_solver = BRUESolver(simple_config)
-    simple_solver.run_with_iterations()
-    simple_solver.plot_initial_costs()
+    # # 测试简单网络
+    # simple_config = TrafficNetworkConfig.create_single_od_network()
+    # simple_solver = BRUESolver(simple_config)
+    # simple_solver.run_with_iterations()
+    # simple_solver.plot_initial_costs()
 
-    # 测试路径网络
-    path_config = TrafficNetworkConfig.create_multi_od_network()
-    path_solver = BRUESolver(path_config)
-    path_solver.run_with_iterations()
-    path_solver.plot_initial_costs()
+    # # 测试路径网络
+    # path_config = TrafficNetworkConfig.create_multi_od_network()
+    # path_solver = BRUESolver(path_config)
+    # path_solver.run_with_iterations()
+    # path_solver.plot_initial_costs()
+
+    # 测试两起终点对网络
+    two_od_config = TrafficNetworkConfig.create_two_od_network()
+    two_od_solver = BRUESolver(two_od_config)
+    two_od_solver.run_with_iterations()
+    two_od_solver.plot_initial_costs()
 
 
 if __name__ == "__main__":
