@@ -1,0 +1,40 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# BRUE模型说明
+
+## 模型概念
+
+有界理性用户均衡(BRUE)是传统用户均衡(UE)的扩展，考虑了用户在路径选择时的有限理性。在BRUE模型中，用户可能不会总是选择最优路径，而是会选择成本在一定范围内的路径。
+
+## 关键参数
+
+- `perception`/`perceptions`: 用户感知阈值，表示用户可接受的额外成本上限
+- `epsilon`/`epsilons`: 误差值，用于量化BRUE解的质量
+- `residual`: 残差，表示路径成本与最小成本的差异
+
+## 求解方法
+
+[brue_solver.py](mdc:brue_solver.py)中实现了基于Pyomo的BRUE求解器，主要步骤：
+
+1. 初始化模型和参数
+2. 设置约束条件（流量平衡、路径成本等）
+3. 设置目标函数（最小化epsilon）
+4. 求解模型并分析结果
+5. 支持迭代优化过程
+
+## 多OD组支持
+
+系统支持多起终点对(OD)组场景：
+
+```python
+# 单一OD组情况
+m.perception = Var(domain=NonNegativeReals)
+m.epsilon = Var(domain=NonNegativeReals)
+
+# 多OD组情况
+m.perceptions = Var(self.config.od_groups.keys(), domain=NonNegativeReals)
+m.epsilons = Var(self.config.od_groups.keys(), domain=NonNegativeReals)
+```

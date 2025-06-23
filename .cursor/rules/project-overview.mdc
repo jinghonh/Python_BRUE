@@ -1,0 +1,24 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# BRUE交通网络分析项目概览
+
+本项目实现了有界理性用户均衡(BRUE)模型，用于交通网络分析。
+
+## 主要组件
+
+- [brue_base.py](mdc:brue_base.py): BRUE模型的基础类
+- [brue_solver.py](mdc:brue_solver.py): 主要BRUE求解器实现
+- [brue_set_solver.py](mdc:brue_set_solver.py): 基于集合的BRUE求解器
+- [brue_matlab_solver.py](mdc:brue_matlab_solver.py): MATLAB接口求解器
+- [traffic_network_config.py](mdc:traffic_network_config.py): 交通网络配置
+
+## MATLAB文件
+- [analyzeTrafficNetwork.m](mdc:analyzeTrafficNetwork.m): 交通网络分析MATLAB脚本
+- [main.m](mdc:main.m): MATLAB主程序
+- [plotPathCosts.m](mdc:plotPathCosts.m): 路径成本可视化
+
+## 项目说明
+该项目使用Pyomo优化框架实现BRUE模型，支持多OD组的交通网络均衡分析。可以分析不同情况下的路径选择和流量分配。

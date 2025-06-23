@@ -1,0 +1,55 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# MATLAB与Python集成
+
+## MATLAB文件说明
+
+项目包含以下MATLAB文件：
+
+- [main.m](mdc:main.m): 主程序入口
+- [analyzeTrafficNetwork.m](mdc:analyzeTrafficNetwork.m): 交通网络分析
+- [plotPathCosts.m](mdc:plotPathCosts.m): 路径成本绘图
+
+## Python-MATLAB集成
+
+[brue_matlab_solver.py](mdc:brue_matlab_solver.py)提供了Python与MATLAB的集成接口，允许：
+
+1. 从Python调用MATLAB代码
+2. 在MATLAB中处理复杂计算
+3. 结果返回Python进行后续分析
+
+## 数据交换
+
+Python与MATLAB之间的数据交换主要通过：
+
+1. 文件I/O（CSV、MAT文件等）
+2. MATLAB引擎API（需安装MATLAB Engine for Python）
+
+## 使用示例
+
+```python
+# Python中调用MATLAB求解器示例
+from brue_matlab_solver import BRUEMatlabSolver
+from traffic_network_config import TrafficNetworkConfig
+
+# 创建配置
+config = TrafficNetworkConfig.create_multi_od_network()
+
+# 初始化MATLAB求解器
+solver = BRUEMatlabSolver(config)
+
+# 调用MATLAB求解
+results = solver.solve()
+
+# 在Python中处理结果
+solver.analyze_results(results)
+```
+
+## 注意事项
+
+1. 使用MATLAB功能需要安装MATLAB软件
+2. 确保MATLAB路径设置正确，能找到相关`.m`文件
+3. 数据结构在Python和MATLAB间可能需要转换

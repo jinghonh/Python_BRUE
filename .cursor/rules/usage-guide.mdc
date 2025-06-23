@@ -1,0 +1,51 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# BRUE项目使用指南
+
+## 基本使用流程
+
+1. 创建交通网络配置
+2. 初始化BRUE求解器
+3. 运行迭代求解过程
+4. 分析路径成本和流量分配结果
+
+## 代码示例
+
+```python
+# 导入必要模块
+from brue_solver import BRUESolver
+from traffic_network_config import TrafficNetworkConfig
+
+# 创建交通网络配置
+config = TrafficNetworkConfig.create_multi_od_network()
+
+# 初始化求解器
+solver = BRUESolver(config)
+
+# 运行迭代求解
+results = solver.run_with_iterations()
+
+# 分析初始成本
+solver.plot_initial_costs()
+```
+
+## 网络配置
+
+[traffic_network_config.py](mdc:traffic_network_config.py)提供了多种预设网络配置：
+
+- `create_basic_network()`: 基础测试网络
+- `create_single_od_network()`: 单一OD对网络
+- `create_multi_od_network()`: 多OD对网络
+- `create_two_od_network()`: 两个OD对网络
+
+## 结果分析
+
+求解器提供多种结果分析和可视化方法：
+
+- `display_results()`: 显示计算结果表格
+- `analyze_path_costs()`: 分析路径成本和有效路径
+- `plot_cost_analysis()`: 可视化路径成本分析
+- `plot_initial_costs()`: 比较不同场景下的路径成本

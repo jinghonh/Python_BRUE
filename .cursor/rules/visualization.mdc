@@ -1,0 +1,66 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# BRUE可视化功能说明
+
+## 主要可视化方法
+
+项目提供了多种可视化功能，帮助分析BRUE模型的求解结果：
+
+### 路径成本分析图
+
+[brue_solver.py](mdc:brue_solver.py)中的`plot_cost_analysis`方法绘制路径成本分析图，展示：
+
+- 路径的时间成本与金钱成本关系
+- 可行路径与不可行路径
+- 支配路径与非支配路径
+- 最小成本边界和上界边界
+
+```python
+solver.plot_cost_analysis(effective_paths, iteration_data)
+```
+
+### 初始场景对比图
+
+`plot_initial_costs`方法比较三种不同场景下的路径成本：
+
+- 初始状态
+- 无流量状态
+- 满容量状态
+
+```python
+solver.plot_initial_costs()
+```
+
+### 结果表格展示
+
+使用rich库实现表格可视化：
+
+- `display_results`: 显示流量、时间成本、金钱成本等计算结果
+- `analyze_path_costs`: 显示路径有效性分析
+- `display_iteration_results`: 展示迭代过程的分析结果
+
+## 可视化关键代码
+
+```python
+# 创建表格
+table = Table(title="计算结果")
+for col in columns:
+    table.add_column(col, justify="right")
+
+# 添加数据行
+for i in group_pairs:
+    table.add_row(
+        f"{i} ({group_name})",
+        f"{self.model.flow[i].value:.2f}",
+        f"{self.model.path_cost[i].value:.2f}",
+        f"{money_cost:.2f}",
+        f"{self.model.residual[i].value:.2f}",
+        f"{perception:.2f}"
+    )
+
+# 输出表格
+self.console.print(table)
+```
