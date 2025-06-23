@@ -156,7 +156,8 @@ class BRUESolver(BRUEBase):
                                  for j in m.paths)
         return money_costs
 
-    def is_dominated(self, path_i, path_costs, money_costs, all_paths):
+    @staticmethod
+    def is_dominated(path_i, path_costs, money_costs, all_paths):
         """判断一个路径是否被其他路径支配"""
         cost_i = path_costs[path_i]
         money_i = money_costs[path_i]
@@ -221,7 +222,8 @@ class BRUESolver(BRUEBase):
             for i in group_pairs:
                 cost = m.path_cost[i].value
                 flow = m.flow[i].value
-                is_effective = min_cost - 5e-2 <= cost <= upper_bound + 5e-2
+                # 与plot_cost_analysis保持一致的判断标准
+                is_effective = abs(cost - min_cost) <= 1e-2 or cost <= upper_bound + 1e-2
 
                 table.add_row(
                     str(i),
@@ -245,8 +247,10 @@ class BRUESolver(BRUEBase):
 
         # Analyze each OD group
         for group_name, group_pairs in self.config.od_groups.items():
-            epsilon = (m.epsilons[group_name].value if len(self.config.od_groups) > 1
-                       else m.epsilon.value)
+            if len(self.config.od_groups) > 1:
+                epsilon = m.epsilons[group_name].value
+            else:
+                epsilon = m.epsilon.value
             min_cost = min(path_costs[i] for i in group_pairs)
             upper_bound = min_cost + epsilon + 2e-2
 
@@ -326,10 +330,17 @@ class BRUESolver(BRUEBase):
 
             # 设置图表属性
             if iteration_data:
+                # 处理迭代数据中的epsilon可能是字典的情况
+                if isinstance(iteration_data["epsilon"], dict):
+                    group_epsilon = iteration_data["epsilon"].get(group_name, epsilon)
+                    epsilon_display = f"{group_epsilon:.2f}"
+                else:
+                    epsilon_display = f"{epsilon:.2f}"
+                    
                 plt.title(f'Path Cost Analysis - {group_name}\n'
                           f'Iteration {iteration_data["iteration"]}, '
                           f'Restricted Paths: {iteration_data["restricted_paths"]}\n'
-                          f'ε = {epsilon:.2f}')
+                          f'ε = {epsilon_display}')
             else:
                 plt.title(f'Path Cost Analysis - {group_name}\nε = {epsilon:.2f}')
 
@@ -361,11 +372,17 @@ class BRUESolver(BRUEBase):
             plt.tight_layout()
             plt.show()
 
+        # 返回适当的epsilon值，对于多OD组情况应返回字典
+        if len(self.config.od_groups) > 1:
+            epsilon_return = {g: m.epsilons[g].value for g in self.config.od_groups.keys()}
+        else:
+            epsilon_return = m.epsilon.value
+            
         return {
             'effective_paths': is_effective_path,
             'path_costs': path_costs,
             'money_costs': money_costs,
-            'epsilon': epsilon
+            'epsilon': epsilon_return
         }
 
     def plot_initial_costs(self):
@@ -470,7 +487,7 @@ class BRUESolver(BRUEBase):
         if prev_epsilon is not None:
             if len(self.config.od_groups) > 1:
                 for group_name in self.config.od_groups.keys():
-                    m.path_constraint.add(m.epsilons[group_name] >= prev_epsilon)
+                    m.path_constraint.add(m.epsilons[group_name] >= prev_epsilon[group_name])
             else:
                 m.path_constraint.add(m.epsilon >= prev_epsilon)
 
@@ -478,12 +495,12 @@ class BRUESolver(BRUEBase):
         """
         使用迭代方法求解
         Args:
-            initial_paths: 初始路径列表，默认为[0]
+            initial_paths: 初始路径列表，默认为None(第一次迭代不限制路径)
         Returns:
             list of dict: 迭代结果列表
         """
         results = []
-        current_paths = initial_paths
+        current_paths = initial_paths if initial_paths is not None else []
         prev_epsilon = None
         iteration = 1
 
@@ -511,12 +528,12 @@ class BRUESolver(BRUEBase):
             # 分析结果
             effective_paths = self.analyze_path_costs()
 
-            # 获取当前epsilon
-            current_epsilon = (
-                min(self.model.epsilons[g].value for g in self.config.od_groups.keys())
-                if len(self.config.od_groups) > 1
-                else self.model.epsilon.value
-            )
+            # 获取当前epsilon 或 epsilons
+            if len(self.config.od_groups) > 1:
+                # current_epsilon 为一个字典，key为od_group_name，value为epsilon
+                current_epsilon = {g: self.model.epsilons[g].value for g in self.config.od_groups.keys()}
+            else:
+                current_epsilon = self.model.epsilon.value
 
             # 记录本次迭代结果
             iteration_data = {
@@ -534,19 +551,15 @@ class BRUESolver(BRUEBase):
             self.plot_cost_analysis(effective_paths, iteration_data)
 
             # 检查新的有效路径
-            new_paths = [p for p in effective_paths if p not in current_paths] if current_paths is not None else effective_paths
+            new_paths = [p for p in effective_paths if p not in current_paths]
 
             # 终止条件：无新路径或所有路径都已包含
-            if current_paths is not None:
-                if not new_paths or set(current_paths) == set(range(1, self.config.num_od_pairs + 1)):
-                    self.console.print(f"[green]迭代完成，共 {iteration} 次迭代[/green]")
-                    break
+            if not new_paths or set(current_paths + new_paths) == set(range(1, self.config.num_od_pairs + 1)):
+                self.console.print(f"[green]迭代完成，共 {iteration} 次迭代[/green]")
+                break
 
             # 更新路径集合和epsilon
-            if current_paths is not None:
-                current_paths.extend(new_paths)
-            else:
-                current_paths = new_paths
+            current_paths.extend(new_paths)
             current_paths.sort()
             prev_epsilon = current_epsilon
 
@@ -554,7 +567,10 @@ class BRUESolver(BRUEBase):
             self.console.print(f"\n迭代 {iteration}:")
             self.console.print(f"当前限制路径: {current_paths}")
             self.console.print(f"新增有效路径: {new_paths}")
-            self.console.print(f"当前epsilon: {current_epsilon:.3f}")
+            if isinstance(current_epsilon, dict):
+                self.console.print(f"当前epsilon: {current_epsilon}")
+            else:
+                self.console.print(f"当前epsilon: {current_epsilon:.3f}")
 
             iteration += 1
 
@@ -576,22 +592,29 @@ class BRUESolver(BRUEBase):
             prev_paths = set() if i == 0 else set(results[i - 1]['effective_paths'])
             new_paths = sorted(list(set(result['effective_paths']) - prev_paths))
 
+            # 处理epsilon为字典的情况
+            epsilon_display = result['epsilon']
+            if isinstance(epsilon_display, dict):
+                epsilon_str = str(epsilon_display)
+            else:
+                epsilon_str = f"{epsilon_display:.3f}"
+                
             table.add_row(
                 str(result['iteration']),
                 str(sorted(result['restricted_paths'])),
                 str(sorted(result['effective_paths'])),
                 str(new_paths),
-                f"{result['epsilon']:.3f}"
+                epsilon_str
             )
 
         self.console.print(table)
 
 
 def main():
-    base_config = TrafficNetworkConfig.create_basic_network()
-    base_solver = BRUESolver(base_config)
-    base_solver.run_with_iterations()
-    base_solver.plot_initial_costs()
+    # base_config = TrafficNetworkConfig.create_basic_network()
+    # base_solver = BRUESolver(base_config)
+    # base_solver.run_with_iterations()
+    # base_solver.plot_initial_costs()
 
     # # 测试简单网络
     # simple_config = TrafficNetworkConfig.create_single_od_network()
@@ -600,10 +623,10 @@ def main():
     # simple_solver.plot_initial_costs()
 
     # # 测试路径网络
-    # path_config = TrafficNetworkConfig.create_multi_od_network()
-    # path_solver = BRUESolver(path_config)
-    # path_solver.run_with_iterations()
-    # path_solver.plot_initial_costs()
+    path_config = TrafficNetworkConfig.create_multi_od_network()
+    path_solver = BRUESolver(path_config)
+    path_solver.run_with_iterations()
+    path_solver.plot_initial_costs()
 
     # 测试两起终点对网络
     # two_od_config = TrafficNetworkConfig.create_two_od_network()
