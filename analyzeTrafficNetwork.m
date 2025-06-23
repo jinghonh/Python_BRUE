@@ -23,7 +23,7 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index)
     
     %% 主循环
     tic
-    for ii = 10:40
+    for ii = 10:35
         [samplesMat, totalValidCost, totalValidFlow] = processIteration(ii, n, rangeMin, rangeMax, bound, relationMatrix, totalValidCost, totalValidFlow, zeta);
         
         % 更新搜索范围

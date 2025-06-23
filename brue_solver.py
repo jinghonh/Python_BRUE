@@ -203,20 +203,27 @@ class BRUESolver(BRUEBase):
         """分析路径成本并找出有效路径"""
         m = self.model
         effective_paths = []
+        effective_paths_by_group = {}
 
         # 分析每个OD组
         for group_name, group_pairs in self.config.od_groups.items():
-            epsilon = (m.epsilons[group_name].value if len(self.config.od_groups) > 1
-                       else m.epsilon.value)
+            if len(self.config.od_groups) > 1:
+                epsilon = m.epsilons[group_name].value
+            else:
+                epsilon = m.epsilon.value
             min_cost = min(m.path_cost[i].value for i in group_pairs)
             upper_bound = min_cost + epsilon
 
+            # 存储当前组的有效路径
+            effective_paths_by_group[group_name] = []
+            
             # 创建结果表格
             table = Table(title=f"{group_name} 路径成本分析")
             table.add_column("路径", style="cyan")
             table.add_column("成本", style="magenta")
             table.add_column("流量", style="green")
             table.add_column("有效性", style="yellow")
+            table.add_column("相对差异", style="blue")  # 添加与最小成本的差异
 
             # 分析每条路径，修改判断有效路径的逻辑
             for i in group_pairs:
@@ -224,18 +231,24 @@ class BRUESolver(BRUEBase):
                 flow = m.flow[i].value
                 # 与plot_cost_analysis保持一致的判断标准
                 is_effective = abs(cost - min_cost) <= 1e-2 or cost <= upper_bound + 1e-2
+                relative_diff = cost - min_cost  # 相对于最小成本的差异
 
                 table.add_row(
                     str(i),
                     f"{cost:.3f}",
                     f"{flow:.3f}",
-                    "✓" if is_effective else "✗"
+                    "✓" if is_effective else "✗",
+                    f"{relative_diff:.3f}"
                 )
 
                 if is_effective:
                     effective_paths.append(i)
+                    effective_paths_by_group[group_name].append(i)
 
             self.console.print(table)
+            
+            # 添加组路径总结
+            self.console.print(f"{group_name} 有效路径: {sorted(effective_paths_by_group[group_name])}\n")
 
         return effective_paths
 
@@ -611,10 +624,10 @@ class BRUESolver(BRUEBase):
 
 
 def main():
-    # base_config = TrafficNetworkConfig.create_basic_network()
-    # base_solver = BRUESolver(base_config)
-    # base_solver.run_with_iterations()
-    # base_solver.plot_initial_costs()
+    base_config = TrafficNetworkConfig.create_basic_network()
+    base_solver = BRUESolver(base_config)
+    base_solver.run_with_iterations()
+    base_solver.plot_initial_costs()
 
     # # 测试简单网络
     # simple_config = TrafficNetworkConfig.create_single_od_network()
@@ -623,16 +636,16 @@ def main():
     # simple_solver.plot_initial_costs()
 
     # # 测试路径网络
-    path_config = TrafficNetworkConfig.create_multi_od_network()
-    path_solver = BRUESolver(path_config)
-    path_solver.run_with_iterations()
-    path_solver.plot_initial_costs()
+    # path_config = TrafficNetworkConfig.create_multi_od_network()
+    # path_solver = BRUESolver(path_config)
+    # path_solver.run_with_iterations()
+    # path_solver.plot_initial_costs()
 
     # 测试两起终点对网络
-    # two_od_config = TrafficNetworkConfig.create_two_od_network()
-    # two_od_solver = BRUESolver(two_od_config)
-    # two_od_solver.run_with_iterations()
-    # two_od_solver.plot_initial_costs()
+    two_od_config = TrafficNetworkConfig.create_two_od_network()
+    two_od_solver = BRUESolver(two_od_config)
+    two_od_solver.run_with_iterations()
+    two_od_solver.plot_initial_costs()
 
 
 if __name__ == "__main__":

@@ -657,6 +657,15 @@ wheels = [
 ]
 
 [[package]]
+name = "pybind11"
+version = "2.13.6"
+source = { registry = "https://mirrors.aliyun.com/pypi/simple" }
+sdist = { url = "https://mirrors.aliyun.com/pypi/packages/d2/c1/72b9622fcb32ff98b054f724e213c7f70d6898baa714f4516288456ceaba/pybind11-2.13.6.tar.gz", hash = "sha256:ba6af10348c12b24e92fa086b39cfba0eff619b61ac77c406167d813b096d39a" }
+wheels = [
+    { url = "https://mirrors.aliyun.com/pypi/packages/13/2f/0f24b288e2ce56f51c920137620b4434a38fd80583dbbe24fc2a1656c388/pybind11-2.13.6-py3-none-any.whl", hash = "sha256:237c41e29157b962835d356b370ededd57594a26d5894a795960f0047cb5caf5" },
+]
+
+[[package]]
 name = "pycparser"
 version = "2.22"
 source = { registry = "https://mirrors.aliyun.com/pypi/simple" }
@@ -713,6 +722,7 @@ dependencies = [
     { name = "matplotlib" },
     { name = "networkx" },
     { name = "pandas" },
+    { name = "pybind11" },
     { name = "pyomo" },
     { name = "rich" },
     { name = "seaborn" },
@@ -726,6 +736,7 @@ requires-dist = [
     { name = "matplotlib", specifier = ">=3.10.3" },
     { name = "networkx", specifier = ">=3.5" },
     { name = "pandas", specifier = ">=2.3.0" },
+    { name = "pybind11", specifier = ">=2.13.6" },
     { name = "pyomo", specifier = ">=6.9.2" },
     { name = "rich", specifier = ">=14.0.0" },
     { name = "seaborn", specifier = ">=0.13.2" },
