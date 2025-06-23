@@ -140,12 +140,12 @@ class TrafficNetworkConfig:
                 'OD2': list(range(5, 7))
                 },
             od_demands={
-                'OD1': 800, 
-                'OD2': 1200
+                'OD1': 1, 
+                'OD2': 2
                 },
-            free_flow_time={1: 10,2:20,3:15,4:10},
-            link_money_cost={1: 10,2:20,3:15,4:10},
-            link_capacity={1: 1000,2:1000,3:1000,4:1000},
+            free_flow_time={1: 10, 2: 20, 3: 15, 4: 10},
+            link_money_cost={1: 10, 2: 20, 3: 15, 4: 10},
+            link_capacity={1: 5, 2: 10, 3: 5, 4: 5},
             path_link_matrix={
                 (1, 1): 1, (1, 3): 1,
                 (2, 1): 1, (2, 4): 1,

@@ -200,57 +200,9 @@ class BRUESolver(BRUEBase):
         self.console.print(table)
 
     def analyze_path_costs(self):
-        """分析路径成本并找出有效路径"""
-        m = self.model
-        effective_paths = []
-        effective_paths_by_group = {}
-
-        # 分析每个OD组
-        for group_name, group_pairs in self.config.od_groups.items():
-            if len(self.config.od_groups) > 1:
-                epsilon = m.epsilons[group_name].value
-            else:
-                epsilon = m.epsilon.value
-            min_cost = min(m.path_cost[i].value for i in group_pairs)
-            upper_bound = min_cost + epsilon
-
-            # 存储当前组的有效路径
-            effective_paths_by_group[group_name] = []
-            
-            # 创建结果表格
-            table = Table(title=f"{group_name} 路径成本分析")
-            table.add_column("路径", style="cyan")
-            table.add_column("成本", style="magenta")
-            table.add_column("流量", style="green")
-            table.add_column("有效性", style="yellow")
-            table.add_column("相对差异", style="blue")  # 添加与最小成本的差异
-
-            # 分析每条路径，修改判断有效路径的逻辑
-            for i in group_pairs:
-                cost = m.path_cost[i].value
-                flow = m.flow[i].value
-                # 与plot_cost_analysis保持一致的判断标准
-                is_effective = abs(cost - min_cost) <= 1e-2 or cost <= upper_bound + 1e-2
-                relative_diff = cost - min_cost  # 相对于最小成本的差异
-
-                table.add_row(
-                    str(i),
-                    f"{cost:.3f}",
-                    f"{flow:.3f}",
-                    "✓" if is_effective else "✗",
-                    f"{relative_diff:.3f}"
-                )
-
-                if is_effective:
-                    effective_paths.append(i)
-                    effective_paths_by_group[group_name].append(i)
-
-            self.console.print(table)
-            
-            # 添加组路径总结
-            self.console.print(f"{group_name} 有效路径: {sorted(effective_paths_by_group[group_name])}\n")
-
-        return effective_paths
+        """分析路径成本并找出有效路径（向后兼容）"""
+        _, all_effective_paths = self.analyze_path_costs_by_group()
+        return all_effective_paths
 
     def plot_cost_analysis(self, is_effective_path, iteration_data=None):
         """Plot path cost analysis with money cost"""
@@ -506,18 +458,29 @@ class BRUESolver(BRUEBase):
 
     def run_with_iterations(self, initial_paths=None):
         """
-        使用迭代方法求解
+        使用迭代方法求解，每个OD组有独立的路径和epsilon
         Args:
-            initial_paths: 初始路径列表，默认为None(第一次迭代不限制路径)
+            initial_paths: 初始路径字典，格式为{od_group_name: [paths]}，默认为None
         Returns:
             list of dict: 迭代结果列表
         """
         results = []
-        current_paths = initial_paths if initial_paths is not None else []
-        prev_epsilon = None
+        # 初始化每个OD组的路径集合
+        current_paths = {}
+        if initial_paths is not None:
+            current_paths = initial_paths
+        else:
+            for group_name in self.config.od_groups.keys():
+                current_paths[group_name] = []
+        
+        # 每个OD组独立的epsilon
+        prev_epsilon = {group_name: None for group_name in self.config.od_groups.keys()}
         iteration = 1
+        max_iterations = 10  # 添加最大迭代次数限制
+        relax_factor = 0.99  # 初始放松因子
+        min_relax_factor = 0.5  # 最小放松因子
 
-        while True:
+        while iteration <= max_iterations:
             # 初始化新的模型
             self.model = ConcreteModel()
             self.initialize_sets()
@@ -525,8 +488,8 @@ class BRUESolver(BRUEBase):
             self.initialize_variables()
             self.add_constraints()
 
-            # 添加当前迭代的路径约束
-            self.add_path_constraints(current_paths, prev_epsilon)
+            # 添加当前迭代的路径约束 - 需要修改add_path_constraints以支持按OD组约束
+            self.add_path_constraints_by_group(current_paths, prev_epsilon, relax_factor)
 
             # 设置目标函数并求解
             self.set_objective()
@@ -535,24 +498,93 @@ class BRUESolver(BRUEBase):
             solve_status = self.solve(tee=False)
 
             if solve_status.solver.status != SolverStatus.ok:
-                self.console.print(f"[red]迭代 {iteration} 求解失败[/red]")
-                break
+                self.console.print(f"[red]迭代 {iteration} 求解失败，放松因子为 {relax_factor}[/red]")
+                
+                # 如果有结果，先尝试放松约束重新求解
+                if relax_factor > min_relax_factor:
+                    relax_factor -= 0.1  # 每次减少放松因子
+                    self.console.print(f"[yellow]降低放松因子至 {relax_factor:.2f} 重新尝试...[/yellow]")
+                    continue  # 重新尝试当前迭代，不增加迭代计数
+                
+                # 如果放松到最低限度还是不行，考虑独立求解各OD组
+                self.console.print("[yellow]尝试为各OD组独立求解...[/yellow]")
+                
+                # 尝试独立求解每个OD组
+                group_results = self.solve_groups_independently(current_paths, prev_epsilon)
+                if group_results:
+                    # 如果独立求解成功，合并结果
+                    effective_paths_by_group = {}
+                    all_effective_paths = []
+                    current_epsilon = {}
+                    
+                    for group_name, result in group_results.items():
+                        effective_paths_by_group[group_name] = result['effective_paths']
+                        all_effective_paths.extend(result['effective_paths'])
+                        current_epsilon[group_name] = result['epsilon']
+                    
+                    # 记录本次迭代结果
+                    iteration_data = {
+                        'iteration': iteration,
+                        'restricted_paths': {g: paths.copy() for g, paths in current_paths.items()},
+                        'effective_paths': effective_paths_by_group,
+                        'epsilon': current_epsilon,
+                        'path_costs': {}, # 独立求解时无法获取统一的路径成本
+                        'money_costs': {},
+                        'flows': {}
+                    }
+                    results.append(iteration_data)
+                    
+                    # 更新路径和epsilon
+                    for group_name, result in group_results.items():
+                        new_paths = [p for p in result['effective_paths'] if p not in current_paths[group_name]]
+                        if new_paths:
+                            current_paths[group_name].extend(new_paths)
+                            current_paths[group_name].sort()
+                        prev_epsilon[group_name] = result['epsilon']
+                        
+                        # 输出该组的迭代信息
+                        self.console.print(f"\n{group_name} 迭代 {iteration} (独立求解):")
+                        self.console.print(f"当前限制路径: {current_paths[group_name]}")
+                        self.console.print(f"新增有效路径: {new_paths}")
+                        self.console.print(f"当前epsilon: {result['epsilon']:.3f}")
+                    
+                    iteration += 1
+                    relax_factor = 0.99  # 重置放松因子
+                    continue
+                
+                # 如果独立求解也失败，回退到使用已有结果
+                if results:
+                    self.console.print("[yellow]无法继续求解，使用最后一次有效结果[/yellow]")
+                    break
+                else:
+                    # 如果没有任何结果，进行无约束求解
+                    self.console.print("[yellow]尝试无约束求解...[/yellow]")
+                    self.model = ConcreteModel()
+                    self.initialize_sets()
+                    self.initialize_parameters()
+                    self.initialize_variables()
+                    self.add_constraints()
+                    self.set_objective()
+                    solve_status = self.solve(tee=False)
+                    if solve_status.solver.status != SolverStatus.ok:
+                        self.console.print("[red]无约束求解也失败，退出[/red]")
+                        break
 
-            # 分析结果
-            effective_paths = self.analyze_path_costs()
+            # 分析结果，修改为按OD组返回有效路径
+            effective_paths_by_group, all_effective_paths = self.analyze_path_costs_by_group()
 
-            # 获取当前epsilon 或 epsilons
+            # 获取当前epsilon - 已经是按OD组的字典
             if len(self.config.od_groups) > 1:
-                # current_epsilon 为一个字典，key为od_group_name，value为epsilon
                 current_epsilon = {g: self.model.epsilons[g].value for g in self.config.od_groups.keys()}
             else:
-                current_epsilon = self.model.epsilon.value
+                group_name = list(self.config.od_groups.keys())[0]
+                current_epsilon = {group_name: self.model.epsilon.value}
 
             # 记录本次迭代结果
             iteration_data = {
                 'iteration': iteration,
-                'restricted_paths': current_paths.copy() if current_paths else [],
-                'effective_paths': effective_paths,
+                'restricted_paths': {g: paths.copy() for g, paths in current_paths.items()},
+                'effective_paths': effective_paths_by_group,
                 'epsilon': current_epsilon,
                 'path_costs': {i: self.model.path_cost[i].value for i in self.model.od_pairs},
                 'money_costs': self.calculate_money_cost(),
@@ -561,73 +593,303 @@ class BRUESolver(BRUEBase):
             results.append(iteration_data)
 
             # 生成结果图表
-            self.plot_cost_analysis(effective_paths, iteration_data)
+            self.plot_cost_analysis(all_effective_paths, iteration_data)
 
-            # 检查新的有效路径
-            new_paths = [p for p in effective_paths if p not in current_paths]
+            # 检查每个OD组的新路径并更新
+            has_new_paths = False
+            all_paths_complete = True
+            
+            for group_name, group_pairs in self.config.od_groups.items():
+                # 计算该组的新路径
+                group_effective_paths = effective_paths_by_group[group_name]
+                new_paths = [p for p in group_effective_paths if p not in current_paths[group_name]]
+                
+                # 更新状态变量
+                has_new_paths = has_new_paths or bool(new_paths)
+                
+                # 检查该OD组是否所有路径都已考虑
+                all_group_paths = [p for p in group_pairs]
+                is_group_complete = set(current_paths[group_name] + new_paths) == set(all_group_paths)
+                all_paths_complete = all_paths_complete and is_group_complete
+                
+                # 更新该组的路径集合
+                if new_paths:
+                    current_paths[group_name].extend(new_paths)
+                    current_paths[group_name].sort()
+                
+                # 更新该组的epsilon
+                prev_epsilon[group_name] = current_epsilon[group_name]
+                
+                # 输出该组的迭代信息
+                self.console.print(f"\n{group_name} 迭代 {iteration}:")
+                self.console.print(f"当前限制路径: {current_paths[group_name]}")
+                self.console.print(f"新增有效路径: {new_paths}")
+                self.console.print(f"当前epsilon: {current_epsilon[group_name]:.3f}")
 
-            # 终止条件：无新路径或所有路径都已包含
-            if not new_paths or set(current_paths + new_paths) == set(range(1, self.config.num_od_pairs + 1)):
+            # 终止条件：所有OD组都没有新路径，或所有OD组的所有路径都已考虑
+            if not has_new_paths or all_paths_complete:
                 self.console.print(f"[green]迭代完成，共 {iteration} 次迭代[/green]")
                 break
 
-            # 更新路径集合和epsilon
-            current_paths.extend(new_paths)
-            current_paths.sort()
-            prev_epsilon = current_epsilon
-
-            # 输出迭代信息
-            self.console.print(f"\n迭代 {iteration}:")
-            self.console.print(f"当前限制路径: {current_paths}")
-            self.console.print(f"新增有效路径: {new_paths}")
-            if isinstance(current_epsilon, dict):
-                self.console.print(f"当前epsilon: {current_epsilon}")
-            else:
-                self.console.print(f"当前epsilon: {current_epsilon:.3f}")
-
             iteration += 1
+            # 重置放松因子
+            relax_factor = 0.99
+
+        # 如果达到最大迭代次数
+        if iteration > max_iterations:
+            self.console.print(f"[yellow]已达最大迭代次数 {max_iterations}，停止迭代[/yellow]")
 
         # 显示最终结果汇总
-        self.display_iteration_results(results)
+        self.display_iteration_results_by_group(results)
         return results
 
-    def display_iteration_results(self, results):
-        """显示迭代结果汇总"""
-        table = Table(title="迭代分析结果")
-        table.add_column("迭代", style="cyan")
-        table.add_column("限制路径", style="magenta")
-        table.add_column("有效路径", style="green")
-        table.add_column("新增路径", style="blue")
-        table.add_column("Epsilon", style="yellow")
+    def add_path_constraints_by_group(self, restricted_paths_by_group=None, prev_epsilon=None, relax_factor=0.99):
+        """添加按OD组的路径约束
+        Args:
+            restricted_paths_by_group: 字典，键为OD组名称，值为该组的受限路径列表
+            prev_epsilon: 字典，键为OD组名称，值为该组的上一次迭代epsilon值
+            relax_factor: 流量约束的松弛因子，值越小约束越松
+        """
+        m = self.model
 
-        for i, result in enumerate(results):
-            # 计算新增路径
-            prev_paths = set() if i == 0 else set(results[i - 1]['effective_paths'])
-            new_paths = sorted(list(set(result['effective_paths']) - prev_paths))
+        # 添加路径流量约束
+        m.path_constraint = ConstraintList()
+        for group_name, group_pairs in self.config.od_groups.items():
+            if restricted_paths_by_group and group_name in restricted_paths_by_group:
+                group_restricted_paths = [p for p in restricted_paths_by_group[group_name] if p in group_pairs]
+                # 只在有受限路径时添加约束
+                if group_restricted_paths:
+                    m.path_constraint.add(
+                        sum(m.flow[i] for i in group_restricted_paths) <=
+                        self.config.od_demands[group_name] * relax_factor
+                    )
 
-            # 处理epsilon为字典的情况
-            epsilon_display = result['epsilon']
-            if isinstance(epsilon_display, dict):
-                epsilon_str = str(epsilon_display)
+        # 如果有前一次迭代的epsilon，添加epsilon下界约束，但允许一定的松弛
+        if prev_epsilon is not None:
+            if len(self.config.od_groups) > 1:
+                for group_name in self.config.od_groups.keys():
+                    if prev_epsilon[group_name] is not None:
+                        # 松弛epsilon的下界约束，允许一定的波动
+                        m.path_constraint.add(m.epsilons[group_name] >= prev_epsilon[group_name] * 0.9)
             else:
-                epsilon_str = f"{epsilon_display:.3f}"
-                
-            table.add_row(
-                str(result['iteration']),
-                str(sorted(result['restricted_paths'])),
-                str(sorted(result['effective_paths'])),
-                str(new_paths),
-                epsilon_str
-            )
+                group_name = list(self.config.od_groups.keys())[0]
+                if prev_epsilon[group_name] is not None:
+                    m.path_constraint.add(m.epsilon >= prev_epsilon[group_name] * 0.9)
 
-        self.console.print(table)
+    def solve_groups_independently(self, current_paths, prev_epsilon):
+        """单独为每个OD组求解
+        
+        Args:
+            current_paths: 当前限制路径
+            prev_epsilon: 上一次迭代的epsilon值
+            
+        Returns:
+            Dict: 各个OD组的求解结果
+        """
+        results = {}
+        
+        for group_name, group_pairs in self.config.od_groups.items():
+            self.console.print(f"[blue]尝试单独求解 {group_name}...[/blue]")
+            
+            # 创建单独的模型
+            group_model = ConcreteModel()
+            
+            # 创建组变量
+            group_model.od_pairs = Set(initialize=group_pairs)
+            group_model.paths = RangeSet(1, self.config.num_paths)
+            
+            # 创建路径流量变量
+            group_model.flow = Var(group_model.od_pairs, domain=NonNegativeReals)
+            group_model.travel_time = Var(group_model.paths, domain=NonNegativeReals)
+            group_model.path_cost = Var(group_model.od_pairs, domain=NonNegativeReals)
+            group_model.residual = Var(group_model.od_pairs, domain=NonNegativeReals)
+            group_model.epsilon = Var(domain=NonNegativeReals)
+            group_model.perception = Var(domain=NonNegativeReals)
+            
+            # 添加约束
+            # 需求约束
+            group_model.demand_constraint = Constraint(
+                expr=sum(group_model.flow[i] for i in group_pairs) == self.config.od_demands[group_name]
+            )
+            
+            # 限制路径约束
+            if group_name in current_paths and current_paths[group_name]:
+                group_model.path_constraint = Constraint(
+                    expr=sum(group_model.flow[i] for i in current_paths[group_name]) <= 
+                    self.config.od_demands[group_name] * 0.9  # 使用较低的约束值
+                )
+            
+            # 误差约束
+            def epsilon_rule(m, i):
+                return m.epsilon >= m.residual[i]
+            group_model.epsilon_constraints = Constraint(group_model.od_pairs, rule=epsilon_rule)
+            
+            # 平衡约束
+            def balance_rule(m, i):
+                return m.flow[i] + m.path_cost[i] + m.residual[i] - m.perception >= 0.0
+            group_model.balance_constraints = Constraint(group_model.od_pairs, rule=balance_rule)
+            
+            # 路径成本非负约束
+            def cost_nonnegativity_rule(m, i):
+                return m.path_cost[i] + m.residual[i] - m.perception >= 0
+            group_model.cost_nonnegativity = Constraint(group_model.od_pairs, rule=cost_nonnegativity_rule)
+            
+            # 总成本约束
+            group_model.total_cost_constraint = Constraint(
+                expr=sum(group_model.flow[i] * (group_model.path_cost[i] + 
+                    group_model.residual[i] - group_model.perception) for i in group_pairs) == 0
+            )
+            
+            # 旅行时间约束
+            def travel_time_rule(m, j):
+                # 只考虑当前组中路径使用的链路
+                return m.travel_time[j] == self.config.free_flow_time[j] * (
+                    1 + 0.15 * (sum(self.config.path_link_matrix.get((i, j), 0) * m.flow[i] 
+                                for i in group_pairs) / self.config.link_capacity[j]) ** 4
+                )
+            group_model.travel_time_constraints = Constraint(group_model.paths, rule=travel_time_rule)
+            
+            # 路径成本计算约束
+            def path_cost_rule(m, i):
+                return m.path_cost[i] == sum(
+                    self.config.path_link_matrix.get((i, j), 0) * m.travel_time[j] for j in group_model.paths
+                )
+            group_model.path_cost_constraints = Constraint(group_model.od_pairs, rule=path_cost_rule)
+            
+            # 目标函数
+            group_model.objective = Objective(expr=group_model.epsilon, sense=minimize)
+            
+            # 求解
+            solver = SolverFactory('ipopt')
+            solver.options['tol'] = 1e-6
+            solver.options['max_iter'] = 3000
+            try:
+                solve_result = solver.solve(group_model, tee=False)
+                
+                if solve_result.solver.status == SolverStatus.ok:
+                    self.console.print(f"[green]{group_name} 单独求解成功[/green]")
+                    
+                    # 分析有效路径
+                    epsilon_value = group_model.epsilon.value
+                    min_cost = min(group_model.path_cost[i].value for i in group_pairs)
+                    upper_bound = min_cost + epsilon_value
+                    effective_paths = []
+                    
+                    for i in group_pairs:
+                        cost = group_model.path_cost[i].value
+                        is_effective = abs(cost - min_cost) <= 1e-2 or cost <= upper_bound + 1e-2
+                        if is_effective:
+                            effective_paths.append(i)
+                    
+                    results[group_name] = {
+                        'effective_paths': effective_paths,
+                        'epsilon': epsilon_value,
+                        'flows': {i: group_model.flow[i].value for i in group_pairs}
+                    }
+                    
+                    self.console.print(f"{group_name} 有效路径: {sorted(effective_paths)}")
+                    self.console.print(f"{group_name} epsilon: {epsilon_value:.3f}")
+                else:
+                    self.console.print(f"[red]{group_name} 单独求解失败[/red]")
+            except Exception as e:
+                self.console.print(f"[red]{group_name} 单独求解出错: {str(e)}[/red]")
+                
+        return results if results else None
+
+    def analyze_path_costs_by_group(self):
+        """分析路径成本并按OD组返回有效路径"""
+        m = self.model
+        effective_paths_by_group = {group_name: [] for group_name in self.config.od_groups.keys()}
+        all_effective_paths = []  # 用于向后兼容
+
+        # 分析每个OD组
+        for group_name, group_pairs in self.config.od_groups.items():
+            if len(self.config.od_groups) > 1:
+                epsilon = m.epsilons[group_name].value
+            else:
+                epsilon = m.epsilon.value
+            min_cost = min(m.path_cost[i].value for i in group_pairs)
+            upper_bound = min_cost + epsilon
+
+            # 创建结果表格
+            table = Table(title=f"{group_name} 路径成本分析")
+            table.add_column("路径", style="cyan")
+            table.add_column("成本", style="magenta")
+            table.add_column("流量", style="green")
+            table.add_column("有效性", style="yellow")
+            table.add_column("相对差异", style="blue")  # 添加与最小成本的差异
+
+            # 分析每条路径，修改判断有效路径的逻辑
+            for i in group_pairs:
+                cost = m.path_cost[i].value
+                flow = m.flow[i].value
+                # 与plot_cost_analysis保持一致的判断标准
+                is_effective = abs(cost - min_cost) <= 1e-2 or cost <= upper_bound + 1e-2
+                relative_diff = cost - min_cost  # 相对于最小成本的差异
+
+                table.add_row(
+                    str(i),
+                    f"{cost:.3f}",
+                    f"{flow:.3f}",
+                    "✓" if is_effective else "✗",
+                    f"{relative_diff:.3f}"
+                )
+
+                if is_effective:
+                    effective_paths_by_group[group_name].append(i)
+                    all_effective_paths.append(i)  # 添加到总的有效路径列表
+
+            self.console.print(table)
+            
+            # 添加组路径总结
+            self.console.print(f"{group_name} 有效路径: {sorted(effective_paths_by_group[group_name])}\n")
+
+        # 为了保持向后兼容，返回全局的有效路径列表
+        return effective_paths_by_group, all_effective_paths
+
+    def display_iteration_results_by_group(self, results):
+        """按OD组显示迭代结果汇总"""
+        # 为每个OD组创建一个表格
+        for group_name in self.config.od_groups.keys():
+            table = Table(title=f"{group_name} 迭代分析结果")
+            table.add_column("迭代", style="cyan")
+            table.add_column("限制路径", style="magenta")
+            table.add_column("有效路径", style="green")
+            table.add_column("新增路径", style="blue")
+            table.add_column("Epsilon", style="yellow")
+
+            for i, result in enumerate(results):
+                # 确保数据存在
+                if group_name not in result['effective_paths']:
+                    continue
+                
+                # 计算新增路径
+                prev_paths = set()
+                if i > 0 and group_name in results[i - 1]['effective_paths']:
+                    prev_paths = set(results[i - 1]['effective_paths'][group_name])
+                
+                new_paths = sorted(list(set(result['effective_paths'][group_name]) - prev_paths))
+                
+                # 获取当前epsilon
+                epsilon_value = result['epsilon'].get(group_name, 0.0)
+                
+                table.add_row(
+                    str(result['iteration']),
+                    str(sorted(result['restricted_paths'].get(group_name, []))),
+                    str(sorted(result['effective_paths'][group_name])),
+                    str(new_paths),
+                    f"{epsilon_value:.3f}"
+                )
+
+            self.console.print(table)
+            self.console.print("\n")
 
 
 def main():
-    base_config = TrafficNetworkConfig.create_basic_network()
-    base_solver = BRUESolver(base_config)
-    base_solver.run_with_iterations()
-    base_solver.plot_initial_costs()
+    # base_config = TrafficNetworkConfig.create_basic_network()
+    # base_solver = BRUESolver(base_config)
+    # base_solver.run_with_iterations()
+    # base_solver.plot_initial_costs()
 
     # # 测试简单网络
     # simple_config = TrafficNetworkConfig.create_single_od_network()
