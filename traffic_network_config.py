@@ -141,9 +141,9 @@ class TrafficNetworkConfig:
                 },
             od_demands={
                 'OD1': 1, 
-                'OD2': 2
+                'OD2': 1
                 },
-            free_flow_time={1: 10, 2: 20, 3: 15, 4: 10},
+            free_flow_time={1: 0, 2: 10, 3: 5, 4: 0},
             link_money_cost={1: 10, 2: 20, 3: 15, 4: 10},
             link_capacity={1: 5, 2: 10, 3: 5, 4: 5},
             path_link_matrix={
