@@ -740,7 +740,7 @@ class BRUESolver(BRUEBase):
                     group_model.residual[i] - group_model.perception) for i in group_pairs) == 0
             )
             
-            # 旅行时间约束
+            # 旅行时间约束 cost = t0(1 + 0.15(f/c)^4)
             def travel_time_rule(m, j):
                 # 只考虑当前组中路径使用的链路
                 return m.travel_time[j] == self.config.free_flow_time[j] * (

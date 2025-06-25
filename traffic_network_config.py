@@ -145,7 +145,7 @@ class TrafficNetworkConfig:
                 },
             free_flow_time={1: 0, 2: 10, 3: 5, 4: 0},
             link_money_cost={1: 10, 2: 20, 3: 15, 4: 10},
-            link_capacity={1: 5, 2: 10, 3: 5, 4: 5},
+            link_capacity={1: 0.5, 2: 1, 3: 0.5, 4: 0.5},
             path_link_matrix={
                 (1, 1): 1, (1, 3): 1,
                 (2, 1): 1, (2, 4): 1,

@@ -37,7 +37,10 @@ class PaperAlgorithmBRUESolver:
         model.link_flow_constraint = Constraint(model.links, rule=link_flow_rule)
         
         def travel_time_rule(m, l):
-            return m.travel_time[l] == m.free_flow_time[l] + m.link_flow[l]
+            # return m.travel_time[l] == m.free_flow_time[l] + m.link_flow[l]
+            return m.travel_time[l] == m.free_flow_time[l] * (
+                1 + 0.15 * (m.link_flow[l] / self.config.link_capacity[l]) ** 4
+            )
         model.travel_time_constraint = Constraint(model.links, rule=travel_time_rule)
 
         def path_cost_rule(m, p):
@@ -67,12 +70,16 @@ class PaperAlgorithmBRUESolver:
         for p in model.od_pairs:
             flows[p] = model.flow[p].value if model.flow[p].value else 0
         
+        past_cost = {}
+        for p in model.od_pairs:
+            past_cost[p] = model.path_cost[p].value if model.path_cost[p].value else 0
+        print(past_cost)
         return flows
 
-    def _solve_equation_19e(self, target_od_group: str, other_flows: dict, 
+    def _solve_equation_19(self, target_od_group: str, other_flows: dict, 
                            acceptable_paths: dict):
         """
-        实现论文公式(19e) - 为特定OD对计算临界点
+        实现论文公式(19) - 为特定OD对计算临界点
         """
         model = ConcreteModel()
         
@@ -102,12 +109,12 @@ class PaperAlgorithmBRUESolver:
         model.travel_time = Var(model.links, domain=NonNegativeReals)
         model.path_cost = Var(model.od_pairs, domain=NonNegativeReals)
         
-        # 论文公式(19e)的关键变量
+        # 论文公式(19)的关键变量
         model.epsilon = Var(domain=NonNegativeReals)  # 目标：最小化这个ε
         model.pi = Var(domain=NonNegativeReals)       # π^ν
         model.rho = Var(model.target_paths, domain=NonNegativeReals)  # ρ_i^ν
         
-        # 目标函数：min ε (论文公式19e第一行)
+        # 目标函数：min ε (论文公式19第一行)
         model.objective = Objective(expr=model.epsilon, sense=minimize)
         
         # 链路流量：目标OD组流量 + 其他固定流量
@@ -119,10 +126,17 @@ class PaperAlgorithmBRUESolver:
             return m.link_flow[l] == target_contrib + other_contrib
         model.link_flow_constraint = Constraint(model.links, rule=link_flow_rule)
         
-        # 旅行时间
-        def travel_time_rule(m, l):
-            return m.travel_time[l] == m.free_flow_time[l] + m.link_flow[l]
-        model.travel_time_constraint = Constraint(model.links, rule=travel_time_rule)
+        # 旅行时间 cost = to + f
+        # def travel_time_rule(m, l):
+        #     return m.travel_time[l] == m.free_flow_time[l] + m.link_flow[l]
+        # model.travel_time_constraint = Constraint(model.links, rule=travel_time_rule)
+
+        # 另一种非线性旅行时间 cost = t0（1 + 0.15(f/c)^4）
+        def travel_time_rule_nonlinear(m, l):
+            return m.travel_time[l] == m.free_flow_time[l] * (
+                1 + 0.15 * (m.link_flow[l] / self.config.link_capacity[l]) ** 4
+            )
+        model.travel_time_constraint_nonlinear = Constraint(model.links, rule=travel_time_rule_nonlinear)
         
         # 路径成本
         def path_cost_rule(m, p):
@@ -145,7 +159,7 @@ class PaperAlgorithmBRUESolver:
                     model.rho[i] - model.pi) for i in model.target_paths) == 0
             )
         
-        # ρ的边界：0 ≤ ρ_i^ν ≤ ε (论文公式19e第四行)
+        # ρ的边界：0 ≤ ρ_i^ν ≤ ε (论文公式19第四行)
         model.rho_bounds = ConstraintList()
         for p in model.target_paths:
             model.rho_bounds.add(model.rho[p] <= model.epsilon)
@@ -198,11 +212,15 @@ class PaperAlgorithmBRUESolver:
         # 初始化可接受路径集合（UE中有流量的路径）
         acceptable_paths = {g: [] for g in self.config.od_groups.keys()}
         critical_points = {g: [0.0] for g in self.config.od_groups.keys()}
+        # 用于跟踪每个临界点的路径集合
+        path_evolution = {g: [] for g in self.config.od_groups.keys()}
         
         for g, paths in self.config.od_groups.items():
             for p in paths:
                 if initial_flows.get(p, 0) > 1e-5:
                     acceptable_paths[g].append(p)
+            # 记录初始可接受路径
+            path_evolution[g].append(acceptable_paths[g].copy())
         
         self.console.print(f"UE解下的可接受路径: {acceptable_paths}")
         
@@ -224,15 +242,16 @@ class PaperAlgorithmBRUESolver:
                     if p not in self.config.od_groups[target_od_group]:
                         other_flows[p] = current_flows.get(p, 0)
                 
-                # 使用公式(19e)计算临界点
-                critical_epsilon, new_paths, target_flows = self._solve_equation_19e(
+                # 使用公式(19)计算临界点
+                critical_epsilon, new_paths, target_flows = self._solve_equation_19(
                     target_od_group, other_flows, acceptable_paths
                 )
+                self.console.print(f"critical_epsilon: {critical_epsilon}")
                 
                 if critical_epsilon is not None and new_paths:
                     last_epsilon = critical_points[target_od_group][-1]
                     
-                    if critical_epsilon > last_epsilon + 1e-6:
+                    if abs(critical_epsilon - last_epsilon) > 1e-6:
                         self.console.print(f"[green]找到新临界点! ε* = {critical_epsilon:.6f}[/green]")
                         self.console.print(f"新增路径: {new_paths}")
                         
@@ -240,6 +259,9 @@ class PaperAlgorithmBRUESolver:
                         critical_points[target_od_group].append(critical_epsilon)
                         acceptable_paths[target_od_group].extend(new_paths)
                         acceptable_paths[target_od_group] = sorted(list(set(acceptable_paths[target_od_group])))
+                        
+                        # 记录当前临界点的路径集合
+                        path_evolution[target_od_group].append(acceptable_paths[target_od_group].copy())
                         
                         # 更新流量（论文算法步骤2的副产品）
                         for p, flow in target_flows.items():
@@ -256,9 +278,9 @@ class PaperAlgorithmBRUESolver:
                 break
         
         # 显示结果
-        self._display_results(critical_points, acceptable_paths, initial_flows)
+        self._display_results(critical_points, path_evolution, initial_flows)
 
-    def _display_results(self, critical_points, acceptable_paths, initial_flows):
+    def _display_results(self, critical_points, path_evolution, initial_flows):
         """显示最终结果"""
         self.console.print("\n[bold underline]========== 最终结果 ==========[/bold underline]")
         
@@ -268,19 +290,18 @@ class PaperAlgorithmBRUESolver:
             table.add_column("临界点 ε*", style="yellow")
             table.add_column("可接受路径集合", style="green")
             
-            # UE阶段
-            ue_paths = [p for p in self.config.od_groups[g] if initial_flows.get(p, 0) > 1e-5]
-            table.add_row("UE", f"{critical_points[g][0]:.6f}", str(sorted(ue_paths)))
+            # UE阶段 - 使用最初的可接受路径
+            table.add_row("UE", f"{critical_points[g][0]:.6f}", str(sorted(path_evolution[g][0])))
             
-            # 临界点阶段
+            # 临界点阶段 - 循环显示每个临界点及其对应的可接受路径
             for i, eps in enumerate(critical_points[g][1:], 1):
-                table.add_row(f"临界点{i}", f"{eps:.6f}", str(sorted(acceptable_paths[g])))
+                table.add_row(f"临界点{i}", f"{eps:.6f}", str(sorted(path_evolution[g][i])))
             
             self.console.print(table)
 
 def main():
     # 测试两OD网络
-    config = TrafficNetworkConfig.create_two_od_network()
+    config = TrafficNetworkConfig.create_multi_od_network()
     solver = PaperAlgorithmBRUESolver(config)
     solver.solve_multi_od_brue()
 

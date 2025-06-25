@@ -360,6 +360,16 @@ wheels = [
 ]
 
 [[package]]
+name = "knitro"
+version = "15.0.0"
+source = { registry = "https://mirrors.aliyun.com/pypi/simple" }
+wheels = [
+    { url = "https://mirrors.aliyun.com/pypi/packages/76/66/936edcd2255055cf6c8a060d1beeb8ce543ef078dceb631caad22a20002a/knitro-15.0.0-py3-none-macosx_13_0_arm64.whl", hash = "sha256:94ebc22e7b12dca3030cca917b34d6f5177cad97f4213b76159f823d9dc2f6d4" },
+    { url = "https://mirrors.aliyun.com/pypi/packages/76/6e/ffe880b013ad244f0fd91940454e4f2bf16fa01e74c469e1b0fb75eda12a/knitro-15.0.0-py3-none-manylinux1_x86_64.whl", hash = "sha256:46f6158098e39be9b7dcb73c1be0ebd14792490c2b6a2c12e9fef6a9531cf93a" },
+    { url = "https://mirrors.aliyun.com/pypi/packages/13/3f/54953373ee3b631640b33b5d4bdb0217bdb1f8514b9374b08348e098ea2a/knitro-15.0.0-py3-none-win_amd64.whl", hash = "sha256:1f9049939f6ab0d0350a21546399e0732423e9a1699c42541a4a41c96255a066" },
+]
+
+[[package]]
 name = "markdown-it-py"
 version = "3.0.0"
 source = { registry = "https://mirrors.aliyun.com/pypi/simple" }
@@ -719,6 +729,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "ipykernel" },
     { name = "ipywidgets" },
+    { name = "knitro" },
     { name = "matplotlib" },
     { name = "networkx" },
     { name = "pandas" },
@@ -733,6 +744,7 @@ dependencies = [
 requires-dist = [
     { name = "ipykernel", specifier = ">=6.29.5" },
     { name = "ipywidgets", specifier = ">=8.1.7" },
+    { name = "knitro", specifier = ">=15.0.0" },
     { name = "matplotlib", specifier = ">=3.10.3" },
     { name = "networkx", specifier = ">=3.5" },
     { name = "pandas", specifier = ">=2.3.0" },
