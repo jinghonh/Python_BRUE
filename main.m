@@ -7,8 +7,8 @@ clc;
 close all;
 
 % 设置参数
-zeta = 31;          % 可选值：15 或 31
-subset_index = 0;   % zeta=15时可选0,1；zeta=31时可选0,1,2
+zeta = 15;          % 可选值：15 或 31
+subset_index = 1;   % zeta=15时可选0,1；zeta=31时可选0,1,2
 
 % 验证输入参数
 if ~ismember(zeta, [15, 31])
@@ -54,7 +54,46 @@ fprintf('subset_index = %d\n', subset_index);
 fprintf('rangeMin = [%s]\n', num2str(rangeMin));
 fprintf('rangeMax = [%s]\n', num2str(rangeMax));
 
+% 检查是否有临时文件可恢复
+lastIterFile = '';
+lastIter = 0;
+totalValidCost = [];
+totalValidFlow = [];
+
+for i = 10:35
+    tempFile = sprintf('temp_results_iter%d.mat', i);
+    if exist(tempFile, 'file')
+        lastIterFile = tempFile;
+        lastIter = i;
+    end
+end
+
+% % 如果找到临时文件，询问用户是否恢复
+% if ~isempty(lastIterFile)
+%     fprintf('发现临时结果文件 %s\n', lastIterFile);
+%     choice = input('是否从上次计算结果继续? (y/n): ', 's');
+%     if strcmpi(choice, 'y')
+%         fprintf('加载临时结果文件...\n');
+%         load(lastIterFile, 'totalValidCost', 'totalValidFlow');
+%         fprintf('成功加载临时结果，将从迭代 %d 继续\n', lastIter + 1);
+%     end
+% end
+
+% 创建结果目录（如果不存在）
+if ~exist('results', 'dir')
+    mkdir('results');
+    fprintf('创建结果目录: results\n');
+end
+
 % 运行分析
 tic
 analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index); 
 toc
+
+% 保存当前的时间作为结果标识
+timestamp = datestr(now, 'yyyymmdd_HHMMSS');
+resultFile = sprintf('results/result_zeta%d_subset%d_%s.mat', zeta, subset_index, timestamp);
+
+% 保存所有工作区变量
+save(resultFile);
+fprintf('所有结果已保存到: %s\n', resultFile);

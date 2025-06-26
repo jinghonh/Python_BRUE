@@ -19,7 +19,7 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index)
         if ~isempty(totalValidFlow)
             selectedIndices = randperm(size(totalValidFlow, 1), min(q, size(totalValidFlow, 1)));
             plotResults(totalValidCost, selectedIndices);
-            % plotPathCosts(totalValidFlow, relationMatrix, selectedIndices);
+            plotPathCosts(totalValidFlow, relationMatrix, selectedIndices);
         end
         return;
     end
@@ -365,11 +365,11 @@ function plotResults(totalValidCost, selectedIndices)
     figure('Name', 'Traffic Network Analysis', 'NumberTitle', 'off');
     
     % Plot all points (blue)
-    scatter(totalValidCost(:,1), totalValidCost(:,2), 10, 'blue', "filled");
+    scatter(totalValidCost(:,1), totalValidCost(:,2), 5, 'blue', '.');
     hold on;
     
     % Plot selected points (red)
-    scatter(totalValidCost(selectedIndices,1), totalValidCost(selectedIndices,2), 20, 'red', "filled");
+    scatter(totalValidCost(selectedIndices,1), totalValidCost(selectedIndices,2), 50, 'red', '.');
     
     xlabel('Total Travel Time');
     ylabel('Total Cost');

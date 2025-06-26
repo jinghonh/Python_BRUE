@@ -1,6 +1,6 @@
 ---
 description: 
-globs: 
+globs: *.m
 alwaysApply: false
 ---
 # MATLAB与Python集成
