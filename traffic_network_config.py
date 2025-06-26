@@ -136,8 +136,8 @@ class TrafficNetworkConfig:
             num_od_pairs=6,
             total_demand=3000,
             od_groups={
-                'OD1': list(range(1, 5)),
-                'OD2': list(range(5, 7))
+                'OD1': list(range(5,7)),
+                'OD2': list(range(1,5))
                 },
             od_demands={
                 'OD1': 1, 

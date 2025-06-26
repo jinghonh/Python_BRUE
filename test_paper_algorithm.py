@@ -301,7 +301,7 @@ class PaperAlgorithmBRUESolver:
 
 def main():
     # 测试两OD网络
-    config = TrafficNetworkConfig.create_multi_od_network()
+    config = TrafficNetworkConfig.create_two_od_network()
     solver = PaperAlgorithmBRUESolver(config)
     solver.solve_multi_od_brue()
 
