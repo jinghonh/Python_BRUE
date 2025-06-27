@@ -57,7 +57,7 @@ function plotPathCosts(totalValidFlow, relationMatrix, selectedIndices)
     
     % ----------------- Figure 1: Time-Money Cost Relationship -----------------
     % Create separate figure for time-money cost relationship
-    fig1 = figure('Name', 'Path Time-Money Cost Relationship', 'NumberTitle', 'off', 'Position', [100, 100, 600, 500]);
+    fig1 = figure('Name', 'Path Time-Money Cost Relationship', 'NumberTitle', 'off', 'Position', [100, 100, 800, 600]);
     set(fig1, 'Color', 'white');
     set(gca, 'FontName', 'Arial', 'FontSize', 10, 'Box', 'on', 'LineWidth', 1);
     
@@ -73,19 +73,6 @@ function plotPathCosts(totalValidFlow, relationMatrix, selectedIndices)
     end
     
     hold on;
-    
-    % 使用所有点计算边界
-    % 首先绘制所有散点
-    for i = 1:q
-        costs = allPathCosts{i};
-        if ~isempty(costs)
-            % Plot with thinner, more elegant lines
-            plot(costs(:,1), costs(:,2), '-', 'Color', [colorVariations(i,:), 0.7], 'LineWidth', 1.2);
-            
-            % Use smaller, more elegant markers
-            scatter(costs(:,1), costs(:,2), 30, colorVariations(i,:), 'o', 'filled', 'MarkerEdgeColor', 'none', 'MarkerFaceAlpha', 0.8);
-        end
-    end
     
     % 改进的边界计算逻辑 - 使用金钱成本固定的特性
     % 用所有散点数据进行计算
@@ -128,26 +115,35 @@ function plotPathCosts(totalValidFlow, relationMatrix, selectedIndices)
     [rightBoundaryY, sortIdx] = sort(rightBoundaryY);
     rightBoundaryX = rightBoundaryX(sortIdx);
     
-    % 平滑边界线（可选）
-    % if length(leftBoundaryX) >= 3
-    %     leftBoundaryX = smoothdata(leftBoundaryX, 'movmean', 3);
-    %     rightBoundaryX = smoothdata(rightBoundaryX, 'movmean', 3);
-    % end
-    
     % 合并上下边界以形成封闭区域
     boundaryX = [leftBoundaryX; flipud(rightBoundaryX)];
     boundaryY = [leftBoundaryY; flipud(rightBoundaryY)];
     
+    % 先创建隐藏的图例句柄
+    h_legend = zeros(q+2, 1);
+    
     % 创建渐变填充
-    patch('XData', boundaryX, 'YData', boundaryY, ...
+    h_legend(1) = patch('XData', boundaryX, 'YData', boundaryY, ...
           'FaceColor', [0.9 0.95 1], ... % 非常浅的蓝色
-          'EdgeColor', [0.4 0.5 0.8], ... % 中等蓝色边缘
+          'EdgeColor', 'none', ... 
           'LineWidth', 1.5, ...
-          'FaceAlpha', 0.6);
+          'FaceAlpha', 1);
           
     % 绘制边界线
-    plot(leftBoundaryX, leftBoundaryY, '-', 'Color', [0.4 0.5 0.8], 'LineWidth', 1.5);
+    h_legend(2) = plot(leftBoundaryX, leftBoundaryY, '-', 'Color', [0.4 0.5 0.8], 'LineWidth', 1.5);
     plot(rightBoundaryX, rightBoundaryY, '-', 'Color', [0.4 0.5 0.8], 'LineWidth', 1.5);
+
+    % 使用所有点计算边界后绘制散点
+    for i = 1:q
+        costs = allPathCosts{i};
+        if ~isempty(costs)
+            % Plot with thinner, more elegant lines
+            plot(costs(:,1), costs(:,2), '-', 'Color', [colorVariations(i,:), 0.7], 'LineWidth', 1.2);
+            
+            % Use smaller, more elegant markers
+            h_legend(i+2) = scatter(costs(:,1), costs(:,2), 30, colorVariations(i,:), 'o', 'filled', 'MarkerEdgeColor', 'none', 'MarkerFaceAlpha', 0.8);
+        end
+    end
     
     % 保存边界以便在第二个图中使用
     saveBoundaryX = boundaryX;
@@ -161,92 +157,117 @@ function plotPathCosts(totalValidFlow, relationMatrix, selectedIndices)
     % Figure properties
     xlabel('Time Cost', 'FontSize', 12, 'FontWeight', 'bold');
     ylabel('Money Cost', 'FontSize', 12, 'FontWeight', 'bold');
-    title('Time-Money Cost Relationship for Each Path (Sorted by Money Cost)', 'FontSize', 14, 'FontWeight', 'bold');
+    % title('Time-Money Cost Relationship for Each Path', 'FontSize', 14, 'FontWeight', 'bold');
     
-    % No legend as requested
+    % 添加科研风格的图例
+    if q <= 10
+        % 如果路径数量较少，显示每条路径的图例
+        legendItems = cell(q + 2, 1);
+        legendItems{1} = 'Feasible Region';
+        legendItems{2} = 'Boundary';
+        
+        % 为每个选定的路径添加图例项
+        for i = 1:q
+            legendItems{i+2} = sprintf('Path %d', i);
+        end
+        
+        legend(h_legend, legendItems, ...
+            'Location', 'best', ...
+            'FontName', 'Arial', 'FontSize', 9, ...
+            'EdgeColor', [0.7, 0.7, 0.7], ...
+            'Box', 'on');
+    else
+        % 如果路径数量较多，只显示概括性图例
+        legend([h_legend(1), h_legend(2), h_legend(3)], {'Feasible Region', 'Boundary', 'Selected Paths'}, ...
+            'Location', 'best', ...
+            'FontName', 'Arial', 'FontSize', 9, ...
+            'EdgeColor', [0.7, 0.7, 0.7], ...
+            'Box', 'on');
+    end
+    
     figFile = sprintf('results/path_time_money_relationship_%s.png', datestr(now, 'yyyymmdd_HHMMSS'));
     print(figFile, '-dpng', '-r300');
     hold off;
     
     % ----------------- Figure 2: Path Cost Scatter Plot -----------------
     % Create separate figure for path cost scatter plot
-    fig2 = figure('Name', 'Path Cost Scatter Plot', 'NumberTitle', 'off', 'Position', [100, 100, 600, 500]);
-    set(fig2, 'Color', 'white');
-    set(gca, 'FontName', 'Arial', 'FontSize', 10, 'Box', 'on', 'LineWidth', 1);
-    
-    hold on;
-    for i = 1:q
-        indices = allFlowVectorIndices == i;
-        scatter(allPathTimeCosts(indices), allPathMoneyCosts(indices), 70, colors(i,:), 'filled', 'MarkerEdgeColor', 'black', 'MarkerEdgeAlpha', 0.3);
-    end
-    
-    % 为第二个图添加边界线
-    if exist('saveBoundaryX', 'var') && exist('saveBoundaryY', 'var') && ~isempty(saveBoundaryX) && ~isempty(saveBoundaryY)
-        patch('XData', saveBoundaryX, 'YData', saveBoundaryY, ...
-              'FaceColor', [0.95 0.95 1], ... % 非常浅的蓝色
-              'EdgeColor', [0.5 0.5 0.8], ... % 中等蓝色边缘
-              'LineWidth', 1.2, ...
-              'FaceAlpha', 0.3);  % 更低的透明度
-        
-        % 绘制边界线
-        plot(saveBoundaryX, saveBoundaryY, '-', 'Color', [0.5 0.5 0.8], 'LineWidth', 1.2);
-    end
-    
-    % Figure properties
-    xlabel('Time Cost', 'FontSize', 12, 'FontWeight', 'bold');
-    ylabel('Money Cost', 'FontSize', 12, 'FontWeight', 'bold');
-    title('Path Cost Scatter Plot', 'FontSize', 14, 'FontWeight', 'bold');
-    grid on;
-    grid minor;
-    set(gca, 'GridAlpha', 0.15, 'MinorGridAlpha', 0.1, 'Layer', 'top');
-    
-    % No legend as requested
-    figFile = sprintf('results/path_cost_scatter_%s.png', datestr(now, 'yyyymmdd_HHMMSS'));
-    print(figFile, '-dpng', '-r300');
-    hold off;
-    
-    % ----------------- Figure 3: Time Cost Distribution -----------------
-    % Create separate figure for time cost distribution
-    fig3 = figure('Name', 'Path Time Cost Distribution', 'NumberTitle', 'off', 'Position', [100, 100, 600, 500]);
-    set(fig3, 'Color', 'white');
-    set(gca, 'FontName', 'Arial', 'FontSize', 10, 'Box', 'on', 'LineWidth', 1);
-    
-    % Optimize x-axis by using custom box plot with more space
-    positions = 1:q;
-    boxplot(allPathTimeCosts, allFlowVectorIndices, 'Positions', positions, 'Width', 0.6, 'Symbol', 'k+');
-    
-    % Customize box plot colors
-    h = findobj(gca, 'Tag', 'Box');
-    for j = 1:length(h)
-        patch(get(h(j), 'XData'), get(h(j), 'YData'), colors(q-j+1,:), 'FaceAlpha', 0.7);
-    end
-    
-    % Add custom scatter points for better visualization
-    hold on;
-    for i = 1:q
-        indices = allFlowVectorIndices == i;
-        % Add jitter to x positions for better visibility
-        x_jitter = positions(i) + (rand(sum(indices),1)-0.5)*0.3;
-        scatter(x_jitter, allPathTimeCosts(indices), 20, colors(i,:), 'filled', 'MarkerEdgeColor', 'black', 'MarkerEdgeAlpha', 0.3);
-    end
-    
-    % Figure properties
-    title('Path Time Cost Distribution by Flow Vector', 'FontSize', 14, 'FontWeight', 'bold');
-    xlabel('Flow Vector', 'FontSize', 12, 'FontWeight', 'bold');
-    ylabel('Time Cost', 'FontSize', 12, 'FontWeight', 'bold');
-    
-    % Fix x-axis overcrowding
-    xticks(positions);
-    xticklabels(cellfun(@(x) sprintf('FV%d', str2double(regexp(x, '\d+', 'match'))), legendLabels, 'UniformOutput', false));
-    xtickangle(0);
-    
-    grid on;
-    set(gca, 'GridAlpha', 0.15, 'Layer', 'top');
-    
-    % No legend as requested
-    
-    figFile = sprintf('results/path_time_distribution_%s.png', datestr(now, 'yyyymmdd_HHMMSS'));
-    print(figFile, '-dpng', '-r300');
+    % fig2 = figure('Name', 'Path Cost Scatter Plot', 'NumberTitle', 'off', 'Position', [100, 100, 600, 500]);
+    % set(fig2, 'Color', 'white');
+    % set(gca, 'FontName', 'Arial', 'FontSize', 10, 'Box', 'on', 'LineWidth', 1);
+    % 
+    % hold on;
+    % for i = 1:q
+    %     indices = allFlowVectorIndices == i;
+    %     scatter(allPathTimeCosts(indices), allPathMoneyCosts(indices), 70, colors(i,:), 'filled', 'MarkerEdgeColor', 'black', 'MarkerEdgeAlpha', 0.3);
+    % end
+    % 
+    % % 为第二个图添加边界线
+    % if exist('saveBoundaryX', 'var') && exist('saveBoundaryY', 'var') && ~isempty(saveBoundaryX) && ~isempty(saveBoundaryY)
+    %     patch('XData', saveBoundaryX, 'YData', saveBoundaryY, ...
+    %           'FaceColor', [0.95 0.95 1], ... % 非常浅的蓝色
+    %           'EdgeColor', [0.5 0.5 0.8], ... % 中等蓝色边缘
+    %           'LineWidth', 1.2, ...
+    %           'FaceAlpha', 0.3);  % 更低的透明度
+    % 
+    %     % 绘制边界线
+    %     plot(saveBoundaryX, saveBoundaryY, '-', 'Color', [0.5 0.5 0.8], 'LineWidth', 1.2);
+    % end
+    % 
+    % % Figure properties
+    % xlabel('Time Cost', 'FontSize', 12, 'FontWeight', 'bold');
+    % ylabel('Money Cost', 'FontSize', 12, 'FontWeight', 'bold');
+    % title('Path Cost Scatter Plot', 'FontSize', 14, 'FontWeight', 'bold');
+    % grid on;
+    % grid minor;
+    % set(gca, 'GridAlpha', 0.15, 'MinorGridAlpha', 0.1, 'Layer', 'top');
+    % 
+    % % No legend as requested
+    % figFile = sprintf('results/path_cost_scatter_%s.png', datestr(now, 'yyyymmdd_HHMMSS'));
+    % print(figFile, '-dpng', '-r300');
+    % hold off;
+    % 
+    % % ----------------- Figure 3: Time Cost Distribution -----------------
+    % % Create separate figure for time cost distribution
+    % fig3 = figure('Name', 'Path Time Cost Distribution', 'NumberTitle', 'off', 'Position', [100, 100, 600, 500]);
+    % set(fig3, 'Color', 'white');
+    % set(gca, 'FontName', 'Arial', 'FontSize', 10, 'Box', 'on', 'LineWidth', 1);
+    % 
+    % % Optimize x-axis by using custom box plot with more space
+    % positions = 1:q;
+    % boxplot(allPathTimeCosts, allFlowVectorIndices, 'Positions', positions, 'Width', 0.6, 'Symbol', 'k+');
+    % 
+    % % Customize box plot colors
+    % h = findobj(gca, 'Tag', 'Box');
+    % for j = 1:length(h)
+    %     patch(get(h(j), 'XData'), get(h(j), 'YData'), colors(q-j+1,:), 'FaceAlpha', 0.7);
+    % end
+    % 
+    % % Add custom scatter points for better visualization
+    % hold on;
+    % for i = 1:q
+    %     indices = allFlowVectorIndices == i;
+    %     % Add jitter to x positions for better visibility
+    %     x_jitter = positions(i) + (rand(sum(indices),1)-0.5)*0.3;
+    %     scatter(x_jitter, allPathTimeCosts(indices), 20, colors(i,:), 'filled', 'MarkerEdgeColor', 'black', 'MarkerEdgeAlpha', 0.3);
+    % end
+    % 
+    % % Figure properties
+    % title('Path Time Cost Distribution by Flow Vector', 'FontSize', 14, 'FontWeight', 'bold');
+    % xlabel('Flow Vector', 'FontSize', 12, 'FontWeight', 'bold');
+    % ylabel('Time Cost', 'FontSize', 12, 'FontWeight', 'bold');
+    % 
+    % % Fix x-axis overcrowding
+    % xticks(positions);
+    % xticklabels(cellfun(@(x) sprintf('FV%d', str2double(regexp(x, '\d+', 'match'))), legendLabels, 'UniformOutput', false));
+    % xtickangle(0);
+    % 
+    % grid on;
+    % set(gca, 'GridAlpha', 0.15, 'Layer', 'top');
+    % 
+    % % No legend as requested
+    % 
+    % figFile = sprintf('results/path_time_distribution_%s.png', datestr(now, 'yyyymmdd_HHMMSS'));
+    % print(figFile, '-dpng', '-r300');
     hold off;
 end
 

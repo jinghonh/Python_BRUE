@@ -13,13 +13,15 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index)
     if exist(cacheFileName, 'file')
         fprintf('加载缓存数据...\n');
         load(cacheFileName, 'totalValidCost', 'totalValidFlow', 'relationMatrix');
+        fprintf('加载缓存数据完成...\n');
+        toc;
         
         % 直接绘图
-        q = 30;
+        q = 200;
         if ~isempty(totalValidFlow)
             selectedIndices = randperm(size(totalValidFlow, 1), min(q, size(totalValidFlow, 1)));
             plotResults(totalValidCost, selectedIndices);
-            % plotPathCosts(totalValidFlow, relationMatrix, selectedIndices);
+            plotPathCosts(totalValidFlow, relationMatrix, selectedIndices);
         end
         return;
     end
@@ -55,7 +57,7 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index)
     % 添加进度显示
     h = waitbar(0, '开始计算...');
     minIt = 10;
-    maxIt = 50;
+    maxIt = 40;
     
     % 设置数据压缩参数
     maxPointsPerIteration = 5e4; % 每次迭代最大保留点数
@@ -83,18 +85,18 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index)
         fprintf('完成迭代 %d\n', ii);
         
         % 增量保存
-        if mod(ii, 5) == 0 && ~isempty(totalValidCost)
-            tempFile = sprintf('results/result_zeta%d_subset%d_%s.mat', zeta, subset_index, datestr(now, 'yyyymmdd_HHMMSS'));
-            
-            % 确保结果目录存在
-            if ~exist('results', 'dir')
-                mkdir('results');
-            end
-            
-            % 保存当前结果
-            save(tempFile, 'totalValidCost', 'totalValidFlow', 'relationMatrix');
-            fprintf('已保存阶段性结果到%s\n', tempFile);
-        end
+        % if mod(ii, 5) == 0 && ~isempty(totalValidCost)
+        %     tempFile = sprintf('results/result_zeta%d_subset%d_%s.mat', zeta, subset_index, datestr(now, 'yyyymmdd_HHMMSS'));
+        % 
+        %     % 确保结果目录存在
+        %     if ~exist('results', 'dir')
+        %         mkdir('results');
+        %     end
+        % 
+        %     % 保存当前结果
+        %     save(tempFile, 'totalValidCost', 'totalValidFlow', 'relationMatrix');
+        %     fprintf('已保存阶段性结果到%s\n', tempFile);
+        % end
     end
     close(h);
     toc
@@ -104,7 +106,7 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index)
     totalValidFlow = totalValidFlow(Ia,:);
     
     % 使用网格采样减少数据点数量
-    targetSize = 1e5; % 目标数据点数量：十万级别
+    targetSize = 5e5; % 目标数据点数量：十万级别
     if size(totalValidCost, 1) > targetSize
         fprintf('正在进行数据压缩，从 %d 个点压缩到目标 %d 个点左右...\n', size(totalValidCost, 1), targetSize);
         [totalValidCost, totalValidFlow] = reduceDataPoints(totalValidCost, totalValidFlow, targetSize);
@@ -361,24 +363,161 @@ function [rangeMin, rangeMax, bound] = updateSearchRange(validSamples, ii)
 end
 
 function plotResults(totalValidCost, selectedIndices)
-    % Plot scatter plot of results
-    figure('Name', 'Traffic Network Analysis', 'NumberTitle', 'off');
+    % 绘制结果并使用boundary函数添加科研风格的非凸边界
+    fig = figure('Name', 'Traffic Network Analysis', 'NumberTitle', 'off', 'Position', [100, 100, 800, 600]);
+    set(fig, 'Color', 'white');  % 白色背景
+    set(gca, 'FontName', 'Arial', 'FontSize', 10, 'Box', 'on', 'LineWidth', 1.2);
     
-    % Plot all points (blue)
-    scatter(totalValidCost(:,1), totalValidCost(:,2), 10, 'blue', "filled");
+    % 创建优雅的色彩方案
+    baseColor = [0.2, 0.4, 0.8];  % 基础蓝色
+    highlightColor = [0.8, 0.3, 0.3];  % 高亮红色
+    boundaryColor = [0.4, 0.5, 0.8];  % 中等蓝色边界
+    
     hold on;
     
-    % Plot selected points (red)
-    scatter(totalValidCost(selectedIndices,1), totalValidCost(selectedIndices,2), 20, 'red', "filled");
+        % 绘制所有点（浅蓝色，半透明）
+    scatter(totalValidCost(:,1), totalValidCost(:,2), 10, baseColor, 'filled', ...
+        'MarkerFaceAlpha', 0.5, 'MarkerEdgeColor', 'none');
+    % 应用boundary函数提取非凸边界（仅使用sf=0.3）
+    try
+        cleanData = totalValidCost;  % 使用全部数据
+        
+        % 固定sf值为0.3
+        sf = 0.5;
+        
+        % 提取边界
+        idx = boundary(cleanData(:,1), cleanData(:,2), sf);
+        
+        % 绘制边界
+        if ~isempty(idx) && length(idx) > 3
+            % 计算边界面积
+            boundaryArea = polyarea(cleanData(idx,1), cleanData(idx,2));
+            
+            % 创建边界闭合多边形
+            boundaryX = cleanData(idx,1);
+            boundaryY = cleanData(idx,2);
+            
+            % 添加渐变填充
+            patch('XData', boundaryX, 'YData', boundaryY, ...
+                'FaceColor', [0.9, 0.95, 1], ... % 非常浅的蓝色
+                'EdgeColor', boundaryColor, ... % 中等蓝色边缘
+                'LineWidth', 1.5, ...
+                'FaceAlpha', 0.9);  % 半透明填充
+                
+            % % 在图形右上角添加边界信息
+            % infoText = sprintf('边界参数: sf=%.1f\n边界面积: %.1f', sf, boundaryArea);
+            % annotation('textbox', [0.65, 0.8, 0.3, 0.1], ...
+            %     'String', infoText, 'FitBoxToText', 'on', ...
+            %     'BackgroundColor', [1, 1, 1, 0.7], ... % 半透明白色背景
+            %     'EdgeColor', boundaryColor, ...
+            %     'LineWidth', 1.0, ...
+            %     'FontName', 'Arial', 'FontSize', 9);
+        end
+    catch e
+        fprintf('boundary方法错误 (sf=%.2f): %s\n', sf, e.message);
+    end
+
+    % 绘制选定点（深红色，突出显示）
+    scatter(totalValidCost(selectedIndices,1), totalValidCost(selectedIndices,2), 20, highlightColor, 'filled', ...
+        'MarkerEdgeColor', 'black', 'MarkerEdgeAlpha', 0.5);
+
     
-    xlabel('Total Travel Time');
-    ylabel('Total Cost');
-    title('Traffic Network Analysis Results');
+    % 设置坐标轴标签和标题
+    xlabel('Total Travel Time', 'FontSize', 12, 'FontWeight', 'bold');
+    ylabel('Total Cost', 'FontSize', 12, 'FontWeight', 'bold');
+    % title('交通网络分析结果与非凸边界', 'FontSize', 14, 'FontWeight', 'bold', 'FontName', 'Arial');
+    
+    % 添加科学风格网格
     grid on;
+    grid minor;
+    set(gca, 'GridAlpha', 0.1, 'MinorGridAlpha', 0.05, 'Layer', 'top');
     
-    % Add legend
-    legend('All Feasible Solutions', 'Selected Solutions', 'Location', 'best');
+    % 坐标轴美化
+    ax = gca;
+    ax.XAxis.TickLength = [0.01, 0.01];
+    ax.YAxis.TickLength = [0.01, 0.01];
+    
+    % Add legend 
+    legend({'Feasible Solutions', 'Concave Boundary', 'Selected Solutions'}, ...
+        'Location', 'best', ...
+        'FontName', 'Arial', 'FontSize', 9, ...
+        'EdgeColor', [0.7, 0.7, 0.7], ...
+        'Box', 'on');
+    
+    % 自动调整坐标轴，留出边距
+    axis tight;
+    axisLimits = axis;
+    axisRange = [axisLimits(2)-axisLimits(1), axisLimits(4)-axisLimits(3)];
+    axis([axisLimits(1)-0.02*axisRange(1), axisLimits(2)+0.02*axisRange(1), ...
+          axisLimits(3)-0.02*axisRange(2), axisLimits(4)+0.02*axisRange(2)]);
+    
     hold off;
+    
+    % 保存图像为高分辨率PNG文件
+    figFile = sprintf('results/concave_boundary_%s.png', datestr(now, 'yyyymmdd_HHMMSS'));
+    print(figFile, '-dpng', '-r300');
+end
+
+function hullIdx = concaveHull_knn(P, k)
+    % 基于k-近邻的非凸包提取算法
+    % P: N×2 点集, 每行一个二维点
+    % k: 近邻数量
+    % hullIdx: 非凸包上点的索引
+    
+    if size(P,1) < 3
+        error('点数量太少，至少需要3个点');
+    end
+    
+    % 寻找起点（最左点）
+    [~, start] = min(P(:,1));
+    
+    % 初始化
+    hullIdx = start;
+    cur = start;
+    prevAngle = 0;
+    visited = false(size(P,1), 1);
+    visited(start) = true;
+    
+    while true
+        % 计算当前点到所有点的距离
+        d = sqrt((P(:,1)-P(cur,1)).^2 + (P(:,2)-P(cur,2)).^2);
+        d(visited) = Inf;  % 已访问点不再考虑
+        
+        % 找到k个最近的点
+        [~, sorted] = sort(d);
+        cand = sorted(1:min(k, sum(~isinf(d))));
+        
+        if isempty(cand)
+            % 没有候选点，可能因为所有点都已访问
+            break;
+        end
+        
+        % 计算极角增量
+        angles = atan2(P(cand,2)-P(cur,2), P(cand,1)-P(cur,1));
+        angles = mod(angles - prevAngle, 2*pi);
+        
+        % 选择最小极角增量的点（避免交叉）
+        [~, minIdx] = min(angles);
+        next = cand(minIdx);
+        
+        % 检查是否回到起点
+        if next == start || visited(next)
+            break;
+        end
+        
+        % 添加点到hull
+        hullIdx(end+1) = next;
+        visited(next) = true;
+        
+        % 更新当前点和角度
+        prevAngle = atan2(P(next,2)-P(cur,2), P(next,1)-P(cur,1));
+        cur = next;
+    end
+    
+    % 如果需要闭合，添加起点
+    if hullIdx(end) ~= hullIdx(1)
+        hullIdx(end+1) = hullIdx(1);
+    end
 end
 
 function [upperHull, lowerHull] = findSegmentBoundary(x, y)
