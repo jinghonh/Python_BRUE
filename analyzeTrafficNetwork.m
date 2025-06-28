@@ -25,6 +25,8 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index)
             selectedIndices = randperm(size(totalValidFlow, 1), min(q, size(totalValidFlow, 1)));
             plotResults(totalValidCost, selectedIndices);
             plotPathCosts(totalValidFlow, relationMatrix, selectedIndices);
+            % 绘制流量向量可视化
+            plotFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, selectedIndices);
         end
         return;
     end
@@ -139,6 +141,9 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index)
         
         % 调用路径成本绘图函数
         plotPathCosts(totalValidFlow, relationMatrix, selectedIndices);
+        
+        % 绘制流量向量可视化
+        plotFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, selectedIndices);
     else
         warning('没有找到可行解');
     end
@@ -488,6 +493,206 @@ function plotResults(totalValidCost, selectedIndices)
     % 保存图像为高分辨率PNG文件
     figFile = sprintf('results/concave_boundary_%s.png', datestr(now, 'yyyymmdd_HHMMSS'));
     print(figFile, '-dpng', '-r300');
+end
+
+function plotFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, selectedIndices)
+    % 绘制流量向量的二维投影可视化
+    % 
+    % 输入参数:
+    %   totalValidFlow     - 满足所有约束的流量向量矩阵
+    %   totalPathValidFlow - 只满足路径约束的流量向量矩阵
+    %   relationMatrix     - 关系矩阵
+    %   selectedIndices    - 被选择的流量向量的索引
+    
+    % 创建图形
+    fig = figure('Name', 'Flow Vectors Visualization', 'NumberTitle', 'off', 'Position', [100, 100, 700, 600]);
+    set(fig, 'Color', 'white'); % 白色背景
+    
+    % 创建颜色方案
+    fullConstraintColor = [0.2, 0.6, 0.8]; % 蓝色：满足所有约束的流量
+    pathConstraintColor = [0.8, 0.4, 0.2]; % 橙色：只满足路径约束的流量
+    selectedColor = [0.2, 0.8, 0.4]; % 绿色：选中的流量
+    
+    % 准备要绘制的数据
+    allFlow = [];
+    colors = [];
+    markerSizes = [];
+    
+    % 处理满足所有约束的流量向量
+    if ~isempty(totalValidFlow)
+        allFlow = [allFlow; totalValidFlow];
+        colors = [colors; repmat(fullConstraintColor, size(totalValidFlow, 1), 1)];
+        markerSizes = [markerSizes; repmat(10, size(totalValidFlow, 1), 1)];
+    end
+    
+    % 处理只满足路径约束的流量向量
+    if ~isempty(totalPathValidFlow)
+        % 排除已经在totalValidFlow中的向量
+        if ~isempty(totalValidFlow)
+            uniquePathFlows = setdiff(totalPathValidFlow, totalValidFlow, 'rows');
+        else
+            uniquePathFlows = totalPathValidFlow;
+        end
+        
+        if ~isempty(uniquePathFlows)
+            allFlow = [allFlow; uniquePathFlows];
+            colors = [colors; repmat(pathConstraintColor, size(uniquePathFlows, 1), 1)];
+            markerSizes = [markerSizes; repmat(10, size(uniquePathFlows, 1), 1)];
+        end
+    end
+    
+    if isempty(allFlow)
+        warning('没有可视化的流量向量');
+        return;
+    end
+    
+    % 验证所有流量向量的和为10000
+    sumFlow = sum(allFlow, 2);
+    if any(abs(sumFlow - 10000) > 1e-6)
+        warning('有些流量向量的和不是10000');
+    end
+    
+    hold on;
+    
+    % 使用超平面投影
+    projectedCustom = projectToHyperplane(allFlow);
+    
+    % 绘制散点图
+    for i = 1:size(projectedCustom, 1)
+        scatter(projectedCustom(i, 1), projectedCustom(i, 2), markerSizes(i), colors(i,:), 'filled', 'MarkerFaceAlpha', 0.7);
+    end
+    
+    % 高亮选定的点
+    if ~isempty(totalValidFlow) && ~isempty(selectedIndices)
+        if max(selectedIndices) <= size(totalValidFlow, 1)
+            selectedPoints = totalValidFlow(selectedIndices, :);
+            % 使用相同的方法投影选定点
+            projectedSelected = projectToHyperplane(selectedPoints);
+            scatter(projectedSelected(:, 1), projectedSelected(:, 2), 50, selectedColor, 'filled', 'MarkerEdgeColor', 'black');
+        end
+    end
+    
+    % 尝试应用boundary函数绘制凸包边界
+    if size(projectedCustom, 1) > 3
+        try
+            % 全部数据的边界
+            idx_all = boundary(projectedCustom(:,1), projectedCustom(:,2), 0.8);
+            if ~isempty(idx_all) && length(idx_all) > 3
+                % 分别绘制满足所有约束和仅满足路径约束的边界
+                if ~isempty(totalValidFlow)
+                    idxFull = 1:size(totalValidFlow, 1);
+                    projectedFull = projectedCustom(idxFull, :);
+                    idx_full = boundary(projectedFull(:,1), projectedFull(:,2), 0.8);
+                    if ~isempty(idx_full) && length(idx_full) > 3
+                        patch('XData', projectedFull(idx_full,1), 'YData', projectedFull(idx_full,2), ...
+                            'FaceColor', fullConstraintColor, 'FaceAlpha', 0.2, ...
+                            'EdgeColor', fullConstraintColor, 'LineWidth', 1.5);
+                    end
+                end
+            end
+        catch e
+            fprintf('边界绘制错误: %s\n', e.message);
+        end
+    end
+    
+    % 设置标题和标签
+    title('流量向量在超平面上的投影', 'FontSize', 14, 'FontWeight', 'bold');
+    xlabel('投影维度 1', 'FontSize', 12);
+    ylabel('投影维度 2', 'FontSize', 12);
+    
+    % 添加图例
+    legend_items = {};
+    legend_colors = [];
+    
+    if ~isempty(totalValidFlow)
+        legend_items{end+1} = '满足所有约束的流量';
+        legend_colors(end+1, :) = fullConstraintColor;
+    end
+    
+    if ~isempty(totalPathValidFlow)
+        legend_items{end+1} = '只满足路径约束的流量';
+        legend_colors(end+1, :) = pathConstraintColor;
+    end
+    
+    if ~isempty(selectedIndices) && ~isempty(totalValidFlow)
+        legend_items{end+1} = '选中的流量向量';
+        legend_colors(end+1, :) = selectedColor;
+    end
+    
+    % 手动创建图例
+    for i = 1:length(legend_items)
+        scatter(-1000, -1000, 50, legend_colors(i,:), 'filled'); % 在图外创建点
+    end
+    legend(legend_items, 'Location', 'best', 'FontSize', 10);
+    
+    grid on;
+    box on;
+    
+    % 保存图形
+    figFile = sprintf('results/flow_vectors_%s.png', datestr(now, 'yyyymmdd_HHMMSS'));
+    print(figFile, '-dpng', '-r300');
+end
+
+function projectedData = projectToHyperplane(data)
+    % 将数据投影到超平面上
+    % 
+    % 输入参数:
+    %   data - 要投影的数据矩阵，每行一个样本
+    %
+    % 输出参数:
+    %   projectedData - 投影后的二维数据
+    
+    % 获取数据维度
+    [numPoints, n] = size(data);
+    
+    % 维度检查
+    if n < 3
+        warning('输入数据维度应大于2以便在超平面上进行二维投影');
+        if n == 2
+            % 如果是2维，则投影结果是一条线，将第二维设为0
+            projectedData = [data(:,1)-data(:,2), zeros(numPoints,1)];
+            return;
+        elseif n == 1
+            % 一维数据，无法投影，直接返回原数据和零列
+            projectedData = [data, zeros(numPoints,1)];
+            return;
+        end
+    end
+    
+    % 将数据转为double类型以保证数值精度
+    data = double(data);
+    
+    % 首先，确保所有点在总和为10000的超平面上
+    sumFlow = sum(data, 2);
+    if any(abs(sumFlow - 10000) > 1e-6)
+        % 法向量：归一化的(1,1,...,1)
+        normal = ones(1, n) / sqrt(n);
+        
+        % 一次性计算所有点到超平面的距离并投影
+        distances = (sumFlow - 10000) / sqrt(n);
+        data = data - distances * normal;
+    end
+    
+    % 使用质心作为基点（坐标原点）
+    basePoint = ones(1,n) * (10000/n);
+    
+    % 使用null函数构造超平面内的正交基
+    % 超平面法向量为(1,1,...,1)，方程为sum(x)=10000
+    if n >= 3
+        % 对于n>=3，使用null函数获取零空间基
+        B = null(ones(1, n));  % 返回 n x (n-1) 矩阵，列是正交基
+        basis = B(:, 1:2);     % 取前两列作为基，形成 n x 2 矩阵
+    else
+        % n=2的情况（前面已经处理了n=1的情况）
+        % 手动构造正交基
+        basis = [-1, 1; 1, 1] / sqrt(2);  % n x 2 矩阵，正交化的基向量
+    end
+    
+    % 计算相对于基点的向量
+    diff = data - basePoint;
+    
+    % 使用矩阵乘法一次性计算所有投影坐标
+    projectedData = diff * basis;  % numPoints x 2 矩阵
 end
 
 function hullIdx = concaveHull_knn(P, k)
