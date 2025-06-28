@@ -23,8 +23,8 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index)
         q = 200;
         if ~isempty(totalValidFlow)
             selectedIndices = randperm(size(totalValidFlow, 1), min(q, size(totalValidFlow, 1)));
-            plotResults(totalValidCost, selectedIndices);
-            plotPathCosts(totalValidFlow, relationMatrix, selectedIndices);
+            % plotResults(totalValidCost, selectedIndices);
+            % plotPathCosts(totalValidFlow, relationMatrix, selectedIndices);
             % 绘制流量向量可视化
             plotFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, selectedIndices);
         end
@@ -496,38 +496,40 @@ function plotResults(totalValidCost, selectedIndices)
 end
 
 function plotFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, selectedIndices)
-    % 绘制流量向量的二维投影可视化
+    % Draw 2D projection visualization of flow vectors
     % 
-    % 输入参数:
-    %   totalValidFlow     - 满足所有约束的流量向量矩阵
-    %   totalPathValidFlow - 只满足路径约束的流量向量矩阵
-    %   relationMatrix     - 关系矩阵
-    %   selectedIndices    - 被选择的流量向量的索引
+    % Input parameters:
+    %   totalValidFlow     - Flow vectors meeting all constraints
+    %   totalPathValidFlow - Flow vectors meeting only path constraints
+    %   relationMatrix     - Relation matrix
+    %   selectedIndices    - Selected flow vector indices
     
-    % 创建图形
+    % Create figure with scientific style
     fig = figure('Name', 'Flow Vectors Visualization', 'NumberTitle', 'off', 'Position', [100, 100, 700, 600]);
-    set(fig, 'Color', 'white'); % 白色背景
+    set(fig, 'Color', 'white'); % White background
+    set(gca, 'FontName', 'Arial', 'FontSize', 10, 'Box', 'on', 'LineWidth', 1.2);
     
-    % 创建颜色方案
-    fullConstraintColor = [0.2, 0.6, 0.8]; % 蓝色：满足所有约束的流量
-    pathConstraintColor = [0.8, 0.4, 0.2]; % 橙色：只满足路径约束的流量
-    selectedColor = [0.2, 0.8, 0.4]; % 绿色：选中的流量
+    % Create elegant color scheme
+    fullConstraintColor = [0.2, 0.6, 0.8]; % Blue: flow meeting all constraints
+    pathConstraintColor = [0.8, 0.4, 0.2]; % Orange: flow meeting only path constraints
+    selectedColor = [0.2, 0.8, 0.4];       % Green: selected flows
     
-    % 准备要绘制的数据
+    % Prepare data for visualization
     allFlow = [];
     colors = [];
     markerSizes = [];
     
-    % 处理满足所有约束的流量向量
+    % Process flows meeting all constraints
     if ~isempty(totalValidFlow)
         allFlow = [allFlow; totalValidFlow];
         colors = [colors; repmat(fullConstraintColor, size(totalValidFlow, 1), 1)];
         markerSizes = [markerSizes; repmat(10, size(totalValidFlow, 1), 1)];
     end
     
-    % 处理只满足路径约束的流量向量
+    % Process flows meeting only path constraints
+    uniquePathFlows = [];
     if ~isempty(totalPathValidFlow)
-        % 排除已经在totalValidFlow中的向量
+        % Exclude flows already in totalValidFlow
         if ~isempty(totalValidFlow)
             uniquePathFlows = setdiff(totalPathValidFlow, totalValidFlow, 'rows');
         else
@@ -542,93 +544,192 @@ function plotFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, sel
     end
     
     if isempty(allFlow)
-        warning('没有可视化的流量向量');
+        warning('No flow vectors available for visualization');
         return;
     end
     
-    % 验证所有流量向量的和为10000
+    % Verify all flow vectors sum to 10000
     sumFlow = sum(allFlow, 2);
     if any(abs(sumFlow - 10000) > 1e-6)
-        warning('有些流量向量的和不是10000');
+        warning('Some flow vectors do not sum to 10000');
     end
     
     hold on;
+
+    sf=0.3;
     
-    % 使用超平面投影
-    projectedCustom = projectToHyperplane(allFlow);
+    % Project to hyperplane
+    projectedData = projectToHyperplane(allFlow);
     
-    % 绘制散点图
-    for i = 1:size(projectedCustom, 1)
-        scatter(projectedCustom(i, 1), projectedCustom(i, 2), markerSizes(i), colors(i,:), 'filled', 'MarkerFaceAlpha', 0.7);
+    % Define point sizes based on data count for better visibility
+    pointSize = min(50, max(20, 500/sqrt(size(projectedData,1))));
+    
+    % Create empty arrays for legend handles and names
+    legendHandles = [];
+    legendNames = {};
+
+    % Draw boundaries and regions for different categories
+    
+    % 1. Project data for different categories
+    if ~isempty(totalValidFlow)
+        fullIdx = 1:size(totalValidFlow, 1);
+        projectedFull = projectedData(fullIdx, :);
+    else
+        projectedFull = [];
     end
     
-    % 高亮选定的点
+    if ~isempty(uniquePathFlows)
+        pathIdx = size(totalValidFlow,1)+1:size(allFlow,1);
+        projectedPath = projectedData(pathIdx, :);
+    else
+        projectedPath = [];
+    end
+
+    % Draw points meeting only path constraints
+    if ~isempty(uniquePathFlows) && ~isempty(pathIdx)
+        h_path_points = scatter(projectedData(pathIdx, 1), projectedData(pathIdx, 2), ...
+            pointSize, pathConstraintColor, 'o', 'filled', ...
+            'MarkerFaceAlpha', 0.7, 'MarkerEdgeColor', 'none');
+        
+        % Add to legend
+        legendHandles = [legendHandles, h_path_points];
+        legendNames{end+1} = 'Path Constraint Only';
+    end
+    
+    % Draw points meeting all constraints
+    if ~isempty(totalValidFlow)
+        h_full_points = scatter(projectedData(fullIdx, 1), projectedData(fullIdx, 2), ...
+            pointSize, fullConstraintColor, 'o', 'filled', ...
+            'MarkerFaceAlpha', 0.7, 'MarkerEdgeColor', 'none');
+        
+        % Add to legend
+        legendHandles = [legendHandles, h_full_points];
+        legendNames{end+1} = 'All Constraints';
+    end
+    
+
+   
+    % 2. Draw boundary for "Path Constraint Only" category
+    if size(projectedPath, 1) > 3
+        try
+            % Calculate boundary
+            idx_path = boundary(projectedPath(:,1), projectedPath(:,2), sf);
+            if ~isempty(idx_path) && length(idx_path) > 3
+                % Create boundary polygon
+                pathBoundaryX = projectedPath(idx_path,1);
+                pathBoundaryY = projectedPath(idx_path,2);
+                
+                % Fill area with light color
+                h_path = patch('XData', pathBoundaryX, 'YData', pathBoundaryY, ...
+                    'FaceColor', pathConstraintColor, ... 
+                    'FaceAlpha', 0.9, ...
+                    'EdgeColor', pathConstraintColor, ...
+                    'LineWidth', 1.5);
+                
+                % Add to legend
+                legendHandles = [legendHandles, h_path];
+                legendNames{end+1} = 'Path Constraint Region';
+            end
+        catch e
+            fprintf('Boundary calculation error (path): %s\n', e.message);
+        end
+    end
+    
+    % 3. Draw boundary for "All Constraints" category
+    if size(projectedFull, 1) > 3
+        try
+            % Calculate boundary
+            idx_full = boundary(projectedFull(:,1), projectedFull(:,2), sf);
+            if ~isempty(idx_full) && length(idx_full) > 3
+                % Create boundary polygon
+                fullBoundaryX = projectedFull(idx_full,1);
+                fullBoundaryY = projectedFull(idx_full,2);
+                
+                % Fill area with light color
+                h_full = patch('XData', fullBoundaryX, 'YData', fullBoundaryY, ...
+                    'FaceColor', fullConstraintColor, ... 
+                    'FaceAlpha', 0.8, ...
+                    'EdgeColor', fullConstraintColor, ...
+                    'LineWidth', 1.5);
+                
+                % Add to legend
+                legendHandles = [legendHandles, h_full];
+                legendNames{end+1} = 'All Constraints Region';
+            end
+        catch e
+            fprintf('Boundary calculation error (full): %s\n', e.message);
+        end
+    end
+    
+
+    
+    % % 4. Draw overall boundary if needed
+    % if size(projectedData, 1) > 3 && ~isempty(legendHandles)
+    %     try
+    %         % Calculate overall boundary
+    %         idx_all = boundary(projectedData(:,1), projectedData(:,2), sf);
+    %         if ~isempty(idx_all) && length(idx_all) > 3
+    %             % Create boundary polygon
+    %             boundaryX = projectedData(idx_all,1);
+    %             boundaryY = projectedData(idx_all,2);
+    % 
+    %             % Draw boundary line only (no fill)
+    %             h_all = plot(boundaryX, boundaryY, 'Color', [0.4, 0.5, 0.8], 'LineWidth', 1.0, 'LineStyle', '-');
+    % 
+    %             % Add to legend
+    %             legendHandles = [legendHandles, h_all];
+    %             legendNames{end+1} = 'Overall Boundary';
+    %         end
+    %     catch e
+    %         fprintf('Boundary calculation error (overall): %s\n', e.message);
+    %     end
+    % end
+    
+    % 5. Draw points on top of regions
+    
+    % Highlight selected points (drawn last to be on top)
     if ~isempty(totalValidFlow) && ~isempty(selectedIndices)
         if max(selectedIndices) <= size(totalValidFlow, 1)
             selectedPoints = totalValidFlow(selectedIndices, :);
-            % 使用相同的方法投影选定点
+            % Project selected points
             projectedSelected = projectToHyperplane(selectedPoints);
-            scatter(projectedSelected(:, 1), projectedSelected(:, 2), 50, selectedColor, 'filled', 'MarkerEdgeColor', 'black');
+            h_selected = scatter(projectedSelected(:, 1), projectedSelected(:, 2), ...
+                pointSize*1.5, selectedColor, 'o', 'filled', ...
+                'MarkerEdgeColor', 'black', 'LineWidth', 1);
+            
+            % Add to legend
+            legendHandles = [legendHandles, h_selected];
+            legendNames{end+1} = 'Selected Flows';
         end
     end
     
-    % 尝试应用boundary函数绘制凸包边界
-    if size(projectedCustom, 1) > 3
-        try
-            % 全部数据的边界
-            idx_all = boundary(projectedCustom(:,1), projectedCustom(:,2), 0.8);
-            if ~isempty(idx_all) && length(idx_all) > 3
-                % 分别绘制满足所有约束和仅满足路径约束的边界
-                if ~isempty(totalValidFlow)
-                    idxFull = 1:size(totalValidFlow, 1);
-                    projectedFull = projectedCustom(idxFull, :);
-                    idx_full = boundary(projectedFull(:,1), projectedFull(:,2), 0.8);
-                    if ~isempty(idx_full) && length(idx_full) > 3
-                        patch('XData', projectedFull(idx_full,1), 'YData', projectedFull(idx_full,2), ...
-                            'FaceColor', fullConstraintColor, 'FaceAlpha', 0.2, ...
-                            'EdgeColor', fullConstraintColor, 'LineWidth', 1.5);
-                    end
-                end
-            end
-        catch e
-            fprintf('边界绘制错误: %s\n', e.message);
-        end
-    end
-    
-    % 设置标题和标签
-    title('流量向量在超平面上的投影', 'FontSize', 14, 'FontWeight', 'bold');
-    xlabel('投影维度 1', 'FontSize', 12);
-    ylabel('投影维度 2', 'FontSize', 12);
-    
-    % 添加图例
-    legend_items = {};
-    legend_colors = [];
-    
-    if ~isempty(totalValidFlow)
-        legend_items{end+1} = '满足所有约束的流量';
-        legend_colors(end+1, :) = fullConstraintColor;
-    end
-    
-    if ~isempty(totalPathValidFlow)
-        legend_items{end+1} = '只满足路径约束的流量';
-        legend_colors(end+1, :) = pathConstraintColor;
-    end
-    
-    if ~isempty(selectedIndices) && ~isempty(totalValidFlow)
-        legend_items{end+1} = '选中的流量向量';
-        legend_colors(end+1, :) = selectedColor;
-    end
-    
-    % 手动创建图例
-    for i = 1:length(legend_items)
-        scatter(-1000, -1000, 50, legend_colors(i,:), 'filled'); % 在图外创建点
-    end
-    legend(legend_items, 'Location', 'best', 'FontSize', 10);
-    
+    % Add scientific style grid
     grid on;
-    box on;
+    grid minor;
+    set(gca, 'GridAlpha', 0.1, 'MinorGridAlpha', 0.05, 'Layer', 'top');
     
-    % 保存图形
+    % Set title and labels
+    title('Flow Vectors Projected on Hyperplane', 'FontSize', 14, 'FontWeight', 'bold');
+    xlabel('Projection Dimension 1', 'FontSize', 12, 'FontWeight', 'bold');
+    ylabel('Projection Dimension 2', 'FontSize', 12, 'FontWeight', 'bold');
+    
+    % Add legend
+    if ~isempty(legendHandles)
+        legend(legendHandles, legendNames, ...
+            'Location', 'best', ...
+            'FontName', 'Arial', 'FontSize', 9, ...
+            'EdgeColor', [0.7, 0.7, 0.7], ...
+            'Box', 'on');
+    end
+    
+    % Adjust axis limits to provide margin
+    axis tight;
+    axisLimits = axis;
+    axisRange = [axisLimits(2)-axisLimits(1), axisLimits(4)-axisLimits(3)];
+    axis([axisLimits(1)-0.03*axisRange(1), axisLimits(2)+0.03*axisRange(1), ...
+          axisLimits(3)-0.03*axisRange(2), axisLimits(4)+0.03*axisRange(2)]);
+    
+    % Save figure as high-resolution PNG
     figFile = sprintf('results/flow_vectors_%s.png', datestr(now, 'yyyymmdd_HHMMSS'));
     print(figFile, '-dpng', '-r300');
 end
@@ -693,139 +794,6 @@ function projectedData = projectToHyperplane(data)
     
     % 使用矩阵乘法一次性计算所有投影坐标
     projectedData = diff * basis;  % numPoints x 2 矩阵
-end
-
-function hullIdx = concaveHull_knn(P, k)
-    % 基于k-近邻的非凸包提取算法
-    % P: N×2 点集, 每行一个二维点
-    % k: 近邻数量
-    % hullIdx: 非凸包上点的索引
-    
-    if size(P,1) < 3
-        error('点数量太少，至少需要3个点');
-    end
-    
-    % 寻找起点（最左点）
-    [~, start] = min(P(:,1));
-    
-    % 初始化
-    hullIdx = start;
-    cur = start;
-    prevAngle = 0;
-    visited = false(size(P,1), 1);
-    visited(start) = true;
-    
-    while true
-        % 计算当前点到所有点的距离
-        d = sqrt((P(:,1)-P(cur,1)).^2 + (P(:,2)-P(cur,2)).^2);
-        d(visited) = Inf;  % 已访问点不再考虑
-        
-        % 找到k个最近的点
-        [~, sorted] = sort(d);
-        cand = sorted(1:min(k, sum(~isinf(d))));
-        
-        if isempty(cand)
-            % 没有候选点，可能因为所有点都已访问
-            break;
-        end
-        
-        % 计算极角增量
-        angles = atan2(P(cand,2)-P(cur,2), P(cand,1)-P(cur,1));
-        angles = mod(angles - prevAngle, 2*pi);
-        
-        % 选择最小极角增量的点（避免交叉）
-        [~, minIdx] = min(angles);
-        next = cand(minIdx);
-        
-        % 检查是否回到起点
-        if next == start || visited(next)
-            break;
-        end
-        
-        % 添加点到hull
-        hullIdx(end+1) = next;
-        visited(next) = true;
-        
-        % 更新当前点和角度
-        prevAngle = atan2(P(next,2)-P(cur,2), P(next,1)-P(cur,1));
-        cur = next;
-    end
-    
-    % 如果需要闭合，添加起点
-    if hullIdx(end) ~= hullIdx(1)
-        hullIdx(end+1) = hullIdx(1);
-    end
-end
-
-function [upperHull, lowerHull] = findSegmentBoundary(x, y)
-    % This function finds the upper and lower boundaries of a set of points
-    % Identify upper and lower hulls
-    
-    % Use moving window approach for better boundary detection
-    window = min(50, length(x));
-    step = max(1, floor(window/4));
-    
-    upperPoints = [];
-    lowerPoints = [];
-    
-    for i = 1:step:length(x)-window+1
-        windowIdx = i:i+window-1;
-        
-        % Find local min and max y in the window
-        [maxY, maxIdx] = max(y(windowIdx));
-        [minY, minIdx] = min(y(windowIdx));
-        
-        % Add these points to upper and lower hulls
-        upperPoints = [upperPoints; x(windowIdx(maxIdx)), maxY];
-        lowerPoints = [lowerPoints; x(windowIdx(minIdx)), minY];
-    end
-    
-    % Add endpoints if needed
-    if ~isempty(upperPoints) && upperPoints(1,1) > x(1)
-        upperPoints = [x(1), y(1); upperPoints];
-    end
-    if ~isempty(upperPoints) && upperPoints(end,1) < x(end)
-        upperPoints = [upperPoints; x(end), y(end)];
-    end
-    if ~isempty(lowerPoints) && lowerPoints(1,1) > x(1)
-        lowerPoints = [x(1), y(1); lowerPoints];
-    end
-    if ~isempty(lowerPoints) && lowerPoints(end,1) < x(end)
-        lowerPoints = [lowerPoints; x(end), y(end)];
-    end
-    
-    % Sort by x-coordinate to ensure proper order
-    [~, upperIdx] = sort(upperPoints(:,1));
-    upperHull = upperPoints(upperIdx,:);
-    
-    [~, lowerIdx] = sort(lowerPoints(:,1));
-    lowerHull = lowerPoints(lowerIdx,:);
-    
-    % Ensure the hulls are smooth by removing unnecessary zigzags
-    if size(upperHull, 1) > 3
-        upperHull = smoothHull(upperHull);
-    end
-    if size(lowerHull, 1) > 3
-        lowerHull = smoothHull(lowerHull);
-    end
-end
-
-function smoothedHull = smoothHull(hull)
-    % Smooth a hull by removing points that cause zigzag patterns
-    i = 2;
-    while i < size(hull, 1)
-        % Calculate slopes
-        slopePrev = (hull(i,2) - hull(i-1,2)) / (hull(i,1) - hull(i-1,1));
-        slopeNext = (hull(i+1,2) - hull(i,2)) / (hull(i+1,1) - hull(i,1));
-        
-        % If slope changes direction dramatically, remove the point
-        if sign(slopePrev) ~= sign(slopeNext) && abs(slopePrev - slopeNext) > 0.1
-            hull(i,:) = [];
-        else
-            i = i + 1;
-        end
-    end
-    smoothedHull = hull;
 end
 
 function M = pairsToMatrix(pairs)
