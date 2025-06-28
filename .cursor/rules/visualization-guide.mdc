@@ -1,0 +1,39 @@
+---
+description: 
+globs: *.m
+alwaysApply: false
+---
+# 交通网络可视化指南
+
+## 主要可视化文件
+
+项目中的 [plotPathCosts.m](mdc:plotPathCosts.m) 提供了以下可视化功能：
+
+### 基础路径成本关系图
+- 显示时间-金钱成本关系
+- 定义可行区域及其边界
+- 使用优雅的颜色方案和科学风格展示
+
+### 可行成本上限分析图
+- 通过 `plotPathCostsWithUpperLimit` 函数实现
+- 在可行区域内定义成本上限折线（使用边界中点）
+- 将路径流量方案分为可行与不可行两类：
+  - 可行方案：所有点都在成本上限线下（蓝色系）
+  - 不可行方案：任一点超出成本上限（红色系）
+- 输出可行与不可行方案的索引信息
+
+## 调用方式
+
+使用以下格式调用主可视化函数：
+```matlab
+plotPathCosts(totalValidFlow, relationMatrix, selectedIndices);
+```
+
+参数说明：
+- totalValidFlow: 所有可行流量矩阵 (M x n)
+- relationMatrix: 关系矩阵
+- selectedIndices: 选定的流量向量索引
+
+## 与BRUE模型集成
+
+可视化结果可帮助理解BRUE模型中的路径选择决策，通过 [brue_matlab_solver.py](mdc:brue_matlab_solver.py) 可将Python模型结果传递给MATLAB进行可视化分析。

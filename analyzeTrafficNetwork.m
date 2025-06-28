@@ -10,9 +10,12 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index)
     
     % 检查是否存在缓存文件
     cacheFileName = sprintf('cache_zeta%d_subset%d.mat', zeta, subset_index);
-    if exist(cacheFileName, 'file')
+    pathConstraintCacheFileName = sprintf('cache_path_only_zeta%d_subset%d.mat', zeta, subset_index);
+    
+    if exist(cacheFileName, 'file') && exist(pathConstraintCacheFileName, 'file')
         fprintf('加载缓存数据...\n');
         load(cacheFileName, 'totalValidCost', 'totalValidFlow', 'relationMatrix');
+        load(pathConstraintCacheFileName, 'totalPathValidCost', 'totalPathValidFlow');
         fprintf('加载缓存数据完成...\n');
         toc;
         
@@ -37,6 +40,8 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index)
     n = size(relationMatrix, 1);
     totalValidCost = [];
     totalValidFlow = [];
+    totalPathValidCost = []; % 只满足路径约束的成本
+    totalPathValidFlow = []; % 只满足路径约束的流量
     bound = 0;
     
     %% 确保rangeMin和rangeMax的长度与n一致
@@ -64,17 +69,23 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index)
     
     for ii = minIt:maxIt
         waitbar((ii-minIt)/(maxIt-minIt), h, sprintf('正在计算第 %d/%d 次迭代...', ii-minIt+1, maxIt-minIt+1));
-        [samplesMat, totalValidCost, totalValidFlow] = processIteration(ii, n, rangeMin, rangeMax, bound, relationMatrix, totalValidCost, totalValidFlow, zeta);
+        [samplesMat, totalValidCost, totalValidFlow, totalPathValidCost, totalPathValidFlow] = processIteration(ii, n, rangeMin, rangeMax, bound, relationMatrix, totalValidCost, totalValidFlow, totalPathValidCost, totalPathValidFlow, zeta);
         
         % 增量数据压缩：当有效点数量超过阈值时进行压缩
         if size(totalValidCost, 1) > maxPointsPerIteration
-            fprintf('迭代 %d: 压缩数据点，从 %d 个点压缩...\n', ii, size(totalValidCost, 1));
+            fprintf('迭代 %d: 压缩全部约束数据点，从 %d 个点压缩...\n', ii, size(totalValidCost, 1));
             [totalValidCost, totalValidFlow] = reduceDataPoints(totalValidCost, totalValidFlow, maxPointsPerIteration);
         end
         
+        % 增量数据压缩：当路径约束点数量超过阈值时进行压缩
+        if size(totalPathValidCost, 1) > maxPointsPerIteration
+            fprintf('迭代 %d: 压缩路径约束数据点，从 %d 个点压缩...\n', ii, size(totalPathValidCost, 1));
+            [totalPathValidCost, totalPathValidFlow] = reduceDataPoints(totalPathValidCost, totalPathValidFlow, maxPointsPerIteration);
+        end
+        
         % 更新搜索范围
-        [~, sum_err] = evaluateObjective(samplesMat, relationMatrix, zeta);
-        valid = find(sum_err == 0);
+        [~, path_err, ~] = evaluateObjective(samplesMat, relationMatrix, zeta);
+        valid = find(path_err == 0);
         
         if ~isempty(valid)
             [rangeMin, rangeMax, bound] = updateSearchRange(samplesMat(valid,:), ii);
@@ -83,37 +94,38 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index)
         end
         
         fprintf('完成迭代 %d\n', ii);
-        
-        % 增量保存
-        % if mod(ii, 5) == 0 && ~isempty(totalValidCost)
-        %     tempFile = sprintf('results/result_zeta%d_subset%d_%s.mat', zeta, subset_index, datestr(now, 'yyyymmdd_HHMMSS'));
-        % 
-        %     % 确保结果目录存在
-        %     if ~exist('results', 'dir')
-        %         mkdir('results');
-        %     end
-        % 
-        %     % 保存当前结果
-        %     save(tempFile, 'totalValidCost', 'totalValidFlow', 'relationMatrix');
-        %     fprintf('已保存阶段性结果到%s\n', tempFile);
-        % end
     end
     close(h);
     toc
     
-    % 保存最终结果到缓存文件
+    % 保存满足所有约束的结果
     [totalValidCost,Ia,Ic]=unique(totalValidCost,"rows");
     totalValidFlow = totalValidFlow(Ia,:);
     
     % 使用网格采样减少数据点数量
     targetSize = 5e5; % 目标数据点数量：十万级别
     if size(totalValidCost, 1) > targetSize
-        fprintf('正在进行数据压缩，从 %d 个点压缩到目标 %d 个点左右...\n', size(totalValidCost, 1), targetSize);
+        fprintf('正在进行全约束数据压缩，从 %d 个点压缩到目标 %d 个点左右...\n', size(totalValidCost, 1), targetSize);
         [totalValidCost, totalValidFlow] = reduceDataPoints(totalValidCost, totalValidFlow, targetSize);
     end
     
+    % 保存满足路径约束的结果
+    [totalPathValidCost,Ia,Ic]=unique(totalPathValidCost,"rows");
+    totalPathValidFlow = totalPathValidFlow(Ia,:);
+    
+    % 使用网格采样减少数据点数量
+    if size(totalPathValidCost, 1) > targetSize
+        fprintf('正在进行路径约束数据压缩，从 %d 个点压缩到目标 %d 个点左右...\n', size(totalPathValidCost, 1), targetSize);
+        [totalPathValidCost, totalPathValidFlow] = reduceDataPoints(totalPathValidCost, totalPathValidFlow, targetSize);
+    end
+    
+    % 保存结果到缓存文件
     save(cacheFileName, 'totalValidCost', 'totalValidFlow', 'relationMatrix');
-    fprintf('结果已保存到缓存文件%s\n', cacheFileName);
+    fprintf('全部约束结果已保存到缓存文件%s\n', cacheFileName);
+    
+    % 保存只满足路径约束的数据到缓存文件
+    save(pathConstraintCacheFileName, 'totalPathValidCost', 'totalPathValidFlow', 'relationMatrix');
+    fprintf('只满足路径约束的结果已保存到缓存文件%s\n', pathConstraintCacheFileName);
     
     % 设置随机选择的流量向量数量
     q = 30;  % 可以根据需要修改
@@ -176,17 +188,22 @@ function validateInputs(zeta, rangeMin, rangeMax)
     end
 end
 
-function [samplesMat, totalValidCost, totalValidFlow] = processIteration(ii, n, rangeMin, rangeMax, bound, relationMatrix, totalValidCost, totalValidFlow, zeta)
+function [samplesMat, totalValidCost, totalValidFlow, totalPathValidCost, totalPathValidFlow] = processIteration(ii, n, rangeMin, rangeMax, bound, relationMatrix, totalValidCost, totalValidFlow, totalPathValidCost, totalPathValidFlow, zeta)
     % 处理单次迭代
     dimNum = ones(1,n)*ii;
     samples = generateSamples(n, rangeMin-bound, rangeMax+bound, dimNum);
     samplesMat = combineSamples(samples, n);
     
     % 计算目标函数和约束违反
-    [ff, sum_err] = evaluateObjective(samplesMat, relationMatrix, zeta);
-    valid = sum_err == 0;
+    [ff, path_err, money_err] = evaluateObjective(samplesMat, relationMatrix, zeta);
     
-    % 更新结果
+    % 满足所有约束的流量向量
+    valid = path_err == 0 & money_err == 0;
+    
+    % 只满足路径约束的流量向量
+    path_valid = path_err == 0;
+    
+    % 更新满足所有约束的结果
     if any(valid)
         if isempty(totalValidCost)
             totalValidCost = ff(valid,:);
@@ -197,6 +214,20 @@ function [samplesMat, totalValidCost, totalValidFlow] = processIteration(ii, n, 
             totalValidFlow = samplesMat(valid,:);
         else
             totalValidFlow = [totalValidFlow;samplesMat(valid,:)];
+        end
+    end
+    
+    % 更新只满足路径约束的结果
+    if any(path_valid)
+        if isempty(totalPathValidCost)
+            totalPathValidCost = ff(path_valid,:);
+        else
+            totalPathValidCost = [totalPathValidCost; ff(path_valid,:)];
+        end
+        if isempty(totalPathValidFlow)
+            totalPathValidFlow = samplesMat(path_valid,:);
+        else
+            totalPathValidFlow = [totalPathValidFlow;samplesMat(path_valid,:)];
         end
     end
 end
@@ -277,7 +308,7 @@ function samplesMat = combineSamples(samples, n)
     samplesMat = [samplesMat, lastDim];
 end
 
-function [ff, err] = evaluateObjective(f, M, zeta)
+function [ff, path_err, money_err] = evaluateObjective(f, M, zeta)
     % 评估目标函数和约束违反
     n = size(M,1);
     
@@ -299,17 +330,18 @@ function [ff, err] = evaluateObjective(f, M, zeta)
     money = money*M';
     
     % 初始化误差
-    err = zeros(size(f, 1), 1);
+    path_err = zeros(size(f, 1), 1);
+    money_err = zeros(size(f, 1), 1);
     
     % 计算实际行驶时间
     x = f*M;
     RT = calculateRealTime(x, M, freeFlowTime, maxCapacity);
     
     % 检查路径时间差异约束
-    err = checkPathConstraints(RT, zeta, n, err);
+    path_err = checkPathConstraints(RT, zeta, n, path_err);
     
     % 检查货币约束
-    err = checkMoneyConstraints(RT, money, n, err);
+    money_err = checkMoneyConstraints(RT, money, n, money_err);
     
     % 计算目标函数
     ff = calculateObjectives(f, RT, money);
@@ -383,7 +415,7 @@ function plotResults(totalValidCost, selectedIndices)
         cleanData = totalValidCost;  % 使用全部数据
         
         % 固定sf值为0.3
-        sf = 0.5;
+        sf = 1;
         
         % 提取边界
         idx = boundary(cleanData(:,1), cleanData(:,2), sf);
