@@ -24,7 +24,7 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index)
         if ~isempty(totalValidFlow)
             selectedIndices = randperm(size(totalValidFlow, 1), min(q, size(totalValidFlow, 1)));
             % plotResults(totalValidCost, selectedIndices);
-            % plotPathCosts(totalValidFlow, relationMatrix, selectedIndices);
+            plotPathCosts(totalValidFlow, relationMatrix, selectedIndices);
             % 绘制流量向量可视化
             plotFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, selectedIndices);
         end
@@ -68,50 +68,41 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index)
     
     % 设置数据压缩参数
     maxPointsPerIteration = 1e5; % 每次迭代最大保留点数
-    
-    % 选择采样策略: 'grid' (传统网格采样) 或 'boundary' (边界优先采样)
-    samplingStrategy = 'grid';
-    
-    if strcmp(samplingStrategy, 'boundary')
-        % 使用边界优先采样策略
-        [totalValidCost, totalValidFlow, totalPathValidCost, totalPathValidFlow] = ...
-            boundaryFocusedSampling(minIt, maxIt, h, n, rangeMin, rangeMax, relationMatrix, zeta, maxPointsPerIteration);
-    else
-        % 传统网格采样策略
-        for ii = minIt:maxIt
-            waitbar((ii-minIt)/(maxIt-minIt), h, sprintf('正在计算第 %d/%d 次迭代...', ii-minIt+1, maxIt-minIt+1));
-            [samplesMat, totalValidCost, totalValidFlow, totalPathValidCost, totalPathValidFlow] = processIteration(ii, n, rangeMin, rangeMax, bound, relationMatrix, totalValidCost, totalValidFlow, totalPathValidCost, totalPathValidFlow, zeta);
-            
-            % 增量数据压缩：当有效点数量超过阈值时进行压缩
-            if size(totalValidCost, 1) > maxPointsPerIteration
-                fprintf('迭代 %d: 压缩全部约束数据点，从 %d 个点压缩...\n', ii, size(totalValidCost, 1));
-                [totalValidCost, totalValidFlow] = reduceDataPoints(totalValidCost, totalValidFlow, maxPointsPerIteration);
-            end
-            
-            % 增量数据压缩：当路径约束点数量超过阈值时进行压缩
-            if size(totalPathValidCost, 1) > maxPointsPerIteration
-                fprintf('迭代 %d: 压缩路径约束数据点，从 %d 个点压缩...\n', ii, size(totalPathValidCost, 1));
-                [totalPathValidCost, totalPathValidFlow] = reduceDataPoints(totalPathValidCost, totalPathValidFlow, maxPointsPerIteration);
-            end
-            
-            % 更新搜索范围
-            [~, path_err, ~] = evaluateObjective(samplesMat, relationMatrix, zeta);
-            valid = find(path_err == 0);
-            
-            if ~isempty(valid)
-                [rangeMin, rangeMax, bound] = updateSearchRange(samplesMat(valid,:), ii);
-            else
-                bound = 0;
-            end
-            
-            fprintf('完成迭代 %d\n', ii);
+
+    % 传统网格采样策略
+    for ii = minIt:maxIt
+        waitbar((ii-minIt)/(maxIt-minIt), h, sprintf('正在计算第 %d/%d 次迭代...', ii-minIt+1, maxIt-minIt+1));
+        [samplesMat, totalValidCost, totalValidFlow, totalPathValidCost, totalPathValidFlow] = processIteration(ii, n, rangeMin, rangeMax, bound, relationMatrix, totalValidCost, totalValidFlow, totalPathValidCost, totalPathValidFlow, zeta);
+        
+        % 增量数据压缩：当有效点数量超过阈值时进行压缩
+        if size(totalValidCost, 1) > maxPointsPerIteration
+            fprintf('迭代 %d: 压缩全部约束数据点，从 %d 个点压缩...\n', ii, size(totalValidCost, 1));
+            [totalValidCost, totalValidFlow] = reduceDataPoints(totalValidCost, totalValidFlow, maxPointsPerIteration);
         end
+        
+        % 增量数据压缩：当路径约束点数量超过阈值时进行压缩
+        if size(totalPathValidCost, 1) > maxPointsPerIteration
+            fprintf('迭代 %d: 压缩路径约束数据点，从 %d 个点压缩...\n', ii, size(totalPathValidCost, 1));
+            [totalPathValidCost, totalPathValidFlow] = reduceDataPoints(totalPathValidCost, totalPathValidFlow, maxPointsPerIteration);
+        end
+        
+        % 更新搜索范围
+        [~, path_err, ~] = evaluateObjective(samplesMat, relationMatrix, zeta);
+        valid = find(path_err == 0);
+        
+        if ~isempty(valid)
+            [rangeMin, rangeMax, bound] = updateSearchRange(samplesMat(valid,:), ii);
+        else
+            bound = 0;
+        end
+        
+        fprintf('完成迭代 %d\n', ii);
     end
     close(h);
     toc
     
     % 保存满足所有约束的结果
-    [totalValidCost,Ia,Ic]=unique(totalValidCost,"rows");
+    [totalValidCost,Ia,~]=unique(totalValidCost,"rows");
     totalValidFlow = totalValidFlow(Ia,:);
     
     % 使用网格采样减少数据点数量
@@ -122,7 +113,7 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index)
     end
     
     % 保存满足路径约束的结果
-    [totalPathValidCost,Ia,Ic]=unique(totalPathValidCost,"rows");
+    [totalPathValidCost,Ia,~]=unique(totalPathValidCost,"rows");
     totalPathValidFlow = totalPathValidFlow(Ia,:);
     
     % 使用网格采样减少数据点数量
@@ -147,7 +138,7 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index)
         selectedIndices = randperm(size(totalValidFlow, 1), min(q, size(totalValidFlow, 1)));
         
         % 先绘制总体结果
-        plotResults(totalValidCost, selectedIndices);
+        % plotResults(totalValidCost, selectedIndices);
         
         % 调用路径成本绘图函数
         plotPathCosts(totalValidFlow, relationMatrix, selectedIndices);
@@ -376,22 +367,24 @@ function t = calculateTravelTime(x, t0, C)
 end
 
 function err = checkPathConstraints(RT, zeta, n, err)
-    % 检查路径约束
-    combs = nchoosek(1:n, 2);
-    RTDiffs = abs(RT(:, combs(:,1)) - RT(:, combs(:,2)));
-    
-    for i = 1:size(RTDiffs,2)
-        err = err + max(0, RTDiffs(:,i) - zeta);
-    end
+    % 检查路径约束（矢量化实现）
+    % 对所有路径对一次性计算 |RT_i - RT_j| - zeta，并累加违反量
+    combs = nchoosek(1:n, 2);                  % 所有(i,j)组合，i<j
+    % 计算差值并扣减 zeta
+    RTDiffs = abs(RT(:, combs(:,1)) - RT(:, combs(:,2))) - zeta;  % (samples × pairs)
+    % 仅累加违反部分 (>0)
+    err = err + sum(max(RTDiffs, 0), 2);
 end
 
 function err = checkMoneyConstraints(RT, money, n, err)
-    % 检查货币约束
-    for i = 1:n
-        for j = i+1:n
-            err = err + max(0, (RT(:,i)- RT(:,j)) .* (money(i) - money(j)));
-        end
-    end
+    % 检查货币约束（矢量化实现）
+    % 对所有路径对一次性计算 (RT_i - RT_j)*(money_i - money_j)
+    combs = nchoosek(1:n, 2);                          % 所有(i,j)组合
+    moneyDiffs = money(combs(:,1)) - money(combs(:,2));% 1 × pairs
+    % RT 差 (samples × pairs)
+    RTDiffs = RT(:, combs(:,1)) - RT(:, combs(:,2));
+    % 违反量：只保留正值再累加
+    err = err + sum(max(RTDiffs .* moneyDiffs, 0), 2);
 end
 
 function ff = calculateObjectives(f, RT, money)
@@ -940,419 +933,3 @@ function paretoIndices = findParetoFrontier(points)
     % 返回非支配点的索引
     paretoIndices = find(~isDominated);
 end
-
-function [totalValidCost, totalValidFlow, totalPathValidCost, totalPathValidFlow] = boundaryFocusedSampling(minIt, maxIt, h, n, rangeMin, rangeMax, relationMatrix, zeta, maxPointsPerIteration)
-    % 边界优先采样方法 - 集中计算边界区域
-    % 
-    % 输入参数:
-    %   minIt, maxIt         - 最小和最大迭代次数
-    %   h                    - waitbar句柄
-    %   n                    - 维度数
-    %   rangeMin, rangeMax   - 搜索范围边界
-    %   relationMatrix       - 关系矩阵
-    %   zeta                 - 路径约束参数
-    %   maxPointsPerIteration - 每次迭代最大保留点数量
-    %
-    % 输出参数:
-    %   totalValidCost       - 满足全部约束的点的成本
-    %   totalValidFlow       - 满足全部约束的点的流量
-    %   totalPathValidCost   - 满足路径约束的点的成本
-    %   totalPathValidFlow   - 满足路径约束的点的流量
-    
-    % 初始化
-    totalValidCost = [];
-    totalValidFlow = [];
-    totalPathValidCost = [];
-    totalPathValidFlow = [];
-    
-    % 初始边界探索
-    fprintf('开始边界优先采样...\n');
-    
-    % 阶段1: 初始密集采样以找到基础边界
-    waitbar(0, h, '阶段1: 进行初始采样以找到边界区域...');
-    fprintf('阶段1: 进行初始采样以找到边界区域...\n');
-    
-    % 使用较粗的网格进行初始采样(但维度仍然保持较高)
-    initialGridSize = 60; % 初始网格尺寸
-    dimNum = ones(1,n) * initialGridSize;
-    samples = generateSamples(n, rangeMin-22, rangeMax+22, dimNum);
-    samplesMat = combineSamples(samples, n);
-    
-    % 评估初始样本
-    [ff, path_err, money_err] = evaluateObjective(samplesMat, relationMatrix, zeta);
-    
-    % 找出满足约束的点
-    path_valid = path_err == 0;
-    all_valid = path_err == 0 & money_err == 0;
-    
-    path_valid_samples = samplesMat(path_valid, :);
-    all_valid_samples = samplesMat(all_valid, :);
-    
-    % 初始化结果存储
-    if any(path_valid)
-        totalPathValidCost = ff(path_valid, :);
-        totalPathValidFlow = path_valid_samples;
-    end
-    
-    if any(all_valid)
-        totalValidCost = ff(all_valid, :);
-        totalValidFlow = all_valid_samples;
-    end
-    
-    % 阶段2: 边界区域识别与精细化
-    waitbar(0.2, h, '阶段2: 识别边界区域...');
-    fprintf('阶段2: 识别边界区域...\n');
-    
-    % 如果有足够的有效点，可以尝试识别边界
-    if size(path_valid_samples, 1) > 10
-        % 使用凸包估计边界点
-        % 对路径约束区域边界点
-        path_boundary_points = identifyBoundaryPoints(path_valid_samples);
-        
-        % 对全部约束区域边界点
-        if size(all_valid_samples, 1) > 10
-            all_boundary_points = identifyBoundaryPoints(all_valid_samples);
-        else
-            all_boundary_points = all_valid_samples;
-        end
-        
-        % 阶段3: 边界区域精细采样
-        waitbar(0.4, h, '阶段3: 对边界区域进行精细采样...');
-        fprintf('阶段3: 对边界区域进行精细采样...\n');
-        
-        % 为边界点创建采样区域，并进行密集采样
-        for ii = minIt:maxIt
-            waitbar(0.4 + 0.5*((ii-minIt)/(maxIt-minIt)), h, ...
-                sprintf('阶段3: 精细采样迭代 %d/%d...', ii-minIt+1, maxIt-minIt+1));
-            
-            % 为每个边界点创建小区域进行密集采样
-            if ~isempty(path_boundary_points)
-                % 对路径边界点区域进行采样
-                newSamples = generateBoundarySamples(path_boundary_points, ii, rangeMin, rangeMax, n);
-                
-                % 评估新样本
-                if ~isempty(newSamples)
-                    [new_ff, new_path_err, new_money_err] = evaluateObjective(newSamples, relationMatrix, zeta);
-                    new_path_valid = new_path_err == 0;
-                    new_all_valid = new_path_err == 0 & new_money_err == 0;
-                    
-                    % 更新结果
-                    if any(new_path_valid)
-                        totalPathValidCost = [totalPathValidCost; new_ff(new_path_valid, :)];
-                        totalPathValidFlow = [totalPathValidFlow; newSamples(new_path_valid, :)];
-                        
-                        % 更新路径约束边界点
-                        new_path_valid_samples = newSamples(new_path_valid, :);
-                        path_boundary_points = refreshBoundaryPoints(path_boundary_points, new_path_valid_samples);
-                    end
-                    
-                    if any(new_all_valid)
-                        totalValidCost = [totalValidCost; new_ff(new_all_valid, :)];
-                        totalValidFlow = [totalValidFlow; newSamples(new_all_valid, :)];
-                        
-                        % 更新全约束边界点
-                        new_all_valid_samples = newSamples(new_all_valid, :);
-                        all_boundary_points = refreshBoundaryPoints(all_boundary_points, new_all_valid_samples);
-                    end
-                end
-            end
-            
-            % 边界区域精细化采样
-            if ~isempty(all_boundary_points) && size(all_boundary_points, 1) > 5
-                % 对全约束边界点区域进行更精细采样
-                fineNewSamples = generateBoundarySamples(all_boundary_points, ii+5, rangeMin, rangeMax, n);
-                
-                if ~isempty(fineNewSamples)
-                    [fine_ff, fine_path_err, fine_money_err] = evaluateObjective(fineNewSamples, relationMatrix, zeta);
-                    fine_path_valid = fine_path_err == 0;
-                    fine_all_valid = fine_path_err == 0 & fine_money_err == 0;
-                    
-                    % 更新结果
-                    if any(fine_path_valid)
-                        totalPathValidCost = [totalPathValidCost; fine_ff(fine_path_valid, :)];
-                        totalPathValidFlow = [totalPathValidFlow; fineNewSamples(fine_path_valid, :)];
-                    end
-                    
-                    if any(fine_all_valid)
-                        totalValidCost = [totalValidCost; fine_ff(fine_all_valid, :)];
-                        totalValidFlow = [totalValidFlow; fineNewSamples(fine_all_valid, :)];
-                        
-                        % 更新全约束边界
-                        new_fine_valid_samples = fineNewSamples(fine_all_valid, :);
-                        all_boundary_points = refreshBoundaryPoints(all_boundary_points, new_fine_valid_samples);
-                    end
-                end
-            end
-            
-            % 数据压缩以控制内存使用
-            if size(totalValidCost, 1) > maxPointsPerIteration
-                fprintf('迭代 %d: 压缩全部约束数据点，从 %d 个点压缩...\n', ii, size(totalValidCost, 1));
-                [totalValidCost, totalValidFlow] = reduceDataPoints(totalValidCost, totalValidFlow, maxPointsPerIteration);
-            end
-            
-            if size(totalPathValidCost, 1) > maxPointsPerIteration
-                fprintf('迭代 %d: 压缩路径约束数据点，从 %d 个点压缩...\n', ii, size(totalPathValidCost, 1));
-                [totalPathValidCost, totalPathValidFlow] = reduceDataPoints(totalPathValidCost, totalPathValidFlow, maxPointsPerIteration);
-            end
-            
-            fprintf('完成边界采样迭代 %d\n', ii);
-        end
-        
-        % 阶段4: 边界点扩展，填充内部区域采样
-        waitbar(0.9, h, '阶段4: 填充内部区域...');
-        fprintf('阶段4: 填充内部区域...\n');
-        
-        % 使用凸组合生成内部点
-        if size(all_valid_samples, 1) > 3
-            interiorSamples = generateInteriorSamples(all_valid_samples);
-            
-            if ~isempty(interiorSamples)
-                [interior_ff, interior_path_err, interior_money_err] = evaluateObjective(interiorSamples, relationMatrix, zeta);
-                interior_all_valid = interior_path_err == 0 & interior_money_err == 0;
-                
-                % 更新内部点结果
-                if any(interior_all_valid)
-                    totalValidCost = [totalValidCost; interior_ff(interior_all_valid, :)];
-                    totalValidFlow = [totalValidFlow; interiorSamples(interior_all_valid, :)];
-                end
-            end
-        end
-    else
-        % 如果初始采样没有找到足够的有效点，回退到传统网格方法
-        fprintf('未发现足够边界点，回退到传统网格采样方法...\n');
-        
-        % 执行传统网格采样
-        bound = 0;
-        for ii = minIt:maxIt
-            waitbar((ii-minIt)/(maxIt-minIt), h, sprintf('正在计算第 %d/%d 次迭代...', ii-minIt+1, maxIt-minIt+1));
-            [samplesMat, totalValidCost, totalValidFlow, totalPathValidCost, totalPathValidFlow] = ...
-                processIteration(ii, n, rangeMin, rangeMax, bound, relationMatrix, totalValidCost, ...
-                totalValidFlow, totalPathValidCost, totalPathValidFlow, zeta);
-            
-            % 增量数据压缩
-            if size(totalValidCost, 1) > maxPointsPerIteration
-                fprintf('迭代 %d: 压缩全部约束数据点，从 %d 个点压缩...\n', ii, size(totalValidCost, 1));
-                [totalValidCost, totalValidFlow] = reduceDataPoints(totalValidCost, totalValidFlow, maxPointsPerIteration);
-            end
-            
-            if size(totalPathValidCost, 1) > maxPointsPerIteration
-                fprintf('迭代 %d: 压缩路径约束数据点，从 %d 个点压缩...\n', ii, size(totalPathValidCost, 1));
-                [totalPathValidCost, totalPathValidFlow] = reduceDataPoints(totalPathValidCost, totalPathValidFlow, maxPointsPerIteration);
-            end
-            
-            % 更新搜索范围
-            [~, path_err, ~] = evaluateObjective(samplesMat, relationMatrix, zeta);
-            valid = find(path_err == 0);
-            
-            if ~isempty(valid)
-                [rangeMin, rangeMax, bound] = updateSearchRange(samplesMat(valid,:), ii);
-            else
-                bound = 0;
-            end
-            
-            fprintf('完成迭代 %d\n', ii);
-        end
-    end
-    
-    % 最终数据处理
-    % 去除重复点
-    if ~isempty(totalValidCost)
-        [totalValidCost, Ia, ~] = unique(totalValidCost, "rows");
-        totalValidFlow = totalValidFlow(Ia,:);
-    end
-    
-    if ~isempty(totalPathValidCost)
-        [totalPathValidCost, Ia, ~] = unique(totalPathValidCost, "rows");
-        totalPathValidFlow = totalPathValidFlow(Ia,:);
-    end
-    
-    fprintf('边界优先采样完成。\n');
-    fprintf('发现满足路径约束的点: %d\n', size(totalPathValidCost, 1));
-    fprintf('发现满足全部约束的点: %d\n', size(totalValidCost, 1));
-end
-
-function boundary_points = identifyBoundaryPoints(samples)
-    % 识别样本集的边界点
-    %
-    % 输入:
-    %   samples - 样本点矩阵，每行一个点
-    %
-    % 输出:
-    %   boundary_points - 边界点矩阵，每行一个点
-    
-    % 如果维度大于3，使用PCA降到3维进行计算
-    [n, d] = size(samples);
-    
-    if n < 4
-        % 样本点太少，全部返回
-        boundary_points = samples;
-        return;
-    end
-    
-    if d > 3
-        % 数据标准化
-        samplesNorm = samples - mean(samples);
-        
-        try
-            % 使用PCA降维到3维
-            [~, score, ~] = pca(samplesNorm);
-            samples3D = score(:,1:min(3,size(score,2)));
-            
-            % 计算3D凸包
-            try
-                % 使用Qhull计算边界点
-                K = boundary(samples3D(:,1), samples3D(:,2), samples3D(:,3), 0.5);
-                boundary_points = samples(unique(K),:);
-            catch
-                % 如果3D凸包计算失败，尝试2D
-                K = boundary(samples3D(:,1), samples3D(:,2), 0.5);
-                boundary_points = samples(unique(K),:);
-            end
-        catch
-            % 如果PCA失败，使用随机采样
-            fprintf('PCA降维失败，使用随机采样边界点...\n');
-            % 随机选择30%的点
-            idx = randperm(n, max(ceil(n*0.3), 10));
-            boundary_points = samples(idx,:);
-        end
-    else
-        % 维度小于等于3，直接计算凸包
-        if d == 2
-            try
-                K = boundary(samples(:,1), samples(:,2), 0.5);
-                boundary_points = samples(unique(K),:);
-            catch
-                % 失败时，随机采样
-                idx = randperm(n, max(ceil(n*0.3), 10));
-                boundary_points = samples(idx,:);
-            end
-        elseif d == 3
-            try
-                K = boundary(samples(:,1), samples(:,2), samples(:,3), 0.5);
-                boundary_points = samples(unique(K),:);
-            catch
-                % 失败时，随机采样
-                idx = randperm(n, max(ceil(n*0.3), 10));
-                boundary_points = samples(idx,:);
-            end
-        else
-            % 维度为1，没有边界的概念
-            boundary_points = samples([1, end],:); % 取两端点
-        end
-    end
-    
-    % 确保返回的边界点不超过原始点的30%
-    if size(boundary_points, 1) > n*0.3
-        idx = randperm(size(boundary_points, 1), ceil(n*0.3));
-        boundary_points = boundary_points(idx,:);
-    end
-end
-
-function newSamples = generateBoundarySamples(boundaryPoints, iteration, rangeMin, rangeMax, n)
-    % 在边界点周围生成新样本
-    %
-    % 输入:
-    %   boundaryPoints - 边界点
-    %   iteration     - 当前迭代次数
-    %   rangeMin, rangeMax - 搜索范围
-    %   n            - 维度
-    %
-    % 输出:
-    %   newSamples    - 新生成的样本
-    
-    % 定义迭代范围（与主函数保持一致）
-    minIt = 10;
-    maxIt = 40;
-    
-    % 确定采样半径(随迭代次数减小)
-    radius = max((maxIt-iteration)/(maxIt-minIt), 0.1);
-    
-    % 选择一部分边界点进行扰动采样
-    numPoints = min(size(boundaryPoints, 1), 50);
-    selectedIdx = randperm(size(boundaryPoints, 1), numPoints);
-    selectedPoints = boundaryPoints(selectedIdx, :);
-    
-    % 为每个选定的边界点生成多个扰动样本
-    numSamplesPerPoint = ceil(200 / numPoints);
-    newSamples = [];
-    
-    for i = 1:numPoints
-        basePoint = selectedPoints(i, :);
-        
-        % 生成扰动样本
-        perturbations = radius * (rand(numSamplesPerPoint, n) - 0.5) .* (rangeMax - rangeMin);
-        perturbedPoints = basePoint + perturbations;
-        
-        % 确保点在范围内
-        perturbedPoints = max(perturbedPoints, rangeMin);
-        perturbedPoints = min(perturbedPoints, rangeMax);
-        
-        % 确保总和为10000
-        rowSums = sum(perturbedPoints, 2);
-        perturbedPoints = perturbedPoints .* (10000 ./ rowSums);
-        
-        % 添加到新样本中
-        newSamples = [newSamples; perturbedPoints];
-    end
-end
-
-function updatedBoundaryPoints = refreshBoundaryPoints(oldBoundaryPoints, newValidSamples)
-    % 根据新的有效样本更新边界点
-    %
-    % 输入:
-    %   oldBoundaryPoints - 旧边界点
-    %   newValidSamples   - 新有效样本
-    %
-    % 输出:
-    %   updatedBoundaryPoints - 更新后的边界点
-    
-    % 合并旧边界点和一些新样本
-    numNewPoints = min(size(newValidSamples, 1), 50);
-    if numNewPoints > 0
-        selectedNewIdx = randperm(size(newValidSamples, 1), numNewPoints);
-        selectedNewPoints = newValidSamples(selectedNewIdx, :);
-        
-        % 合并点
-        combinedPoints = [oldBoundaryPoints; selectedNewPoints];
-        
-        % 识别新的边界点
-        updatedBoundaryPoints = identifyBoundaryPoints(combinedPoints);
-    else
-        updatedBoundaryPoints = oldBoundaryPoints;
-    end
-end
-
-function interiorSamples = generateInteriorSamples(validSamples)
-    % 使用凸组合生成内部点
-    %
-    % 输入:
-    %   validSamples - 有效样本点
-    %
-    % 输出:
-    %   interiorSamples - 生成的内部点
-    
-    n = size(validSamples, 1);
-    
-    if n < 4
-        % 样本点太少，无法生成内部点
-        interiorSamples = [];
-        return;
-    end
-    
-    % 确定生成的样本数
-    numInteriorSamples = min(1000, n*2);
-    interiorSamples = zeros(numInteriorSamples, size(validSamples, 2));
-    
-    for i = 1:numInteriorSamples
-        % 随机选择2-4个点
-        numPoints = randi([2, min(4, n)]);
-        pointIndices = randperm(n, numPoints);
-        
-        % 生成随机权重
-        weights = rand(numPoints, 1);
-        weights = weights / sum(weights);
-        
-        % 计算凸组合
-        interiorSamples(i, :) = weights' * validSamples(pointIndices, :);
-    end
-end 
