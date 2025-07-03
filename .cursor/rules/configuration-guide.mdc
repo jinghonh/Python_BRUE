@@ -1,0 +1,60 @@
+---
+description: 
+globs: *.m
+alwaysApply: false
+---
+# 配置系统指南
+
+交通网络分析系统采用集中式配置管理，提供灵活的参数调整能力。
+
+## 配置结构
+
+配置通过 [getDefaultConfig.m](mdc:TrafficNetwork/utils/getDefaultConfig.m) 提供，包括以下主要部分：
+
+```matlab
+config.sampling      % 采样策略配置
+config.cache         % 缓存配置
+config.visualization % 可视化配置
+config.computation   % 计算参数
+```
+
+## 采样配置
+
+```matlab
+config.sampling.strategy = 'boundary';         % 'boundary'或'grid'
+config.sampling.minIteration = 30;             % 最小迭代次数
+config.sampling.maxIteration = 40;             % 最大迭代次数
+config.sampling.maxPointsPerIteration = 1e5;   % 每次迭代最大保留点数
+config.sampling.adaptiveThreshold = 50;        % 自适应边界识别阈值
+config.sampling.explorationRate = 0.7;         % 初始探索率
+```
+
+## 缓存配置
+
+```matlab
+config.cache.enabled = true;          % 是否启用缓存
+config.cache.compression = true;      % 是否压缩缓存
+config.cache.directory = 'cache';     % 缓存目录
+```
+
+## 可视化配置
+
+```matlab
+config.visualization.samplesCount = 30;         % 可视化样本数
+config.visualization.saveFigures = true;        % 是否保存图像
+config.visualization.outputDirectory = 'results'; % 输出目录
+```
+
+## 自定义配置
+
+可以通过以下方式使用自定义配置：
+
+1. 创建MAT、JSON或脚本文件包含config结构体
+2. 在调用主函数时指定配置文件：
+   ```matlab
+   analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index, 'configFile', 'myConfig.mat');
+   ```
+3. 直接覆盖特定配置参数：
+   ```matlab
+   analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index, 'samplingStrategy', 'grid');
+   ```

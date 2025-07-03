@@ -6,9 +6,13 @@ clear;
 clc;
 close all;
 
+% 添加 TrafficNetwork 目录及其子目录到 MATLAB 路径
+addpath('TrafficNetwork');
+addpath(genpath('TrafficNetwork'));
+
 % 设置参数
-zeta = 31;          % 可选值：15 或 31
-subset_index = 2;   % zeta=15时可选0,1；zeta=31时可选0,1,2
+zeta = 15;          % 可选值：15 或 31
+subset_index = 1;   % zeta=15时可选0,1；zeta=31时可选0,1,2
 
 % 验证输入参数
 if ~ismember(zeta, [15, 31])

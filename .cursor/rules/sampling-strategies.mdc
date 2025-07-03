@@ -1,0 +1,53 @@
+---
+description: 
+globs: *.m
+alwaysApply: false
+---
+# 采样策略指南
+
+交通网络分析系统提供两种主要的采样策略：边界优先采样和传统网格采样。
+
+## 边界优先采样
+
+实现文件: [boundaryFocusedSampling.m](mdc:TrafficNetwork/sampling/boundaryFocusedSampling.m)
+
+边界优先采样是一种高效的采样策略，它专注于探索约束边界区域，包括四个主要阶段：
+
+1. **初始密集采样**: 通过大范围采样找到初始可行点
+2. **边界识别**: 使用降维和凸包算法识别边界点
+3. **边界精细化**: 在边界区域进行高密度采样
+4. **内部填充**: 使用凸组合方法填充内部区域
+
+优点：
+- 在相同迭代次数下能找到更多可行解
+- 对于复杂约束形状更有效
+- 适应性更强，自动关注难采样区域
+
+配置参数:
+```matlab
+config.sampling.strategy = 'boundary';
+config.sampling.adaptiveThreshold = 50;    % 边界识别阈值
+config.sampling.explorationRate = 0.7;     % 探索率(0-1)
+```
+
+## 传统网格采样
+
+实现文件: [gridSampling.m](mdc:TrafficNetwork/sampling/gridSampling.m)
+
+传统网格采样使用均匀网格对搜索空间进行采样，在每次迭代中通过缩小搜索范围提高精度。
+
+优点：
+- 实现简单，计算负担较轻
+- 在简单约束问题上表现良好
+- 搜索范围收敛性好
+
+配置参数:
+```matlab
+config.sampling.strategy = 'grid';
+```
+
+## 策略选择建议
+
+- 对于高维度复杂约束问题，推荐使用边界优先采样
+- 对于低维度简单约束问题，两种方法都可以，传统网格采样可能更高效
+- 如果关注计算速度，可以降低边界优先采样的精度参数

@@ -1,0 +1,34 @@
+---
+description: 
+globs: *.m
+alwaysApply: false
+---
+# 系统架构指南
+
+交通网络分析系统采用模块化架构，分为四个主要组件：
+
+## 核心模块
+
+- [TrafficNetworkAnalyzer.m](mdc:TrafficNetwork/core/TrafficNetworkAnalyzer.m): 系统的中央控制器，协调各模块工作
+- [evaluateObjective.m](mdc:TrafficNetwork/core/evaluateObjective.m): 评估流量分配的目标函数和约束违反
+
+## 采样模块
+
+- [boundaryFocusedSampling.m](mdc:TrafficNetwork/sampling/boundaryFocusedSampling.m): 边界优先采样策略
+- [gridSampling.m](mdc:TrafficNetwork/sampling/gridSampling.m): 传统网格采样策略
+- [identifyBoundaryPoints.m](mdc:TrafficNetwork/sampling/identifyBoundaryPoints.m): 边界点识别算法
+- [generateSamples.m](mdc:TrafficNetwork/sampling/generateSamples.m): 基础样本生成
+- [combineSamples.m](mdc:TrafficNetwork/sampling/combineSamples.m): 样本组合与处理
+
+## 工具模块
+
+- [cacheManager.m](mdc:TrafficNetwork/utils/cacheManager.m): 缓存管理类
+- [getDefaultConfig.m](mdc:TrafficNetwork/utils/getDefaultConfig.m): 默认配置提供
+- [reduceDataPoints.m](mdc:TrafficNetwork/utils/reduceDataPoints.m): 数据点压缩算法
+
+## 组件交互
+
+1. 主入口函数初始化分析器并提供配置
+2. 分析器根据配置选择采样策略
+3. 采样策略生成并评估样本点
+4. 结果通过缓存保存或直接可视化
