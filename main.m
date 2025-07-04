@@ -1,18 +1,12 @@
-% 交通网络分析主脚本
-% 用于运行不同参数组合的交通网络分析
-
 % 清理工作空间
 clear;
 clc;
 close all;
 
-% 添加 TrafficNetwork 目录及其子目录到 MATLAB 路径
-addpath('TrafficNetwork');
-addpath(genpath('TrafficNetwork'));
 
 % 设置参数
 zeta = 15;          % 可选值：15 或 31
-subset_index = 1;   % zeta=15时可选0,1；zeta=31时可选0,1,2
+subset_index = 0;   % zeta=15时可选0,1；zeta=31时可选0,1,2
 
 % 验证输入参数
 if ~ismember(zeta, [15, 31])
@@ -72,16 +66,6 @@ for i = 10:35
     end
 end
 
-% % 如果找到临时文件，询问用户是否恢复
-% if ~isempty(lastIterFile)
-%     fprintf('发现临时结果文件 %s\n', lastIterFile);
-%     choice = input('是否从上次计算结果继续? (y/n): ', 's');
-%     if strcmpi(choice, 'y')
-%         fprintf('加载临时结果文件...\n');
-%         load(lastIterFile, 'totalValidCost', 'totalValidFlow');
-%         fprintf('成功加载临时结果，将从迭代 %d 继续\n', lastIter + 1);
-%     end
-% end
 
 % 创建结果目录（如果不存在）
 if ~exist('results', 'dir')

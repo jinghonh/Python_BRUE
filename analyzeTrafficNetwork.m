@@ -27,6 +27,8 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index)
             plotPathCosts(totalValidFlow, relationMatrix, selectedIndices);
             % 绘制流量向量可视化
             plotFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, selectedIndices);
+            % 绘制三维流量可视化
+            plot3DFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, selectedIndices, subset_index);
         end
         return;
     end
@@ -145,6 +147,9 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index)
         
         % 绘制流量向量可视化
         plotFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, selectedIndices);
+        
+        % 绘制三维流量可视化
+        plot3DFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, selectedIndices, subset_index);
     else
         warning('没有找到可行解');
     end
@@ -932,4 +937,318 @@ function paretoIndices = findParetoFrontier(points)
     
     % 返回非支配点的索引
     paretoIndices = find(~isDominated);
+end
+
+function plot3DFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, selectedIndices, subset_index)
+    % 绘制三维流量向量可视化
+    % 
+    % 输入参数:
+    %   totalValidFlow     - 满足所有约束的流量向量
+    %   totalPathValidFlow - 仅满足路径约束的流量向量
+    %   relationMatrix     - 关系矩阵
+    %   selectedIndices    - 选择的流量向量索引
+    %   subset_index       - 子集索引，用于确定使用哪些路径
+    
+    % 检查是否有有效流量数据
+    if isempty(totalValidFlow)
+        warning('没有满足所有约束的流量数据可供可视化');
+        return;
+    end
+    
+    % 创建科学风格的图形
+    fig = figure('Name', '3D Flow Vectors Visualization', 'NumberTitle', 'off', 'Position', [150, 150, 800, 700]);
+    set(fig, 'Color', 'white'); % 白色背景
+    set(gca, 'FontName', 'Arial', 'FontSize', 10, 'Box', 'on', 'LineWidth', 1.2);
+    
+    % 创建优雅的颜色方案
+    fullConstraintColor = [0.2, 0.6, 0.8]; % 蓝色: 满足所有约束的流量
+    pathConstraintColor = [0.8, 0.4, 0.2]; % 橙色: 仅满足路径约束的流量
+    selectedColor = [0.2, 0.8, 0.4];       % 绿色: 选中的流量
+    
+    % 定义所有可能的路径组合
+    pathCombinations = {};
+    pathCombinationNames = {};
+    
+    if subset_index == 0
+        % 对于subset_index=0，使用path1, path2, path5
+        pathCombinations{1} = [1, 2, 3];
+        pathCombinationNames{1} = 'Path 1,2,5';
+    elseif subset_index == 1
+        % 对于subset_index=1，使用不同的路径组合
+        pathCombinations{1} = [1, 2, 3, 5];
+        pathCombinations{2} = [1, 2, 4, 5];
+        pathCombinations{3} = [1, 3, 5];
+        pathCombinations{4} = [2, 3, 5];
+        
+        pathCombinationNames{1} = 'Path 1,2,3,5';
+        pathCombinationNames{2} = 'Path 1,2,4,5';
+        pathCombinationNames{3} = 'Path 1,3,5';
+        pathCombinationNames{4} = 'Path 2,3,5';
+    end
+    
+    % 如果没有组合，使用默认值
+    if isempty(pathCombinations)
+        pathCombinations{1} = [1, 2, 3];
+        pathCombinationNames{1} = 'Path 1,2,3';
+    end
+    
+    % 创建图形控制面板
+    panel = uipanel('Title', '可视化控制', 'Position', [0.01, 0.01, 0.2, 0.15]);
+    
+    % 添加路径组合选择下拉菜单
+    uicontrol('Parent', panel, 'Style', 'text', 'String', '路径组合:', ...
+        'Position', [10, 60, 80, 20], 'HorizontalAlignment', 'left');
+    pathComboDropdown = uicontrol('Parent', panel, 'Style', 'popupmenu', ...
+        'String', pathCombinationNames, 'Position', [10, 40, 120, 20], ...
+        'Callback', @updatePathCombination);
+    
+    % 添加旋转控制按钮
+    uicontrol('Parent', panel, 'Style', 'pushbutton', 'String', '旋转视图', ...
+        'Position', [10, 10, 80, 20], 'Callback', @toggleRotation);
+    
+    % 添加保存图像按钮
+    uicontrol('Parent', panel, 'Style', 'pushbutton', 'String', '保存图像', ...
+        'Position', [100, 10, 80, 20], 'Callback', @saveImage);
+    
+    % 初始化旋转标志
+    isRotating = false;
+    rotationTimer = [];
+    
+    % 绘制初始组合的可视化
+    updatePathCombination();
+    
+    % 回调函数：更新路径组合
+    function updatePathCombination(~, ~)
+        % 清除当前图形
+        cla;
+        
+        % 获取选择的路径组合
+        comboIdx = get(pathComboDropdown, 'Value');
+        pathIndices = pathCombinations{comboIdx};
+        
+        % 获取路径名称
+        pathNames = cell(1, length(pathIndices));
+        for i = 1:length(pathIndices)
+            pathNames{i} = sprintf('Path %d', pathIndices(i));
+        end
+        
+        % 处理满足所有约束的流量
+        if ~isempty(totalValidFlow)
+            % 提取选择的路径数据
+            validFlowSelected = totalValidFlow(:, pathIndices);
+            
+            % 处理仅满足路径约束的流量
+            uniquePathFlows = [];
+            pathFlowSelected = [];
+            if ~isempty(totalPathValidFlow)
+                % 排除已经在totalValidFlow中的流量
+                uniquePathFlows = setdiff(totalPathValidFlow, totalValidFlow, 'rows');
+                
+                if ~isempty(uniquePathFlows)
+                    % 提取选择的路径数据
+                    pathFlowSelected = uniquePathFlows(:, pathIndices);
+                end
+            end
+            
+            % 准备3D可视化
+            hold on;
+            
+            % 定义点大小
+            numPoints = size(validFlowSelected, 1);
+            pointSize = min(50, max(20, 500/sqrt(numPoints)));
+            
+            % 创建图例句柄和名称数组
+            legendHandles = [];
+            legendNames = {};
+            
+            % 绘制满足路径约束的点（橙色）
+            h_path = [];
+            if ~isempty(uniquePathFlows) && ~isempty(pathFlowSelected)
+                h_path = scatter3(pathFlowSelected(:, 1), pathFlowSelected(:, 2), pathFlowSelected(:, 3), ...
+                    pointSize, pathConstraintColor, 'o', 'filled', ...
+                    'MarkerFaceAlpha', 0.7, 'MarkerEdgeColor', 'none');
+                legendHandles = [legendHandles, h_path];
+                legendNames{end+1} = '仅满足路径约束';
+            end
+            
+            % 绘制满足所有约束的点（蓝色）
+            h_full = scatter3(validFlowSelected(:, 1), validFlowSelected(:, 2), validFlowSelected(:, 3), ...
+                pointSize, fullConstraintColor, 'o', 'filled', ...
+                'MarkerFaceAlpha', 0.7, 'MarkerEdgeColor', 'none');
+            legendHandles = [legendHandles, h_full];
+            legendNames{end+1} = '满足所有约束';
+            
+            % 尝试计算并绘制满足所有约束点的凸包
+            h_hull = [];
+            if size(validFlowSelected, 1) >= 4
+                try
+                    % 使用MATLAB的凸包函数
+                    K = convhull(validFlowSelected(:, 1), validFlowSelected(:, 2), validFlowSelected(:, 3));
+                    h_hull = trisurf(K, validFlowSelected(:, 1), validFlowSelected(:, 2), validFlowSelected(:, 3), ...
+                        'FaceColor', fullConstraintColor, ...
+                        'FaceAlpha', 0.2, ...
+                        'EdgeColor', fullConstraintColor, ...
+                        'EdgeAlpha', 0.5, ...
+                        'LineWidth', 0.5);
+                    legendHandles = [legendHandles, h_hull];
+                    legendNames{end+1} = '可行区域边界';
+                catch e
+                    fprintf('凸包计算错误: %s\n', e.message);
+                end
+            end
+            
+            % 高亮显示选定的点
+            h_selected = [];
+            if ~isempty(selectedIndices)
+                if max(selectedIndices) <= size(totalValidFlow, 1)
+                    selectedPoints = totalValidFlow(selectedIndices, pathIndices);
+                    h_selected = scatter3(selectedPoints(:, 1), selectedPoints(:, 2), selectedPoints(:, 3), ...
+                        pointSize*1.5, selectedColor, 'o', 'filled', ...
+                        'MarkerEdgeColor', 'black', 'LineWidth', 1);
+                    if ~isempty(h_selected) && isvalid(h_selected)
+                        legendHandles = [legendHandles, h_selected];
+                        legendNames{end+1} = '选定流量';
+                    end
+                end
+            end
+            
+            % 添加坐标轴标签
+            if length(pathIndices) >= 3
+                xlabel(pathNames{1}, 'FontSize', 12, 'FontWeight', 'bold');
+                ylabel(pathNames{2}, 'FontSize', 12, 'FontWeight', 'bold');
+                zlabel(pathNames{3}, 'FontSize', 12, 'FontWeight', 'bold');
+            end
+            
+            title('三维流量向量可视化', 'FontSize', 14, 'FontWeight', 'bold');
+            
+            % 如果有4个维度，则处理第4维度
+            if length(pathIndices) > 3
+                % 计算第4维度的流量值（总和为10000）
+                fourthDimValues = 10000 - sum(validFlowSelected(:,1:3), 2);
+                
+                % 检查所有值是否相同
+                if all(abs(fourthDimValues - fourthDimValues(1)) < 1e-6)
+                    title([sprintf('三维流量向量可视化 (%s=%.0f)', pathNames{4}, fourthDimValues(1))], ...
+                        'FontSize', 14, 'FontWeight', 'bold');
+                else
+                    title('三维流量向量可视化', 'FontSize', 14, 'FontWeight', 'bold');
+                    
+                    % 添加第4维度的色彩映射
+                    colormap(jet);
+                    cb = colorbar;
+                    ylabel(cb, pathNames{4}, 'FontSize', 10, 'FontWeight', 'bold');
+                    caxis([min(fourthDimValues), max(fourthDimValues)]);
+                    
+                    % 使用色彩映射重绘点
+                    delete(h_full);
+                    h_full = scatter3(validFlowSelected(:, 1), validFlowSelected(:, 2), validFlowSelected(:, 3), ...
+                        pointSize, fourthDimValues, 'o', 'filled', ...
+                        'MarkerFaceAlpha', 0.7, 'MarkerEdgeColor', 'none');
+                    
+                    % 更新图例
+                    legendHandles = legendHandles(ishandle(legendHandles)); % 移除无效句柄
+                    idx = find(strcmp(legendNames, '满足所有约束'));
+                    if ~isempty(idx)
+                        legendNames(idx) = []; % 移除对应名称
+                        legendHandles = [legendHandles, h_full];
+                        legendNames{end+1} = '满足所有约束 (颜色表示' + string(pathNames{4}) + ')';
+                    end
+                end
+            end
+            
+            % 添加图例，确保所有图形句柄都有效
+            validHandles = ishandle(legendHandles);
+            if any(validHandles) && ~isempty(legendNames)
+                try
+                    legend(legendHandles(validHandles), legendNames(validHandles), ...
+                        'Location', 'best', ...
+                        'FontName', 'Arial', 'FontSize', 9, ...
+                        'EdgeColor', [0.7, 0.7, 0.7], ...
+                        'Box', 'on');
+                catch e
+                    warning('图例创建错误: %s', e.message);
+                end
+            end
+            
+            % 添加网格
+            grid on;
+            
+            % 设置视图角度
+            view(45, 30);
+            
+            % 调整坐标轴限制以提供边距
+            axis tight;
+            axisLimits = axis;
+            axisRange = [axisLimits(2)-axisLimits(1), axisLimits(4)-axisLimits(3), axisLimits(6)-axisLimits(5)];
+            axis([axisLimits(1)-0.03*axisRange(1), axisLimits(2)+0.03*axisRange(1), ...
+                  axisLimits(3)-0.03*axisRange(2), axisLimits(4)+0.03*axisRange(2), ...
+                  axisLimits(5)-0.03*axisRange(3), axisLimits(6)+0.03*axisRange(3)]);
+            
+            % 添加一个文本注释，说明约束条件
+            sumText = sprintf('总流量约束: 所有路径流量之和 = 10000');
+            annotation('textbox', [0.15, 0.02, 0.7, 0.05], ...
+                'String', sumText, ...
+                'FontName', 'Arial', 'FontSize', 9, ...
+                'HorizontalAlignment', 'center', ...
+                'BackgroundColor', 'white', ...
+                'EdgeColor', 'none');
+            
+            hold off;
+        else
+            warning('没有满足所有约束的流量数据可供可视化');
+        end
+    end
+    
+    % 回调函数：切换旋转
+    function toggleRotation(~, ~)
+        if isRotating
+            % 停止旋转
+            stop(rotationTimer);
+            delete(rotationTimer);
+            isRotating = false;
+        else
+            % 开始旋转
+            isRotating = true;
+            rotationTimer = timer('ExecutionMode', 'fixedRate', 'Period', 0.1, ...
+                'TimerFcn', @rotateView);
+            start(rotationTimer);
+        end
+    end
+    
+    % 旋转函数
+    function rotateView(~, ~)
+        % 获取当前视角
+        [az, el] = view;
+        % 更新方位角
+        az = az + 2;
+        if az > 360
+            az = az - 360;
+        end
+        % 应用新视角
+        view(az, el);
+        drawnow;
+    end
+    
+    % 保存图像函数
+    function saveImage(~, ~)
+        % 生成文件名
+        comboIdx = get(pathComboDropdown, 'Value');
+        pathStr = strrep(pathCombinationNames{comboIdx}, ',', '_');
+        pathStr = strrep(pathStr, ' ', '');
+        figFile = sprintf('results/3d_flow_%s_%s.png', pathStr, datestr(now, 'yyyymmdd_HHMMSS'));
+        
+        % 保存图像
+        print(figFile, '-dpng', '-r300');
+        msgbox(['图像已保存为: ' figFile], '保存成功');
+    end
+    
+    % 清理函数
+    set(fig, 'DeleteFcn', @cleanupFunc);
+    function cleanupFunc(~, ~)
+        % 如果旋转定时器存在，停止并删除它
+        if ~isempty(rotationTimer) && isvalid(rotationTimer)
+            stop(rotationTimer);
+            delete(rotationTimer);
+        end
+    end
 end
