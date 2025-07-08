@@ -126,12 +126,12 @@ function plotPathCosts(totalValidFlow, relationMatrix, selectedIndices)
     h_legend(1) = patch('XData', boundaryX, 'YData', boundaryY, ...
           'FaceColor', [0.9 0.95 1], ... % 非常浅的蓝色
           'EdgeColor', 'none', ... 
-          'LineWidth', 1.5, ...
+          'LineWidth', 0.1, ...
           'FaceAlpha', 1);
           
     % 绘制边界线
-    h_legend(2) = plot(leftBoundaryX, leftBoundaryY, '-', 'Color', [0.4 0.5 0.8], 'LineWidth', 1.5);
-    plot(rightBoundaryX, rightBoundaryY, '-', 'Color', [0.4 0.5 0.8], 'LineWidth', 1.5);
+    h_legend(2) = plot(leftBoundaryX, leftBoundaryY, '-', 'Color', [0.4 0.5 0.8], 'LineWidth', 0.1);
+    plot(rightBoundaryX, rightBoundaryY, '-', 'Color', [0.4 0.5 0.8], 'LineWidth', 0.1);
 
     % 使用所有点计算边界后绘制散点
     for i = 1:q
@@ -161,8 +161,8 @@ function plotPathCosts(totalValidFlow, relationMatrix, selectedIndices)
     
     % 添加科研风格的图例
     % 只显示概括性图例
-    legend([h_legend(1), h_legend(2), h_legend(3)], {'Feasible Region', 'Boundary', 'Selected Paths'}, ...
-        'Location', 'best', ...
+    legend([h_legend(1), h_legend(3)], {'Feasible Region', 'Boundary', 'Selected Paths'}, ...
+        'Location', 'northeast', ...
         'FontName', 'Arial', 'FontSize', 9, ...
         'EdgeColor', [0.7, 0.7, 0.7], ...
         'Box', 'on');
@@ -174,86 +174,6 @@ function plotPathCosts(totalValidFlow, relationMatrix, selectedIndices)
     
     % 调用新函数以生成带有上限线的新图
     plotPathCostsWithUpperLimit(allPathCosts, leftBoundaryX, leftBoundaryY, rightBoundaryX, rightBoundaryY, colorVariations);
-    
-    % ----------------- Figure 2: Path Cost Scatter Plot -----------------
-    % Create separate figure for path cost scatter plot
-    % fig2 = figure('Name', 'Path Cost Scatter Plot', 'NumberTitle', 'off', 'Position', [100, 100, 600, 500]);
-    % set(fig2, 'Color', 'white');
-    % set(gca, 'FontName', 'Arial', 'FontSize', 10, 'Box', 'on', 'LineWidth', 1);
-    % 
-    % hold on;
-    % for i = 1:q
-    %     indices = allFlowVectorIndices == i;
-    %     scatter(allPathTimeCosts(indices), allPathMoneyCosts(indices), 70, colors(i,:), 'filled', 'MarkerEdgeColor', 'black', 'MarkerEdgeAlpha', 0.3);
-    % end
-    % 
-    % % 为第二个图添加边界线
-    % if exist('saveBoundaryX', 'var') && exist('saveBoundaryY', 'var') && ~isempty(saveBoundaryX) && ~isempty(saveBoundaryY)
-    %     patch('XData', saveBoundaryX, 'YData', saveBoundaryY, ...
-    %           'FaceColor', [0.95 0.95 1], ... % 非常浅的蓝色
-    %           'EdgeColor', [0.5 0.5 0.8], ... % 中等蓝色边缘
-    %           'LineWidth', 1.2, ...
-    %           'FaceAlpha', 0.3);  % 更低的透明度
-    % 
-    %     % 绘制边界线
-    %     plot(saveBoundaryX, saveBoundaryY, '-', 'Color', [0.5 0.5 0.8], 'LineWidth', 1.2);
-    % end
-    % 
-    % % Figure properties
-    % xlabel('Time Cost', 'FontSize', 12, 'FontWeight', 'bold');
-    % ylabel('Money Cost', 'FontSize', 12, 'FontWeight', 'bold');
-    % title('Path Cost Scatter Plot', 'FontSize', 14, 'FontWeight', 'bold');
-    % grid on;
-    % grid minor;
-    % set(gca, 'GridAlpha', 0.15, 'MinorGridAlpha', 0.1, 'Layer', 'top');
-    % 
-    % % No legend as requested
-    % figFile = sprintf('results/path_cost_scatter_%s.png', datestr(now, 'yyyymmdd_HHMMSS'));
-    % print(figFile, '-dpng', '-r300');
-    % hold off;
-    % 
-    % % ----------------- Figure 3: Time Cost Distribution -----------------
-    % % Create separate figure for time cost distribution
-    % fig3 = figure('Name', 'Path Time Cost Distribution', 'NumberTitle', 'off', 'Position', [100, 100, 600, 500]);
-    % set(fig3, 'Color', 'white');
-    % set(gca, 'FontName', 'Arial', 'FontSize', 10, 'Box', 'on', 'LineWidth', 1);
-    % 
-    % % Optimize x-axis by using custom box plot with more space
-    % positions = 1:q;
-    % boxplot(allPathTimeCosts, allFlowVectorIndices, 'Positions', positions, 'Width', 0.6, 'Symbol', 'k+');
-    % 
-    % % Customize box plot colors
-    % h = findobj(gca, 'Tag', 'Box');
-    % for j = 1:length(h)
-    %     patch(get(h(j), 'XData'), get(h(j), 'YData'), colors(q-j+1,:), 'FaceAlpha', 0.7);
-    % end
-    % 
-    % % Add custom scatter points for better visualization
-    % hold on;
-    % for i = 1:q
-    %     indices = allFlowVectorIndices == i;
-    %     % Add jitter to x positions for better visibility
-    %     x_jitter = positions(i) + (rand(sum(indices),1)-0.5)*0.3;
-    %     scatter(x_jitter, allPathTimeCosts(indices), 20, colors(i,:), 'filled', 'MarkerEdgeColor', 'black', 'MarkerEdgeAlpha', 0.3);
-    % end
-    % 
-    % % Figure properties
-    % title('Path Time Cost Distribution by Flow Vector', 'FontSize', 14, 'FontWeight', 'bold');
-    % xlabel('Flow Vector', 'FontSize', 12, 'FontWeight', 'bold');
-    % ylabel('Time Cost', 'FontSize', 12, 'FontWeight', 'bold');
-    % 
-    % % Fix x-axis overcrowding
-    % xticks(positions);
-    % xticklabels(cellfun(@(x) sprintf('FV%d', str2double(regexp(x, '\d+', 'match'))), legendLabels, 'UniformOutput', false));
-    % xtickangle(0);
-    % 
-    % grid on;
-    % set(gca, 'GridAlpha', 0.15, 'Layer', 'top');
-    % 
-    % % No legend as requested
-    % 
-    % figFile = sprintf('results/path_time_distribution_%s.png', datestr(now, 'yyyymmdd_HHMMSS'));
-    % print(figFile, '-dpng', '-r300');
     hold off;
 end
 
@@ -290,7 +210,7 @@ function plotPathCostsWithUpperLimit(allPathCosts, leftBoundaryX, leftBoundaryY,
     boundaryY = [leftBoundaryY; flipud(rightBoundaryY)];
     
     % 创建图例句柄
-    h_legend = zeros(5, 1);
+    h_legend = zeros(6, 1);
     
     % 绘制可行区域
     h_legend(1) = patch('XData', boundaryX, 'YData', boundaryY, ...
@@ -299,8 +219,8 @@ function plotPathCostsWithUpperLimit(allPathCosts, leftBoundaryX, leftBoundaryY,
           'FaceAlpha', 1);
     
     % 绘制边界线
-    h_legend(2) = plot(leftBoundaryX, leftBoundaryY, '-', 'Color', [0.4 0.5 0.8], 'LineWidth', 1.5);
-    plot(rightBoundaryX, rightBoundaryY, '-', 'Color', [0.4 0.5 0.8], 'LineWidth', 1.5);
+    h_legend(2) = plot(leftBoundaryX, leftBoundaryY, '-', 'Color', [0.4 0.5 0.8], 'LineWidth', 0.1);
+    plot(rightBoundaryX, rightBoundaryY, '-', 'Color', [0.4 0.5 0.8], 'LineWidth', 0.1);
     
     % 检查每个路径流量方案是否可行
     feasiblePaths = [];
@@ -309,6 +229,13 @@ function plotPathCostsWithUpperLimit(allPathCosts, leftBoundaryX, leftBoundaryY,
     % 用于存储不可行方案的图例句柄
     h_infeasible = [];
     
+    % 首先识别所有的可行和不可行流量方案
+    feasiblePaths = [];
+    infeasiblePaths = [];
+    feasibleCosts = {};
+    feasibleColors = {};
+    
+    % 第一步：分类所有流量方案
     for i = 1:length(allPathCosts)
         costs = allPathCosts{i};
         if ~isempty(costs)
@@ -325,28 +252,110 @@ function plotPathCostsWithUpperLimit(allPathCosts, leftBoundaryX, leftBoundaryY,
                 isPointFeasible(j) = currPoint(1) <= upperLimitX(idx);
             end
             
-            % 如果所有点都可行，则整个方案可行
-            if ~all(isPointFeasible)
-                % 不可行方案（）
-                infeasiblePaths = [infeasiblePaths, i];
-                infeasibleColor = [0.9, 0.9, 0.9]; 
-                
-                plot(costs(:,1), costs(:,2), '-', 'Color', [infeasibleColor, 0.7], 'LineWidth', 1.2);
-                h_tmp = scatter(costs(:,1), costs(:,2), 30, infeasibleColor, 'o', 'filled', ...
-                    'MarkerEdgeColor', 'none', 'MarkerFaceAlpha', 0.3);
-                
-                if isempty(h_infeasible)
-                    h_infeasible = h_tmp;
-                    h_legend(5) = h_tmp;
-                end
-            else
+            % 根据所有点的可行性分类方案
+            if all(isPointFeasible)
                 feasiblePaths = [feasiblePaths, i];
-                
-                % 绘制可行方案（蓝色）
-                plot(costs(:,1), costs(:,2), '-', 'Color', [colorVariations(i,:), 0.7], 'LineWidth', 1.2);
-                h_legend(4) = scatter(costs(:,1), costs(:,2), 30, colorVariations(i,:), 'o', 'filled', ...
-                    'MarkerEdgeColor', 'none', 'MarkerFaceAlpha', 0.8);
+                feasibleCosts{end+1} = costs;
+                feasibleColors{end+1} = colorVariations(i,:);
+            else
+                infeasiblePaths = [infeasiblePaths, i];
             end
+        end
+    end
+    
+    % 第二步：绘制所有不可行流量方案（灰色）
+    infeasibleColor = [0.9, 0.9, 0.9];
+    for i = 1:length(infeasiblePaths)
+        idx = infeasiblePaths(i);
+        costs = allPathCosts{idx};
+        
+        plot(costs(:,1), costs(:,2), '-', 'Color', [infeasibleColor, 0.7], 'LineWidth', 1.2);
+        h_tmp = scatter(costs(:,1), costs(:,2), 30, infeasibleColor, 'o', 'filled', ...
+            'MarkerEdgeColor', 'none', 'MarkerFaceAlpha', 0.3);
+        
+        if isempty(h_infeasible)
+            h_infeasible = h_tmp;
+            h_legend(5) = h_tmp;
+        end
+    end
+    
+    % 第三步：绘制可行流量区域和方案
+    if ~isempty(feasibleCosts)
+        % 收集所有可行方案的点
+        allFeasibleX = [];
+        allFeasibleY = [];
+        
+        for i = 1:length(feasibleCosts)
+            costs = feasibleCosts{i};
+            allFeasibleX = [allFeasibleX; costs(:,1)];
+            allFeasibleY = [allFeasibleY; costs(:,2)];
+        end
+        
+        % 绘制可行方案区域（使用按金钱成本分组的方法）
+        if ~isempty(allFeasibleX)
+            try
+                % 收集所有可行点
+                feasiblePoints = [allFeasibleX, allFeasibleY];
+                
+                % 按金钱成本对点进行分组（与原始区域划分方法一致）
+                uniqueMoneyValues = unique(round(feasiblePoints(:,2)*100)/100); % 四舍五入到两位小数
+                
+                % 为每个金钱成本找到对应的最小和最大时间成本
+                leftBoundX = [];
+                leftBoundY = [];
+                rightBoundX = [];
+                rightBoundY = [];
+                
+                for i = 1:length(uniqueMoneyValues)
+                    currMoney = uniqueMoneyValues(i);
+                    % 找到具有相同金钱成本的所有点
+                    sameMoneyIdx = abs(feasiblePoints(:,2) - currMoney) < 0.01;
+                    
+                    if sum(sameMoneyIdx) > 0
+                        timesForMoney = feasiblePoints(sameMoneyIdx, 1);
+                        minTimeForMoney = min(timesForMoney);
+                        maxTimeForMoney = max(timesForMoney);
+                        
+                        % 添加到边界数组
+                        leftBoundX = [leftBoundX; minTimeForMoney];
+                        leftBoundY = [leftBoundY; currMoney];
+                        rightBoundX = [rightBoundX; maxTimeForMoney];
+                        rightBoundY = [rightBoundY; currMoney];
+                    end
+                end
+                
+                % 按金钱成本排序边界点
+                [leftBoundY, sortIdx] = sort(leftBoundY);
+                leftBoundX = leftBoundX(sortIdx);
+                
+                [rightBoundY, sortIdx] = sort(rightBoundY);
+                rightBoundX = rightBoundX(sortIdx);
+                
+                % 合并上下边界以形成封闭区域
+                boundX = [leftBoundX; flipud(rightBoundX)];
+                boundY = [leftBoundY; flipud(rightBoundY)];
+                
+                % 绘制可行区域
+                h_feasible_region = fill(boundX, boundY, [0.8, 1, 0.8], ...
+                    'FaceAlpha', 0.5, 'EdgeColor', [0.4, 0.5, 0.8], 'LineWidth', 0.1);
+                
+                % 更新图例
+                h_legend(6) = h_feasible_region;
+            catch e
+                % 如果边界计算失败，则不绘制区域
+                fprintf('无法绘制可行方案区域：%s\n', e.message);
+            end
+        end
+        
+        % 绘制每个可行方案
+        for i = 1:length(feasibleCosts)
+            costs = feasibleCosts{i};
+            color = feasibleColors{i};
+            
+            % 绘制可行方案（蓝色系）
+            plot(costs(:,1), costs(:,2), '-', 'Color', [color, 0.7], 'LineWidth', 1.2);
+            h_legend(4) = scatter(costs(:,1), costs(:,2), 30, color, 'o', 'filled', ...
+                'MarkerEdgeColor', 'none', 'MarkerFaceAlpha', 0.8);
         end
     end
     % 绘制可行成本上限折线
@@ -368,6 +377,12 @@ function plotPathCostsWithUpperLimit(allPathCosts, leftBoundaryX, leftBoundaryY,
     if ~isempty(feasiblePaths)
         legendItems{end+1} = 'Feasible Flow Vectors';
         legendHandles(end+1) = h_legend(4);
+        
+        % 如果绘制了可行方案区域，添加到图例中
+        if length(h_legend) >= 6 && h_legend(6) ~= 0
+            legendItems{end+1} = '可行流量区域';
+            legendHandles(end+1) = h_legend(6);
+        end
     end
     
     if ~isempty(infeasiblePaths)

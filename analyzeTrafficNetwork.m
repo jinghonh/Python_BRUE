@@ -24,9 +24,9 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index)
         if ~isempty(totalValidFlow)
             selectedIndices = randperm(size(totalValidFlow, 1), min(q, size(totalValidFlow, 1)));
             % plotResults(totalValidCost, selectedIndices);
-            plotPathCosts(totalValidFlow, relationMatrix, selectedIndices);
+            % plotPathCosts(totalValidFlow, relationMatrix, selectedIndices);
             % 绘制流量向量可视化
-            plotFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, selectedIndices);
+            % plotFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, selectedIndices);
             % 绘制三维流量可视化
             plot3DFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, selectedIndices, subset_index);
         end
@@ -521,6 +521,99 @@ function plotFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, sel
     fullConstraintColor = [0.2, 0.6, 0.8]; % Blue: flow meeting all constraints
     pathConstraintColor = [0.8, 0.4, 0.2]; % Orange: flow meeting only path constraints
     selectedColor = [0.2, 0.8, 0.4];       % Green: selected flows
+    feasibleColor = [0.2, 0.7, 0.9];       % Bright blue: flows meeting cost upper limit
+    infeasibleColor = [0.9, 0.3, 0.3];     % Red: flows not meeting cost upper limit
+    
+    % 计算时间和金钱成本，用于绘制成本上限
+    allPathTimeCosts = [];
+    allPathMoneyCosts = [];
+    flowCostsMap = containers.Map('KeyType', 'double', 'ValueType', 'any');
+    
+    % Define constants for cost calculation
+    money = [20, 15, 1, 0, 0, 0, 0, 1];
+    freeFlowTime = [18,22.5,12,24,2.4,6,24,12];
+    maxCapacity = [3600,3600,1800,1800,1800,1800,1800,1800];
+    money = money * relationMatrix';  % 1 x n
+    
+    % 计算每个流量向量的成本
+    if ~isempty(totalValidFlow)
+        for i = 1:size(totalValidFlow, 1)
+            currentFlow = totalValidFlow(i, :);
+            
+            % 计算时间成本
+            x = currentFlow * relationMatrix;
+            RT = calculateRealTime(x, relationMatrix, freeFlowTime, maxCapacity);
+            
+            % 获取每条路径的时间和金钱成本
+            pathTimeCosts = RT(1, :);  % 1 x n
+            pathMoneyCosts = money;    % 1 x n
+            
+            % 移除零成本路径
+            validPaths = pathTimeCosts > 0;
+            validPathMoneyCosts = pathMoneyCosts(validPaths);
+            validPathTimeCosts = pathTimeCosts(validPaths);
+            
+            % 存储所有路径数据
+            allPathTimeCosts = [allPathTimeCosts; validPathTimeCosts'];
+            allPathMoneyCosts = [allPathMoneyCosts; validPathMoneyCosts'];
+            
+            % 组合和排序成本（按金钱成本排序）
+            costs = [validPathTimeCosts', validPathMoneyCosts'];
+            [~, sortIdx] = sort(validPathMoneyCosts);
+            costs = costs(sortIdx, :);
+            
+            % 存储该流量向量的成本
+            flowCostsMap(i) = costs;
+        end
+    end
+    
+    % 计算成本上限
+    % 按金钱成本分组，为每个金钱成本找到时间的最小值和最大值
+    % 找到所有唯一的金钱成本值
+    if ~isempty(allPathMoneyCosts)
+        uniqueMoneyValues = unique(allPathMoneyCosts);
+        leftBoundaryX = [];
+        leftBoundaryY = [];
+        rightBoundaryX = [];
+        rightBoundaryY = [];
+        upperLimitX = [];
+        upperLimitY = [];
+        
+        % 为每个金钱成本找到对应的最小和最大时间成本
+        for i = 1:length(uniqueMoneyValues)
+            currMoney = uniqueMoneyValues(i);
+            % 找到具有相同金钱成本的所有点
+            sameMoneyIdx = abs(allPathMoneyCosts - currMoney) < 0.001;
+            
+            if sum(sameMoneyIdx) > 0
+                timesForMoney = allPathTimeCosts(sameMoneyIdx);
+                minTimeForMoney = min(timesForMoney);
+                maxTimeForMoney = max(timesForMoney);
+                
+                % 计算该金钱成本的时间上限（使用中点）
+                midTimeForMoney = (minTimeForMoney + maxTimeForMoney) / 2;
+                upperLimitX = [upperLimitX; midTimeForMoney];
+                upperLimitY = [upperLimitY; currMoney];
+                
+                % 添加到边界数组
+                leftBoundaryX = [leftBoundaryX; minTimeForMoney];
+                leftBoundaryY = [leftBoundaryY; currMoney];
+                rightBoundaryX = [rightBoundaryX; maxTimeForMoney];
+                rightBoundaryY = [rightBoundaryY; currMoney];
+            end
+        end
+        
+        % 按金钱成本排序边界点
+        [leftBoundaryY, sortIdx] = sort(leftBoundaryY);
+        leftBoundaryX = leftBoundaryX(sortIdx);
+        
+        [rightBoundaryY, sortIdx] = sort(rightBoundaryY);
+        rightBoundaryX = rightBoundaryX(sortIdx);
+        
+        % 排序上限点
+        [upperLimitY, sortIdx] = sort(upperLimitY);
+        upperLimitX = upperLimitX(sortIdx);
+    end
     
     % Prepare data for visualization
     allFlow = [];
@@ -572,6 +665,36 @@ function plotFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, sel
     % Define point sizes based on data count for better visibility
     pointSize = min(50, max(20, 500/sqrt(size(projectedData,1))));
     
+    % 检查每个流量向量是否满足成本上限
+    feasibleFlowIndices = [];
+    infeasibleFlowIndices = [];
+    
+    if ~isempty(upperLimitX) && ~isempty(totalValidFlow)
+        for i = 1:size(totalValidFlow, 1)
+            if flowCostsMap.isKey(i)
+                costs = flowCostsMap(i);
+                isPointFeasible = zeros(size(costs, 1), 1);
+                
+                for j = 1:size(costs, 1)
+                    currPoint = costs(j, :);  % [时间成本, 金钱成本]
+                    
+                    % 找到最接近的金钱成本点
+                    [~, idx] = min(abs(upperLimitY - currPoint(2)));
+                    
+                    % 检查时间成本是否低于或等于上限
+                    isPointFeasible(j) = currPoint(1) <= upperLimitX(idx);
+                end
+                
+                % 如果所有点都可行，则整个流量向量可行
+                if all(isPointFeasible)
+                    feasibleFlowIndices = [feasibleFlowIndices, i];
+                else
+                    infeasibleFlowIndices = [infeasibleFlowIndices, i];
+                end
+            end
+        end
+    end
+    
     % Create empty arrays for legend handles and names
     legendHandles = [];
     legendNames = {};
@@ -582,8 +705,17 @@ function plotFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, sel
     if ~isempty(totalValidFlow)
         fullIdx = 1:size(totalValidFlow, 1);
         projectedFull = projectedData(fullIdx, :);
+        
+        % 将可行和不可行的流量分开
+        feasibleIdx = ismember(fullIdx, feasibleFlowIndices);
+        infeasibleIdx = ismember(fullIdx, infeasibleFlowIndices);
+        
+        projectedFeasible = projectedFull(feasibleIdx, :);
+        projectedInfeasible = projectedFull(infeasibleIdx, :);
     else
         projectedFull = [];
+        projectedFeasible = [];
+        projectedInfeasible = [];
     end
     
     if ~isempty(uniquePathFlows)
@@ -597,24 +729,34 @@ function plotFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, sel
     if ~isempty(uniquePathFlows) && ~isempty(pathIdx)
         h_path_points = scatter(projectedData(pathIdx, 1), projectedData(pathIdx, 2), ...
             pointSize, pathConstraintColor, 'o', 'filled', ...
-            'MarkerFaceAlpha', 0.7, 'MarkerEdgeColor', 'none');
+            'MarkerFaceAlpha', 0.1, 'MarkerEdgeColor', 'none');
         
         % Add to legend
         legendHandles = [legendHandles, h_path_points];
         legendNames{end+1} = 'Path Constraint Only';
     end
     
-    % Draw points meeting all constraints
-    if ~isempty(totalValidFlow)
-        h_full_points = scatter(projectedData(fullIdx, 1), projectedData(fullIdx, 2), ...
-            pointSize, fullConstraintColor, 'o', 'filled', ...
+    % 绘制不满足成本上限的点
+    if ~isempty(projectedInfeasible)
+        h_infeasible = scatter(projectedInfeasible(:, 1), projectedInfeasible(:, 2), ...
+            pointSize, infeasibleColor, 'o', 'filled', ...
             'MarkerFaceAlpha', 0.7, 'MarkerEdgeColor', 'none');
         
         % Add to legend
-        legendHandles = [legendHandles, h_full_points];
-        legendNames{end+1} = 'All Constraints';
+        legendHandles = [legendHandles, h_infeasible];
+        legendNames{end+1} = 'Not Meeting Cost Upper Limit';
     end
     
+    % 绘制满足成本上限的点
+    if ~isempty(projectedFeasible)
+        h_feasible = scatter(projectedFeasible(:, 1), projectedFeasible(:, 2), ...
+            pointSize, feasibleColor, 'o', 'filled', ...
+            'MarkerFaceAlpha', 0.7, 'MarkerEdgeColor', 'none');
+        
+        % Add to legend
+        legendHandles = [legendHandles, h_feasible];
+        legendNames{end+1} = 'Meeting Cost Upper Limit';
+    end
 
    
     % 2. Draw boundary for "Path Constraint Only" category
@@ -643,57 +785,57 @@ function plotFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, sel
         end
     end
     
-    % 3. Draw boundary for "All Constraints" category
-    if size(projectedFull, 1) > 3
+    % 3. 绘制满足成本上限的流量点区域
+    if size(projectedFeasible, 1) > 3
         try
             % Calculate boundary
-            idx_full = boundary(projectedFull(:,1), projectedFull(:,2), sf);
-            if ~isempty(idx_full) && length(idx_full) > 3
+            idx_feasible = boundary(projectedFeasible(:,1), projectedFeasible(:,2), sf);
+            if ~isempty(idx_feasible) && length(idx_feasible) > 3
                 % Create boundary polygon
-                fullBoundaryX = projectedFull(idx_full,1);
-                fullBoundaryY = projectedFull(idx_full,2);
+                feasibleBoundaryX = projectedFeasible(idx_feasible,1);
+                feasibleBoundaryY = projectedFeasible(idx_feasible,2);
                 
                 % Fill area with light color
-                h_full = patch('XData', fullBoundaryX, 'YData', fullBoundaryY, ...
-                    'FaceColor', fullConstraintColor, ... 
-                    'FaceAlpha', 0.8, ...
-                    'EdgeColor', fullConstraintColor, ...
+                h_feasible_region = patch('XData', feasibleBoundaryX, 'YData', feasibleBoundaryY, ...
+                    'FaceColor', feasibleColor, ... 
+                    'FaceAlpha', 0.4, ...
+                    'EdgeColor', feasibleColor, ...
                     'LineWidth', 1.5);
                 
                 % Add to legend
-                legendHandles = [legendHandles, h_full];
-                legendNames{end+1} = 'All Constraints Region';
+                legendHandles = [legendHandles, h_feasible_region];
+                legendNames{end+1} = 'Cost Upper Limit Region';
             end
         catch e
-            fprintf('Boundary calculation error (full): %s\n', e.message);
+            fprintf('Boundary calculation error (feasible): %s\n', e.message);
         end
     end
     
-
-    
-    % % 4. Draw overall boundary if needed
-    % if size(projectedData, 1) > 3 && ~isempty(legendHandles)
-    %     try
-    %         % Calculate overall boundary
-    %         idx_all = boundary(projectedData(:,1), projectedData(:,2), sf);
-    %         if ~isempty(idx_all) && length(idx_all) > 3
-    %             % Create boundary polygon
-    %             boundaryX = projectedData(idx_all,1);
-    %             boundaryY = projectedData(idx_all,2);
-    % 
-    %             % Draw boundary line only (no fill)
-    %             h_all = plot(boundaryX, boundaryY, 'Color', [0.4, 0.5, 0.8], 'LineWidth', 1.0, 'LineStyle', '-');
-    % 
-    %             % Add to legend
-    %             legendHandles = [legendHandles, h_all];
-    %             legendNames{end+1} = 'Overall Boundary';
-    %         end
-    %     catch e
-    %         fprintf('Boundary calculation error (overall): %s\n', e.message);
-    %     end
-    % end
-    
-    % 5. Draw points on top of regions
+    % 4. 绘制不满足成本上限的流量点区域
+    if size(projectedInfeasible, 1) > 3
+        try
+            % Calculate boundary
+            idx_infeasible = boundary(projectedInfeasible(:,1), projectedInfeasible(:,2), sf);
+            if ~isempty(idx_infeasible) && length(idx_infeasible) > 3
+                % Create boundary polygon
+                infeasibleBoundaryX = projectedInfeasible(idx_infeasible,1);
+                infeasibleBoundaryY = projectedInfeasible(idx_infeasible,2);
+                
+                % Fill area with light color
+                h_infeasible_region = patch('XData', infeasibleBoundaryX, 'YData', infeasibleBoundaryY, ...
+                    'FaceColor', infeasibleColor, ... 
+                    'FaceAlpha', 0.4, ...
+                    'EdgeColor', infeasibleColor, ...
+                    'LineWidth', 1.5);
+                
+                % Add to legend
+                legendHandles = [legendHandles, h_infeasible_region];
+                legendNames{end+1} = 'Beyond Cost Upper Limit Region';
+            end
+        catch e
+            fprintf('Boundary calculation error (infeasible): %s\n', e.message);
+        end
+    end
     
     % Highlight selected points (drawn last to be on top)
     if ~isempty(totalValidFlow) && ~isempty(selectedIndices)
@@ -717,7 +859,7 @@ function plotFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, sel
     set(gca, 'GridAlpha', 0.1, 'MinorGridAlpha', 0.05, 'Layer', 'top');
     
     % Set title and labels
-    title('Flow Vectors Projected on Hyperplane', 'FontSize', 14, 'FontWeight', 'bold');
+    title('Flow Vectors Projected on Hyperplane with Cost Upper Limit', 'FontSize', 14, 'FontWeight', 'bold');
     xlabel('Projection Dimension 1', 'FontSize', 12, 'FontWeight', 'bold');
     ylabel('Projection Dimension 2', 'FontSize', 12, 'FontWeight', 'bold');
     
@@ -737,8 +879,14 @@ function plotFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, sel
     axis([axisLimits(1)-0.03*axisRange(1), axisLimits(2)+0.03*axisRange(1), ...
           axisLimits(3)-0.03*axisRange(2), axisLimits(4)+0.03*axisRange(2)]);
     
+    % 输出信息
+    if ~isempty(feasibleFlowIndices) || ~isempty(infeasibleFlowIndices)
+        fprintf('满足成本上限的流量索引: %s\n', mat2str(feasibleFlowIndices));
+        fprintf('超出成本上限的流量索引: %s\n', mat2str(infeasibleFlowIndices));
+    end
+    
     % Save figure as high-resolution PNG
-    figFile = sprintf('results/flow_vectors_%s.png', datestr(now, 'yyyymmdd_HHMMSS'));
+    figFile = sprintf('results/flow_vectors_with_cost_upper_limit_%s.png', datestr(now, 'yyyymmdd_HHMMSS'));
     print(figFile, '-dpng', '-r300');
 end
 
@@ -964,6 +1112,123 @@ function plot3DFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, s
     fullConstraintColor = [0.2, 0.6, 0.8]; % 蓝色: 满足所有约束的流量
     pathConstraintColor = [0.8, 0.4, 0.2]; % 橙色: 仅满足路径约束的流量
     selectedColor = [0.2, 0.8, 0.4];       % 绿色: 选中的流量
+    feasibleColor = [0.2, 0.7, 0.9];       % 亮蓝色: 满足成本上限的流量
+    infeasibleColor = [0.9, 0.3, 0.3];     % 红色: 不满足成本上限的流量
+    
+    % 计算时间和金钱成本，用于绘制成本上限
+    allPathTimeCosts = [];
+    allPathMoneyCosts = [];
+    flowCostsMap = containers.Map('KeyType', 'double', 'ValueType', 'any');
+    
+    % Define constants for cost calculation
+    money = [20, 15, 1, 0, 0, 0, 0, 1];
+    freeFlowTime = [18,22.5,12,24,2.4,6,24,12];
+    maxCapacity = [3600,3600,1800,1800,1800,1800,1800,1800];
+    money = money * relationMatrix';  % 1 x n
+    
+    % 计算每个流量向量的成本
+    if ~isempty(totalValidFlow)
+        for i = 1:size(totalValidFlow, 1)
+            currentFlow = totalValidFlow(i, :);
+            
+            % 计算时间成本
+            x = currentFlow * relationMatrix;
+            RT = calculateRealTime(x, relationMatrix, freeFlowTime, maxCapacity);
+            
+            % 获取每条路径的时间和金钱成本
+            pathTimeCosts = RT(1, :);  % 1 x n
+            pathMoneyCosts = money;    % 1 x n
+            
+            % 移除零成本路径
+            validPaths = pathTimeCosts > 0;
+            validPathMoneyCosts = pathMoneyCosts(validPaths);
+            validPathTimeCosts = pathTimeCosts(validPaths);
+            
+            % 存储所有路径数据
+            allPathTimeCosts = [allPathTimeCosts; validPathTimeCosts'];
+            allPathMoneyCosts = [allPathMoneyCosts; validPathMoneyCosts'];
+            
+            % 组合和排序成本（按金钱成本排序）
+            costs = [validPathTimeCosts', validPathMoneyCosts'];
+            [~, sortIdx] = sort(validPathMoneyCosts);
+            costs = costs(sortIdx, :);
+            
+            % 存储该流量向量的成本
+            flowCostsMap(i) = costs;
+        end
+    end
+    
+    % 计算成本上限
+    % 按金钱成本分组，为每个金钱成本找到时间的最小值和最大值
+    % 找到所有唯一的金钱成本值
+    upperLimitX = [];
+    upperLimitY = [];
+    
+    if ~isempty(allPathMoneyCosts)
+        uniqueMoneyValues = unique(allPathMoneyCosts);
+        leftBoundaryX = [];
+        leftBoundaryY = [];
+        rightBoundaryX = [];
+        rightBoundaryY = [];
+        
+        % 为每个金钱成本找到对应的最小和最大时间成本
+        for i = 1:length(uniqueMoneyValues)
+            currMoney = uniqueMoneyValues(i);
+            % 找到具有相同金钱成本的所有点
+            sameMoneyIdx = abs(allPathMoneyCosts - currMoney) < 0.001;
+            
+            if sum(sameMoneyIdx) > 0
+                timesForMoney = allPathTimeCosts(sameMoneyIdx);
+                minTimeForMoney = min(timesForMoney);
+                maxTimeForMoney = max(timesForMoney);
+                
+                % 计算该金钱成本的时间上限（使用中点）
+                midTimeForMoney = (minTimeForMoney + maxTimeForMoney) / 2;
+                upperLimitX = [upperLimitX; midTimeForMoney];
+                upperLimitY = [upperLimitY; currMoney];
+                
+                % 添加到边界数组
+                leftBoundaryX = [leftBoundaryX; minTimeForMoney];
+                leftBoundaryY = [leftBoundaryY; currMoney];
+                rightBoundaryX = [rightBoundaryX; maxTimeForMoney];
+                rightBoundaryY = [rightBoundaryY; currMoney];
+            end
+        end
+        
+        % 按金钱成本排序边界点
+        [upperLimitY, sortIdx] = sort(upperLimitY);
+        upperLimitX = upperLimitX(sortIdx);
+    end
+    
+    % 检查每个流量向量是否满足成本上限
+    feasibleFlowIndices = [];
+    infeasibleFlowIndices = [];
+    
+    if ~isempty(upperLimitX) && ~isempty(totalValidFlow)
+        for i = 1:size(totalValidFlow, 1)
+            if flowCostsMap.isKey(i)
+                costs = flowCostsMap(i);
+                isPointFeasible = zeros(size(costs, 1), 1);
+                
+                for j = 1:size(costs, 1)
+                    currPoint = costs(j, :);  % [时间成本, 金钱成本]
+                    
+                    % 找到最接近的金钱成本点
+                    [~, idx] = min(abs(upperLimitY - currPoint(2)));
+                    
+                    % 检查时间成本是否低于或等于上限
+                    isPointFeasible(j) = currPoint(1) <= upperLimitX(idx);
+                end
+                
+                % 如果所有点都可行，则整个流量向量可行
+                if all(isPointFeasible)
+                    feasibleFlowIndices = [feasibleFlowIndices, i];
+                else
+                    infeasibleFlowIndices = [infeasibleFlowIndices, i];
+                end
+            end
+        end
+    end
     
     % 定义所有可能的路径组合
     pathCombinations = {};
@@ -993,7 +1258,7 @@ function plot3DFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, s
     end
     
     % 创建图形控制面板
-    panel = uipanel('Title', '可视化控制', 'Position', [0.01, 0.01, 0.2, 0.15]);
+    panel = uipanel('Title', '可视化控制', 'Position', [0.01, 0.01, 0.4, 0.3]);
     
     % 添加路径组合选择下拉菜单
     uicontrol('Parent', panel, 'Style', 'text', 'String', '路径组合:', ...
@@ -1010,12 +1275,59 @@ function plot3DFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, s
     uicontrol('Parent', panel, 'Style', 'pushbutton', 'String', '保存图像', ...
         'Position', [100, 10, 80, 20], 'Callback', @saveImage);
     
+    % 添加成本上限显示控制
+    uicontrol('Parent', panel, 'Style', 'checkbox', 'String', '显示成本上限区分', ...
+        'Position', [150, 60, 120, 20], 'Value', 1, 'Callback', @toggleCostLimit);
+    
+    % 添加边界类型控制
+    boundaryTypeGroup = uibuttongroup('Parent', panel, 'Title', '边界类型', ...
+        'Position', [0.5, 0.5, 0.45, 0.45], 'SelectionChangedFcn', @updateBoundaryType);
+    
+    % 添加凸包和Alpha形状选项
+    uicontrol('Parent', boundaryTypeGroup, 'Style', 'radiobutton', 'String', '凸包', ...
+        'Position', [5, 25, 70, 20], 'Tag', 'convex');
+    uicontrol('Parent', boundaryTypeGroup, 'Style', 'radiobutton', 'String', 'Alpha形状', ...
+        'Position', [5, 5, 70, 20], 'Tag', 'alpha');
+    
+    % 默认选择凸包
+    boundaryTypeGroup.SelectedObject = findobj(boundaryTypeGroup, 'Tag', 'convex');
+    
+    % 添加边界控制滑动条
+    uicontrol('Parent', panel, 'Style', 'text', 'String', 'Alpha值:', ...
+        'Position', [160, 60, 60, 20], 'HorizontalAlignment', 'left');
+    alphaSlider = uicontrol('Parent', panel, 'Style', 'slider', ...
+        'Min', 0.1, 'Max', 3, 'Value', 1.0, ...
+        'Position', [160, 40, 80, 20], 'Callback', @updateAlphaValue);
+    
     % 初始化旋转标志
     isRotating = false;
     rotationTimer = [];
     
+    % 初始化边界类型和Alpha值
+    boundaryType = 'convex';
+    alphaValue = 1.0;
+    showCostLimit = true;
+    
     % 绘制初始组合的可视化
     updatePathCombination();
+    
+    % 回调函数：切换成本上限显示
+    function toggleCostLimit(src, ~)
+        showCostLimit = get(src, 'Value') == 1;
+        updatePathCombination();
+    end
+    
+    % 回调函数：更新边界类型
+    function updateBoundaryType(~, event)
+        boundaryType = event.NewValue.Tag;
+        updatePathCombination();
+    end
+    
+    % 回调函数：更新Alpha值
+    function updateAlphaValue(~, ~)
+        alphaValue = get(alphaSlider, 'Value');
+        updatePathCombination();
+    end
     
     % 回调函数：更新路径组合
     function updatePathCombination(~, ~)
@@ -1061,39 +1373,165 @@ function plot3DFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, s
             legendHandles = [];
             legendNames = {};
             
-            % 绘制满足路径约束的点（橙色）
-            h_path = [];
-            if ~isempty(uniquePathFlows) && ~isempty(pathFlowSelected)
-                h_path = scatter3(pathFlowSelected(:, 1), pathFlowSelected(:, 2), pathFlowSelected(:, 3), ...
-                    pointSize, pathConstraintColor, 'o', 'filled', ...
-                    'MarkerFaceAlpha', 0.7, 'MarkerEdgeColor', 'none');
-                legendHandles = [legendHandles, h_path];
-                legendNames{end+1} = '仅满足路径约束';
+            % 根据成本上限区分流量
+            feasibleFlow = [];
+            infeasibleFlow = [];
+            
+            if showCostLimit && ~isempty(feasibleFlowIndices)
+                % 分离满足和不满足成本上限的流量
+                feasibleMask = ismember(1:size(totalValidFlow, 1), feasibleFlowIndices);
+                infeasibleMask = ismember(1:size(totalValidFlow, 1), infeasibleFlowIndices);
+                
+                feasibleFlow = totalValidFlow(feasibleMask, pathIndices);
+                infeasibleFlow = totalValidFlow(infeasibleMask, pathIndices);
+            else
+                feasibleFlow = validFlowSelected; % 如果不显示成本上限，则所有点都视为可行点
             end
             
-            % 绘制满足所有约束的点（蓝色）
-            h_full = scatter3(validFlowSelected(:, 1), validFlowSelected(:, 2), validFlowSelected(:, 3), ...
-                pointSize, fullConstraintColor, 'o', 'filled', ...
-                'MarkerFaceAlpha', 0.7, 'MarkerEdgeColor', 'none');
-            legendHandles = [legendHandles, h_full];
-            legendNames{end+1} = '满足所有约束';
-            
-            % 尝试计算并绘制满足所有约束点的凸包
-            h_hull = [];
-            if size(validFlowSelected, 1) >= 4
+            % 绘制满足路径约束的点（橙色）
+            h_path = [];
+            if ~isempty(uniquePathFlows) && ~isempty(pathFlowSelected) && size(pathFlowSelected, 1) >= 4
+                % 绘制散点
+                h_path = scatter3(pathFlowSelected(:, 1), pathFlowSelected(:, 2), pathFlowSelected(:, 3), ...
+                    pointSize, pathConstraintColor, 'o', 'filled', ...
+                    'MarkerFaceAlpha', 0.1, 'MarkerEdgeColor', 'none');
+                legendHandles = [legendHandles, h_path];
+                legendNames{end+1} = '仅满足路径约束';
+                
+                % 尝试绘制路径约束点的边界
                 try
-                    % 使用MATLAB的凸包函数
-                    K = convhull(validFlowSelected(:, 1), validFlowSelected(:, 2), validFlowSelected(:, 3));
-                    h_hull = trisurf(K, validFlowSelected(:, 1), validFlowSelected(:, 2), validFlowSelected(:, 3), ...
-                        'FaceColor', fullConstraintColor, ...
-                        'FaceAlpha', 0.2, ...
-                        'EdgeColor', fullConstraintColor, ...
-                        'EdgeAlpha', 0.5, ...
-                        'LineWidth', 0.5);
-                    legendHandles = [legendHandles, h_hull];
-                    legendNames{end+1} = '可行区域边界';
+                    if strcmp(boundaryType, 'convex')
+                        % 使用凸包绘制边界
+                        K_path = convhull(pathFlowSelected(:, 1), pathFlowSelected(:, 2), pathFlowSelected(:, 3));
+                        h_path_hull = trisurf(K_path, pathFlowSelected(:, 1), pathFlowSelected(:, 2), pathFlowSelected(:, 3), ...
+                            'FaceColor', pathConstraintColor, ...
+                            'FaceAlpha', 0.15, ...
+                            'EdgeColor', pathConstraintColor, ...
+                            'EdgeAlpha', 0.3, ...
+                            'LineWidth', 0.5);
+                        legendHandles = [legendHandles, h_path_hull];
+                        legendNames{end+1} = '路径约束边界(凸包)';
+                    else
+                        % 使用Alpha形状绘制边界（如果可用）
+                        if exist('alphaShape', 'file')
+                            % 使用Alpha形状
+                            shp = alphaShape(pathFlowSelected(:, 1), pathFlowSelected(:, 2), pathFlowSelected(:, 3), ...
+                                alphaValue * criticalAlpha(pathFlowSelected));
+                            h_path_alpha = plot(shp, 'FaceColor', pathConstraintColor, 'FaceAlpha', 0.15, ...
+                                'EdgeColor', pathConstraintColor, 'EdgeAlpha', 0.3, 'LineWidth', 0.5);
+                            legendHandles = [legendHandles, h_path_alpha];
+                            legendNames{end+1} = '路径约束边界(Alpha形状)';
+                        else
+                            % 如果Alpha形状不可用，退回到凸包
+                            K_path = convhull(pathFlowSelected(:, 1), pathFlowSelected(:, 2), pathFlowSelected(:, 3));
+                            h_path_hull = trisurf(K_path, pathFlowSelected(:, 1), pathFlowSelected(:, 2), pathFlowSelected(:, 3), ...
+                                'FaceColor', pathConstraintColor, ...
+                                'FaceAlpha', 0.15, ...
+                                'EdgeColor', pathConstraintColor, ...
+                                'EdgeAlpha', 0.3, ...
+                                'LineWidth', 0.5);
+                            legendHandles = [legendHandles, h_path_hull];
+                            legendNames{end+1} = '路径约束边界(凸包)';
+                            warning('Alpha形状函数不可用，已退回到凸包');
+                        end
+                    end
                 catch e
-                    fprintf('凸包计算错误: %s\n', e.message);
+                    fprintf('路径约束边界计算错误: %s\n', e.message);
+                end
+            end
+            
+            % 绘制不满足成本上限的点（红色）
+            if showCostLimit && ~isempty(infeasibleFlow) && size(infeasibleFlow, 1) >= 4
+                h_infeasible = scatter3(infeasibleFlow(:, 1), infeasibleFlow(:, 2), infeasibleFlow(:, 3), ...
+                    pointSize, infeasibleColor, 'o', 'filled', ...
+                    'MarkerFaceAlpha', 0.7, 'MarkerEdgeColor', 'none');
+                legendHandles = [legendHandles, h_infeasible];
+                legendNames{end+1} = '不满足成本上限';
+                
+                % 尝试绘制不满足成本上限点的边界
+                try
+                    if strcmp(boundaryType, 'convex') && size(infeasibleFlow, 1) > 3
+                        % 使用凸包绘制边界
+                        K_infeasible = convhull(infeasibleFlow(:, 1), infeasibleFlow(:, 2), infeasibleFlow(:, 3));
+                        h_infeasible_hull = trisurf(K_infeasible, infeasibleFlow(:, 1), infeasibleFlow(:, 2), infeasibleFlow(:, 3), ...
+                            'FaceColor', infeasibleColor, ...
+                            'FaceAlpha', 0.2, ...
+                            'EdgeColor', infeasibleColor, ...
+                            'EdgeAlpha', 0.5, ...
+                            'LineWidth', 0.5);
+                        legendHandles = [legendHandles, h_infeasible_hull];
+                        legendNames{end+1} = '不满足成本上限区域';
+                    elseif size(infeasibleFlow, 1) > 3
+                        % 使用Alpha形状绘制边界（如果可用）
+                        if exist('alphaShape', 'file')
+                            % 计算推荐的Alpha值并应用用户调整因子
+                            alpha = alphaValue * criticalAlpha(infeasibleFlow);
+                            % 创建Alpha形状
+                            shp = alphaShape(infeasibleFlow(:, 1), infeasibleFlow(:, 2), infeasibleFlow(:, 3), alpha);
+                            h_infeasible_hull = plot(shp, 'FaceColor', infeasibleColor, 'FaceAlpha', 0.2, ...
+                                'EdgeColor', infeasibleColor, 'EdgeAlpha', 0.5, 'LineWidth', 0.5);
+                            legendHandles = [legendHandles, h_infeasible_hull];
+                            legendNames{end+1} = '不满足成本上限区域(Alpha形状)';
+                        end
+                    end
+                catch e
+                    fprintf('不满足成本上限边界计算错误: %s\n', e.message);
+                end
+            end
+            
+            % 绘制满足成本上限的点（蓝色）
+            if ~isempty(feasibleFlow)
+                % 绘制满足成本上限的点
+                h_feasible = scatter3(feasibleFlow(:, 1), feasibleFlow(:, 2), feasibleFlow(:, 3), ...
+                    pointSize, feasibleColor, 'o', 'filled', ...
+                    'MarkerFaceAlpha', 0.7, 'MarkerEdgeColor', 'none');
+                legendHandles = [legendHandles, h_feasible];
+                if showCostLimit
+                    legendNames{end+1} = '满足成本上限';
+                else
+                    legendNames{end+1} = '满足所有约束';
+                end
+                
+                % 绘制满足成本上限点的边界
+                try
+                    if strcmp(boundaryType, 'convex') && size(feasibleFlow, 1) > 3
+                        % 使用凸包绘制边界
+                        K = convhull(feasibleFlow(:, 1), feasibleFlow(:, 2), feasibleFlow(:, 3));
+                        h_hull = trisurf(K, feasibleFlow(:, 1), feasibleFlow(:, 2), feasibleFlow(:, 3), ...
+                            'FaceColor', feasibleColor, ...
+                            'FaceAlpha', 0.2, ...
+                            'EdgeColor', feasibleColor, ...
+                            'EdgeAlpha', 0.5, ...
+                            'LineWidth', 0.5);
+                        legendHandles = [legendHandles, h_hull];
+                        if showCostLimit
+                            legendNames{end+1} = '满足成本上限区域';
+                        else
+                            legendNames{end+1} = '可行区域边界(凸包)';
+                        end
+                    elseif size(feasibleFlow, 1) > 3
+                        % 使用Alpha形状绘制边界（如果可用）
+                        if exist('alphaShape', 'file')
+                            % 计算推荐的Alpha值并应用用户调整因子
+                            alpha = alphaValue * criticalAlpha(feasibleFlow);
+                            % 创建Alpha形状
+                            shp = alphaShape(feasibleFlow(:, 1), feasibleFlow(:, 2), feasibleFlow(:, 3), alpha);
+                            h_hull = plot(shp, 'FaceColor', feasibleColor, 'FaceAlpha', 0.2, ...
+                                'EdgeColor', feasibleColor, 'EdgeAlpha', 0.5, 'LineWidth', 0.5);
+                            legendHandles = [legendHandles, h_hull];
+                            if showCostLimit
+                                legendNames{end+1} = '满足成本上限区域(Alpha形状)';
+                            else
+                                legendNames{end+1} = '可行区域边界(Alpha形状)';
+                            end
+                            
+                            % 显示当前Alpha值
+                            titleStr = sprintf('三维流量向量可视化 (Alpha=%.2f)', alpha);
+                            title(titleStr, 'FontSize', 14, 'FontWeight', 'bold');
+                        end
+                    end
+                catch e
+                    fprintf('边界计算错误: %s\n', e.message);
                 end
             end
             
@@ -1119,7 +1557,15 @@ function plot3DFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, s
                 zlabel(pathNames{3}, 'FontSize', 12, 'FontWeight', 'bold');
             end
             
-            title('三维流量向量可视化', 'FontSize', 14, 'FontWeight', 'bold');
+            % 设置标题（如果没有在前面设置）
+            if ~strcmp(boundaryType, 'alpha') || ~exist('alphaShape', 'file')
+                if showCostLimit
+                    titlePrefix = '三维流量向量可视化(含成本上限)';
+                else
+                    titlePrefix = '三维流量向量可视化';
+                end
+                title(titlePrefix, 'FontSize', 14, 'FontWeight', 'bold');
+            end
             
             % 如果有4个维度，则处理第4维度
             if length(pathIndices) > 3
@@ -1128,10 +1574,20 @@ function plot3DFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, s
                 
                 % 检查所有值是否相同
                 if all(abs(fourthDimValues - fourthDimValues(1)) < 1e-6)
-                    title([sprintf('三维流量向量可视化 (%s=%.0f)', pathNames{4}, fourthDimValues(1))], ...
+                    if showCostLimit
+                        titlePrefix = '三维流量向量可视化(含成本上限)';
+                    else
+                        titlePrefix = '三维流量向量可视化';
+                    end
+                    title([sprintf('%s (%s=%.0f)', titlePrefix, pathNames{4}, fourthDimValues(1))], ...
                         'FontSize', 14, 'FontWeight', 'bold');
                 else
-                    title('三维流量向量可视化', 'FontSize', 14, 'FontWeight', 'bold');
+                    if showCostLimit
+                        titlePrefix = '三维流量向量可视化(含成本上限)';
+                    else
+                        titlePrefix = '三维流量向量可视化';
+                    end
+                    % title(titlePrefix, 'FontSize', 14, 'FontWeight', 'bold');
                     
                     % 添加第4维度的色彩映射
                     colormap(jet);
@@ -1140,18 +1596,20 @@ function plot3DFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, s
                     caxis([min(fourthDimValues), max(fourthDimValues)]);
                     
                     % 使用色彩映射重绘点
-                    delete(h_full);
-                    h_full = scatter3(validFlowSelected(:, 1), validFlowSelected(:, 2), validFlowSelected(:, 3), ...
-                        pointSize, fourthDimValues, 'o', 'filled', ...
-                        'MarkerFaceAlpha', 0.7, 'MarkerEdgeColor', 'none');
-                    
-                    % 更新图例
-                    legendHandles = legendHandles(ishandle(legendHandles)); % 移除无效句柄
-                    idx = find(strcmp(legendNames, '满足所有约束'));
-                    if ~isempty(idx)
-                        legendNames(idx) = []; % 移除对应名称
-                        legendHandles = [legendHandles, h_full];
-                        legendNames{end+1} = '满足所有约束 (颜色表示' + string(pathNames{4}) + ')';
+                    if ~showCostLimit
+                        delete(h_feasible);
+                        h_feasible = scatter3(feasibleFlow(:, 1), feasibleFlow(:, 2), feasibleFlow(:, 3), ...
+                            pointSize, fourthDimValues, 'o', 'filled', ...
+                            'MarkerFaceAlpha', 0.7, 'MarkerEdgeColor', 'none');
+                        
+                        % 更新图例
+                        legendHandles = legendHandles(ishandle(legendHandles)); % 移除无效句柄
+                        idx = find(strcmp(legendNames, '满足所有约束'));
+                        if ~isempty(idx)
+                            legendNames(idx) = []; % 移除对应名称
+                            legendHandles = [legendHandles, h_feasible];
+                            legendNames{end+1} = '满足所有约束 (颜色表示' + string(pathNames{4}) + ')';
+                        end
                     end
                 end
             end
@@ -1166,7 +1624,7 @@ function plot3DFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, s
                         'EdgeColor', [0.7, 0.7, 0.7], ...
                         'Box', 'on');
                 catch e
-                    warning('图例创建错误: %s', e.message);
+                    warning(e.identifier, '图例创建错误: %s', e.message);
                 end
             end
             
@@ -1185,18 +1643,41 @@ function plot3DFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, s
                   axisLimits(5)-0.03*axisRange(3), axisLimits(6)+0.03*axisRange(3)]);
             
             % 添加一个文本注释，说明约束条件
-            sumText = sprintf('总流量约束: 所有路径流量之和 = 10000');
-            annotation('textbox', [0.15, 0.02, 0.7, 0.05], ...
-                'String', sumText, ...
-                'FontName', 'Arial', 'FontSize', 9, ...
-                'HorizontalAlignment', 'center', ...
-                'BackgroundColor', 'white', ...
-                'EdgeColor', 'none');
+            if showCostLimit && (~isempty(feasibleFlowIndices) || ~isempty(infeasibleFlowIndices))
+                sumText = sprintf('总流量约束: 所有路径流量之和 = 10000 | 满足成本上限的流量: %d个 | 不满足成本上限的流量: %d个', ...
+                    length(feasibleFlowIndices), length(infeasibleFlowIndices));
+            else
+                sumText = sprintf('总流量约束: 所有路径流量之和 = 10000');
+            end
+            
+            % annotation('textbox', [0.15, 0.02, 0.7, 0.05], ...
+            %     'String', sumText, ...
+            %     'FontName', 'Arial', 'FontSize', 9, ...
+            %     'HorizontalAlignment', 'center', ...
+            %     'BackgroundColor', 'white', ...
+            %     'EdgeColor', 'none');
             
             hold off;
         else
             warning('没有满足所有约束的流量数据可供可视化');
         end
+    end
+    
+    % 辅助函数：计算Alpha形状的临界Alpha值
+    function critAlpha = criticalAlpha(points)
+        % 计算适合给定点云的推荐Alpha值
+        if size(points, 1) < 4
+            critAlpha = 1;  % 默认值
+            return;
+        end
+        
+        % 计算点云的典型尺度
+        xRange = max(points(:,1)) - min(points(:,1));
+        yRange = max(points(:,2)) - min(points(:,2));
+        zRange = max(points(:,3)) - min(points(:,3));
+        
+        % 使用点云尺度的10%作为推荐Alpha值
+        critAlpha = 0.1 * mean([xRange, yRange, zRange]);
     end
     
     % 回调函数：切换旋转
@@ -1235,7 +1716,12 @@ function plot3DFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, s
         comboIdx = get(pathComboDropdown, 'Value');
         pathStr = strrep(pathCombinationNames{comboIdx}, ',', '_');
         pathStr = strrep(pathStr, ' ', '');
-        figFile = sprintf('results/3d_flow_%s_%s.png', pathStr, datestr(now, 'yyyymmdd_HHMMSS'));
+        if showCostLimit
+            costLimitStr = 'with_cost_limit';
+        else
+            costLimitStr = '';
+        end
+        figFile = sprintf('results/3d_flow_%s_%s_%s.png', pathStr, costLimitStr, datestr(now, 'yyyymmdd_HHMMSS'));
         
         % 保存图像
         print(figFile, '-dpng', '-r300');
