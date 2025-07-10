@@ -24,9 +24,9 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index)
         if ~isempty(totalValidFlow)
             selectedIndices = randperm(size(totalValidFlow, 1), min(q, size(totalValidFlow, 1)));
             % plotResults(totalValidCost, selectedIndices);
-            % plotPathCosts(totalValidFlow, relationMatrix, selectedIndices);
+            plotPathCosts(totalValidFlow, relationMatrix, selectedIndices);
             % 绘制流量向量可视化
-            % plotFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, selectedIndices);
+            plotFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, selectedIndices);
             % 绘制三维流量可视化
             plot3DFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, selectedIndices, subset_index);
         end
@@ -1258,46 +1258,76 @@ function plot3DFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, s
     end
     
     % 创建图形控制面板
-    panel = uipanel('Title', '可视化控制', 'Position', [0.01, 0.01, 0.4, 0.3]);
+    panel = uipanel('Title', '可视化控制', 'Position', [0.01, 0.01, 0.35, 0.3], ...
+        'FontSize', 10, 'FontWeight', 'bold');
     
-    % 添加路径组合选择下拉菜单
+    % 面板内部边距
+    padding = 10;
+    controlHeight = 22;
+    labelWidth = 80;
+    controlWidth = 120;
+    
+    % 计算垂直位置（从上往下排列）
+    panelHeight = panel.Position(4) * fig.Position(4);
+    row1 = panelHeight - padding - controlHeight;
+    row2 = row1 - controlHeight - padding/2;
+    row3 = row2 - controlHeight - padding/2;
+    row4 = row3 - controlHeight - padding/2;
+    row5 = row4 - controlHeight - padding/2;
+    
+    % ===== 第一行：路径组合选择 =====
     uicontrol('Parent', panel, 'Style', 'text', 'String', '路径组合:', ...
-        'Position', [10, 60, 80, 20], 'HorizontalAlignment', 'left');
+        'Position', [padding, row1, labelWidth, controlHeight], ...
+        'HorizontalAlignment', 'left');
     pathComboDropdown = uicontrol('Parent', panel, 'Style', 'popupmenu', ...
-        'String', pathCombinationNames, 'Position', [10, 40, 120, 20], ...
+        'String', pathCombinationNames, 'Position', [padding+labelWidth, row1, controlWidth, controlHeight], ...
         'Callback', @updatePathCombination);
     
+    % ===== 第二行：显示选项 =====
+    % 成本上限显示控制
+    uicontrol('Parent', panel, 'Style', 'checkbox', 'String', '显示成本上限区分', ...
+        'Position', [padding, row2, controlWidth, controlHeight], ...
+        'Value', 1, 'Callback', @toggleCostLimit);
+    
+    % 显示内部线条控制
+    uicontrol('Parent', panel, 'Style', 'checkbox', 'String', '显示内部线条', ...
+        'Position', [padding+labelWidth+50, row2, controlWidth, controlHeight], ...
+        'Value', 0, 'Callback', @toggleInnerLines);
+    
+    % ===== 第三行：边界类型控制 =====
+    % 边界类型标签
+    uicontrol('Parent', panel, 'Style', 'text', 'String', '边界类型:', ...
+        'Position', [padding, row3, labelWidth, controlHeight], ...
+        'HorizontalAlignment', 'left');
+    
+    % 添加凸包选项
+    uicontrol('Parent', panel, 'Style', 'radiobutton', 'String', '凸包', ...
+        'Position', [padding+labelWidth, row3, 70, controlHeight], 'Tag', 'convex', ...
+        'Value', 1, 'Callback', @(src,~)selectBoundaryType(src,'convex'));
+    
+    % 添加Alpha形状选项
+    uicontrol('Parent', panel, 'Style', 'radiobutton', 'String', 'Alpha形状', ...
+        'Position', [padding+labelWidth+80, row3, 100, controlHeight], 'Tag', 'alpha', ...
+        'Value', 0, 'Callback', @(src,~)selectBoundaryType(src,'alpha'));
+    
+    % ===== 第四行：Alpha值滑动条 =====
+    % Alpha值滑动条
+    uicontrol('Parent', panel, 'Style', 'text', 'String', 'Alpha值:', ...
+        'Position', [padding, row4, labelWidth, controlHeight], ...
+        'HorizontalAlignment', 'left');
+    alphaSlider = uicontrol('Parent', panel, 'Style', 'slider', ...
+        'Min', 0.1, 'Max', 3, 'Value', 1.0, ...
+        'Position', [padding+labelWidth, row4, controlWidth, controlHeight], ...
+        'Callback', @updateAlphaValue);
+    
+    % ===== 第五行：操作按钮 =====
     % 添加旋转控制按钮
     uicontrol('Parent', panel, 'Style', 'pushbutton', 'String', '旋转视图', ...
-        'Position', [10, 10, 80, 20], 'Callback', @toggleRotation);
+        'Position', [padding, row5, labelWidth, controlHeight], 'Callback', @toggleRotation);
     
     % 添加保存图像按钮
     uicontrol('Parent', panel, 'Style', 'pushbutton', 'String', '保存图像', ...
-        'Position', [100, 10, 80, 20], 'Callback', @saveImage);
-    
-    % 添加成本上限显示控制
-    uicontrol('Parent', panel, 'Style', 'checkbox', 'String', '显示成本上限区分', ...
-        'Position', [150, 60, 120, 20], 'Value', 1, 'Callback', @toggleCostLimit);
-    
-    % 添加边界类型控制
-    boundaryTypeGroup = uibuttongroup('Parent', panel, 'Title', '边界类型', ...
-        'Position', [0.5, 0.5, 0.45, 0.45], 'SelectionChangedFcn', @updateBoundaryType);
-    
-    % 添加凸包和Alpha形状选项
-    uicontrol('Parent', boundaryTypeGroup, 'Style', 'radiobutton', 'String', '凸包', ...
-        'Position', [5, 25, 70, 20], 'Tag', 'convex');
-    uicontrol('Parent', boundaryTypeGroup, 'Style', 'radiobutton', 'String', 'Alpha形状', ...
-        'Position', [5, 5, 70, 20], 'Tag', 'alpha');
-    
-    % 默认选择凸包
-    boundaryTypeGroup.SelectedObject = findobj(boundaryTypeGroup, 'Tag', 'convex');
-    
-    % 添加边界控制滑动条
-    uicontrol('Parent', panel, 'Style', 'text', 'String', 'Alpha值:', ...
-        'Position', [160, 60, 60, 20], 'HorizontalAlignment', 'left');
-    alphaSlider = uicontrol('Parent', panel, 'Style', 'slider', ...
-        'Min', 0.1, 'Max', 3, 'Value', 1.0, ...
-        'Position', [160, 40, 80, 20], 'Callback', @updateAlphaValue);
+        'Position', [padding+labelWidth+10, row5, labelWidth, controlHeight], 'Callback', @saveImage);
     
     % 初始化旋转标志
     isRotating = false;
@@ -1307,6 +1337,26 @@ function plot3DFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, s
     boundaryType = 'convex';
     alphaValue = 1.0;
     showCostLimit = true;
+    showInnerLines = false;
+    
+    % 边界类型选择回调函数
+    function selectBoundaryType(src, type)
+        % 如果当前按钮被选中，取消选择其他按钮
+        if src.Value == 1
+            boundaryType = type;
+            % 查找并取消选择其他单选按钮
+            btns = findobj(panel, 'Style', 'radiobutton');
+            for i = 1:length(btns)
+                if ~strcmp(btns(i).Tag, type)
+                    btns(i).Value = 0;
+                end
+            end
+            updatePathCombination();
+        else
+            % 防止取消选择当前按钮（必须始终有一个选中）
+            src.Value = 1;
+        end
+    end
     
     % 绘制初始组合的可视化
     updatePathCombination();
@@ -1317,9 +1367,9 @@ function plot3DFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, s
         updatePathCombination();
     end
     
-    % 回调函数：更新边界类型
-    function updateBoundaryType(~, event)
-        boundaryType = event.NewValue.Tag;
+    % 回调函数：切换内部线条显示
+    function toggleInnerLines(src, ~)
+        showInnerLines = get(src, 'Value') == 1;
         updatePathCombination();
     end
     
@@ -1365,10 +1415,6 @@ function plot3DFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, s
             % 准备3D可视化
             hold on;
             
-            % 定义点大小
-            numPoints = size(validFlowSelected, 1);
-            pointSize = min(50, max(20, 500/sqrt(numPoints)));
-            
             % 创建图例句柄和名称数组
             legendHandles = [];
             legendNames = {};
@@ -1388,16 +1434,17 @@ function plot3DFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, s
                 feasibleFlow = validFlowSelected; % 如果不显示成本上限，则所有点都视为可行点
             end
             
-            % 绘制满足路径约束的点（橙色）
-            h_path = [];
+            % 决定是否显示内部线条
+            if showInnerLines
+                edgeColor = 'k';  % 黑色边缘
+                edgeAlpha = 0.3;  % 半透明
+            else
+                edgeColor = 'none';  % 无边缘
+                edgeAlpha = 0;
+            end
+            
+            % 绘制满足路径约束的边界
             if ~isempty(uniquePathFlows) && ~isempty(pathFlowSelected) && size(pathFlowSelected, 1) >= 4
-                % 绘制散点
-                h_path = scatter3(pathFlowSelected(:, 1), pathFlowSelected(:, 2), pathFlowSelected(:, 3), ...
-                    pointSize, pathConstraintColor, 'o', 'filled', ...
-                    'MarkerFaceAlpha', 0.1, 'MarkerEdgeColor', 'none');
-                legendHandles = [legendHandles, h_path];
-                legendNames{end+1} = '仅满足路径约束';
-                
                 % 尝试绘制路径约束点的边界
                 try
                     if strcmp(boundaryType, 'convex')
@@ -1405,10 +1452,9 @@ function plot3DFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, s
                         K_path = convhull(pathFlowSelected(:, 1), pathFlowSelected(:, 2), pathFlowSelected(:, 3));
                         h_path_hull = trisurf(K_path, pathFlowSelected(:, 1), pathFlowSelected(:, 2), pathFlowSelected(:, 3), ...
                             'FaceColor', pathConstraintColor, ...
-                            'FaceAlpha', 0.15, ...
-                            'EdgeColor', pathConstraintColor, ...
-                            'EdgeAlpha', 0.3, ...
-                            'LineWidth', 0.5);
+                            'FaceAlpha', 0.5, ...
+                            'EdgeColor', edgeColor, ...
+                            'EdgeAlpha', edgeAlpha);
                         legendHandles = [legendHandles, h_path_hull];
                         legendNames{end+1} = '路径约束边界(凸包)';
                     else
@@ -1417,8 +1463,8 @@ function plot3DFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, s
                             % 使用Alpha形状
                             shp = alphaShape(pathFlowSelected(:, 1), pathFlowSelected(:, 2), pathFlowSelected(:, 3), ...
                                 alphaValue * criticalAlpha(pathFlowSelected));
-                            h_path_alpha = plot(shp, 'FaceColor', pathConstraintColor, 'FaceAlpha', 0.15, ...
-                                'EdgeColor', pathConstraintColor, 'EdgeAlpha', 0.3, 'LineWidth', 0.5);
+                            h_path_alpha = plot(shp, 'FaceColor', pathConstraintColor, 'FaceAlpha', 0.5, ...
+                                'EdgeColor', edgeColor, 'EdgeAlpha', edgeAlpha);
                             legendHandles = [legendHandles, h_path_alpha];
                             legendNames{end+1} = '路径约束边界(Alpha形状)';
                         else
@@ -1426,10 +1472,9 @@ function plot3DFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, s
                             K_path = convhull(pathFlowSelected(:, 1), pathFlowSelected(:, 2), pathFlowSelected(:, 3));
                             h_path_hull = trisurf(K_path, pathFlowSelected(:, 1), pathFlowSelected(:, 2), pathFlowSelected(:, 3), ...
                                 'FaceColor', pathConstraintColor, ...
-                                'FaceAlpha', 0.15, ...
-                                'EdgeColor', pathConstraintColor, ...
-                                'EdgeAlpha', 0.3, ...
-                                'LineWidth', 0.5);
+                                'FaceAlpha', 0.5, ...
+                                'EdgeColor', edgeColor, ...
+                                'EdgeAlpha', edgeAlpha);
                             legendHandles = [legendHandles, h_path_hull];
                             legendNames{end+1} = '路径约束边界(凸包)';
                             warning('Alpha形状函数不可用，已退回到凸包');
@@ -1440,14 +1485,8 @@ function plot3DFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, s
                 end
             end
             
-            % 绘制不满足成本上限的点（红色）
+            % 绘制不满足成本上限的边界
             if showCostLimit && ~isempty(infeasibleFlow) && size(infeasibleFlow, 1) >= 4
-                h_infeasible = scatter3(infeasibleFlow(:, 1), infeasibleFlow(:, 2), infeasibleFlow(:, 3), ...
-                    pointSize, infeasibleColor, 'o', 'filled', ...
-                    'MarkerFaceAlpha', 0.7, 'MarkerEdgeColor', 'none');
-                legendHandles = [legendHandles, h_infeasible];
-                legendNames{end+1} = '不满足成本上限';
-                
                 % 尝试绘制不满足成本上限点的边界
                 try
                     if strcmp(boundaryType, 'convex') && size(infeasibleFlow, 1) > 3
@@ -1455,10 +1494,9 @@ function plot3DFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, s
                         K_infeasible = convhull(infeasibleFlow(:, 1), infeasibleFlow(:, 2), infeasibleFlow(:, 3));
                         h_infeasible_hull = trisurf(K_infeasible, infeasibleFlow(:, 1), infeasibleFlow(:, 2), infeasibleFlow(:, 3), ...
                             'FaceColor', infeasibleColor, ...
-                            'FaceAlpha', 0.2, ...
-                            'EdgeColor', infeasibleColor, ...
-                            'EdgeAlpha', 0.5, ...
-                            'LineWidth', 0.5);
+                            'FaceAlpha', 0.5, ...
+                            'EdgeColor', edgeColor, ...
+                            'EdgeAlpha', edgeAlpha);
                         legendHandles = [legendHandles, h_infeasible_hull];
                         legendNames{end+1} = '不满足成本上限区域';
                     elseif size(infeasibleFlow, 1) > 3
@@ -1468,8 +1506,8 @@ function plot3DFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, s
                             alpha = alphaValue * criticalAlpha(infeasibleFlow);
                             % 创建Alpha形状
                             shp = alphaShape(infeasibleFlow(:, 1), infeasibleFlow(:, 2), infeasibleFlow(:, 3), alpha);
-                            h_infeasible_hull = plot(shp, 'FaceColor', infeasibleColor, 'FaceAlpha', 0.2, ...
-                                'EdgeColor', infeasibleColor, 'EdgeAlpha', 0.5, 'LineWidth', 0.5);
+                            h_infeasible_hull = plot(shp, 'FaceColor', infeasibleColor, 'FaceAlpha', 0.5, ...
+                                'EdgeColor', edgeColor, 'EdgeAlpha', edgeAlpha);
                             legendHandles = [legendHandles, h_infeasible_hull];
                             legendNames{end+1} = '不满足成本上限区域(Alpha形状)';
                         end
@@ -1479,19 +1517,8 @@ function plot3DFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, s
                 end
             end
             
-            % 绘制满足成本上限的点（蓝色）
-            if ~isempty(feasibleFlow)
-                % 绘制满足成本上限的点
-                h_feasible = scatter3(feasibleFlow(:, 1), feasibleFlow(:, 2), feasibleFlow(:, 3), ...
-                    pointSize, feasibleColor, 'o', 'filled', ...
-                    'MarkerFaceAlpha', 0.7, 'MarkerEdgeColor', 'none');
-                legendHandles = [legendHandles, h_feasible];
-                if showCostLimit
-                    legendNames{end+1} = '满足成本上限';
-                else
-                    legendNames{end+1} = '满足所有约束';
-                end
-                
+            % 绘制满足成本上限的边界
+            if ~isempty(feasibleFlow) && size(feasibleFlow, 1) >= 4
                 % 绘制满足成本上限点的边界
                 try
                     if strcmp(boundaryType, 'convex') && size(feasibleFlow, 1) > 3
@@ -1499,10 +1526,9 @@ function plot3DFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, s
                         K = convhull(feasibleFlow(:, 1), feasibleFlow(:, 2), feasibleFlow(:, 3));
                         h_hull = trisurf(K, feasibleFlow(:, 1), feasibleFlow(:, 2), feasibleFlow(:, 3), ...
                             'FaceColor', feasibleColor, ...
-                            'FaceAlpha', 0.2, ...
-                            'EdgeColor', feasibleColor, ...
-                            'EdgeAlpha', 0.5, ...
-                            'LineWidth', 0.5);
+                            'FaceAlpha', 0.5, ...
+                            'EdgeColor', edgeColor, ...
+                            'EdgeAlpha', edgeAlpha);
                         legendHandles = [legendHandles, h_hull];
                         if showCostLimit
                             legendNames{end+1} = '满足成本上限区域';
@@ -1516,8 +1542,8 @@ function plot3DFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, s
                             alpha = alphaValue * criticalAlpha(feasibleFlow);
                             % 创建Alpha形状
                             shp = alphaShape(feasibleFlow(:, 1), feasibleFlow(:, 2), feasibleFlow(:, 3), alpha);
-                            h_hull = plot(shp, 'FaceColor', feasibleColor, 'FaceAlpha', 0.2, ...
-                                'EdgeColor', feasibleColor, 'EdgeAlpha', 0.5, 'LineWidth', 0.5);
+                            h_hull = plot(shp, 'FaceColor', feasibleColor, 'FaceAlpha', 0.5, ...
+                                'EdgeColor', edgeColor, 'EdgeAlpha', edgeAlpha);
                             legendHandles = [legendHandles, h_hull];
                             if showCostLimit
                                 legendNames{end+1} = '满足成本上限区域(Alpha形状)';
@@ -1526,7 +1552,7 @@ function plot3DFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, s
                             end
                             
                             % 显示当前Alpha值
-                            titleStr = sprintf('三维流量向量可视化 (Alpha=%.2f)', alpha);
+                            titleStr = sprintf('三维流量向量边界可视化 (Alpha=%.2f)', alpha);
                             title(titleStr, 'FontSize', 14, 'FontWeight', 'bold');
                         end
                     end
@@ -1535,39 +1561,24 @@ function plot3DFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, s
                 end
             end
             
-            % 高亮显示选定的点
-            h_selected = [];
-            if ~isempty(selectedIndices)
-                if max(selectedIndices) <= size(totalValidFlow, 1)
-                    selectedPoints = totalValidFlow(selectedIndices, pathIndices);
-                    h_selected = scatter3(selectedPoints(:, 1), selectedPoints(:, 2), selectedPoints(:, 3), ...
-                        pointSize*1.5, selectedColor, 'o', 'filled', ...
-                        'MarkerEdgeColor', 'black', 'LineWidth', 1);
-                    if ~isempty(h_selected) && isvalid(h_selected)
-                        legendHandles = [legendHandles, h_selected];
-                        legendNames{end+1} = '选定流量';
-                    end
-                end
-            end
-            
-            % 添加坐标轴标签
+            % 确保添加坐标轴标签，并设置字体加粗和增大字号
             if length(pathIndices) >= 3
-                xlabel(pathNames{1}, 'FontSize', 12, 'FontWeight', 'bold');
-                ylabel(pathNames{2}, 'FontSize', 12, 'FontWeight', 'bold');
-                zlabel(pathNames{3}, 'FontSize', 12, 'FontWeight', 'bold');
+                xlabel(pathNames{1}, 'FontSize', 14, 'FontWeight', 'bold');
+                ylabel(pathNames{2}, 'FontSize', 14, 'FontWeight', 'bold');
+                zlabel(pathNames{3}, 'FontSize', 14, 'FontWeight', 'bold');
             end
             
             % 设置标题（如果没有在前面设置）
             if ~strcmp(boundaryType, 'alpha') || ~exist('alphaShape', 'file')
                 if showCostLimit
-                    titlePrefix = '三维流量向量可视化(含成本上限)';
+                    titlePrefix = '三维流量向量边界可视化(含成本上限)';
                 else
-                    titlePrefix = '三维流量向量可视化';
+                    titlePrefix = '三维流量向量边界可视化';
                 end
                 title(titlePrefix, 'FontSize', 14, 'FontWeight', 'bold');
             end
             
-            % 如果有4个维度，则处理第4维度
+            % 如果有4个维度，则添加说明
             if length(pathIndices) > 3
                 % 计算第4维度的流量值（总和为10000）
                 fourthDimValues = 10000 - sum(validFlowSelected(:,1:3), 2);
@@ -1575,42 +1586,20 @@ function plot3DFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, s
                 % 检查所有值是否相同
                 if all(abs(fourthDimValues - fourthDimValues(1)) < 1e-6)
                     if showCostLimit
-                        titlePrefix = '三维流量向量可视化(含成本上限)';
+                        titlePrefix = '三维流量向量边界可视化(含成本上限)';
                     else
-                        titlePrefix = '三维流量向量可视化';
+                        titlePrefix = '三维流量向量边界可视化';
                     end
                     title([sprintf('%s (%s=%.0f)', titlePrefix, pathNames{4}, fourthDimValues(1))], ...
                         'FontSize', 14, 'FontWeight', 'bold');
                 else
                     if showCostLimit
-                        titlePrefix = '三维流量向量可视化(含成本上限)';
+                        titlePrefix = '三维流量向量边界可视化(含成本上限)';
                     else
-                        titlePrefix = '三维流量向量可视化';
+                        titlePrefix = '三维流量向量边界可视化';
                     end
-                    % title(titlePrefix, 'FontSize', 14, 'FontWeight', 'bold');
-                    
-                    % 添加第4维度的色彩映射
-                    colormap(jet);
-                    cb = colorbar;
-                    ylabel(cb, pathNames{4}, 'FontSize', 10, 'FontWeight', 'bold');
-                    caxis([min(fourthDimValues), max(fourthDimValues)]);
-                    
-                    % 使用色彩映射重绘点
-                    if ~showCostLimit
-                        delete(h_feasible);
-                        h_feasible = scatter3(feasibleFlow(:, 1), feasibleFlow(:, 2), feasibleFlow(:, 3), ...
-                            pointSize, fourthDimValues, 'o', 'filled', ...
-                            'MarkerFaceAlpha', 0.7, 'MarkerEdgeColor', 'none');
-                        
-                        % 更新图例
-                        legendHandles = legendHandles(ishandle(legendHandles)); % 移除无效句柄
-                        idx = find(strcmp(legendNames, '满足所有约束'));
-                        if ~isempty(idx)
-                            legendNames(idx) = []; % 移除对应名称
-                            legendHandles = [legendHandles, h_feasible];
-                            legendNames{end+1} = '满足所有约束 (颜色表示' + string(pathNames{4}) + ')';
-                        end
-                    end
+                    title([sprintf('%s (%s值为变量)', titlePrefix, pathNames{4})], ...
+                        'FontSize', 14, 'FontWeight', 'bold');
                 end
             end
             
@@ -1620,7 +1609,7 @@ function plot3DFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, s
                 try
                     legend(legendHandles(validHandles), legendNames(validHandles), ...
                         'Location', 'best', ...
-                        'FontName', 'Arial', 'FontSize', 9, ...
+                        'FontName', 'Arial', 'FontSize', 11, ...
                         'EdgeColor', [0.7, 0.7, 0.7], ...
                         'Box', 'on');
                 catch e
@@ -1649,13 +1638,6 @@ function plot3DFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, s
             else
                 sumText = sprintf('总流量约束: 所有路径流量之和 = 10000');
             end
-            
-            % annotation('textbox', [0.15, 0.02, 0.7, 0.05], ...
-            %     'String', sumText, ...
-            %     'FontName', 'Arial', 'FontSize', 9, ...
-            %     'HorizontalAlignment', 'center', ...
-            %     'BackgroundColor', 'white', ...
-            %     'EdgeColor', 'none');
             
             hold off;
         else
@@ -1721,7 +1703,7 @@ function plot3DFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, s
         else
             costLimitStr = '';
         end
-        figFile = sprintf('results/3d_flow_%s_%s_%s.png', pathStr, costLimitStr, datestr(now, 'yyyymmdd_HHMMSS'));
+        figFile = sprintf('results/3d_flow_boundaries_%s_%s_%s.png', pathStr, costLimitStr, datestr(now, 'yyyymmdd_HHMMSS'));
         
         % 保存图像
         print(figFile, '-dpng', '-r300');
