@@ -229,39 +229,22 @@ function plotPathCostsWithUpperLimit(allPathCosts, leftBoundaryX, leftBoundaryY,
     % 用于存储不可行方案的图例句柄
     h_infeasible = [];
     
-    % 首先识别所有的可行和不可行流量方案
-    feasiblePaths = [];
-    infeasiblePaths = [];
-    feasibleCosts = {};
-    feasibleColors = {};
-    
-    % 第一步：分类所有流量方案
-    for i = 1:length(allPathCosts)
-        costs = allPathCosts{i};
-        if ~isempty(costs)
-            % 检查每个点是否在上限线下
-            isPointFeasible = zeros(size(costs, 1), 1);
-            
-            for j = 1:size(costs, 1)
-                currPoint = costs(j, :);  % [时间成本, 金钱成本]
-                
-                % 找到最接近的金钱成本点
-                [~, idx] = min(abs(upperLimitY - currPoint(2)));
-                
-                % 检查时间成本是否低于或等于上限
-                isPointFeasible(j) = currPoint(1) <= upperLimitX(idx);
-            end
-            
-            % 根据所有点的可行性分类方案
-            if all(isPointFeasible)
-                feasiblePaths = [feasiblePaths, i];
-                feasibleCosts{end+1} = costs;
-                feasibleColors{end+1} = colorVariations(i,:);
-            else
-                infeasiblePaths = [infeasiblePaths, i];
-            end
-        end
-    end
+    % 预分配结果数组
+    feasible_flags = false(1, length(allPathCosts));
+
+    % 使用cellfun向量化操作，检查每个流量方案的可行性
+    feasible_flags = cellfun(@(costs) ...
+        ~isempty(costs) && ...
+        all(costs(:,1) <= interp1(upperLimitY, upperLimitX, costs(:,2), 'nearest', 'extrap')), ...
+        allPathCosts);
+
+    % 使用逻辑索引获取可行和不可行方案
+    feasiblePaths = find(feasible_flags);
+    infeasiblePaths = find(~feasible_flags);
+
+    % 提取可行方案的成本和颜色
+    feasibleCosts = allPathCosts(feasiblePaths);
+    feasibleColors = num2cell(colorVariations(feasiblePaths,:), 2);
     
     % 第二步：绘制所有不可行流量方案（灰色）
     infeasibleColor = [0.9, 0.9, 0.9];

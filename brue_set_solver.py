@@ -23,6 +23,10 @@ class BRUESetSolver(BRUESolver):
         Returns:
             实际旅行时间数组
         """
+        # 确保path_link_matrix是正确的形状
+        if self.path_link_matrix.shape[0] != len(flows):
+            raise ValueError(f"路径数量不匹配：flows长度为{len(flows)}，但path_link_matrix行数为{self.path_link_matrix.shape[0]}")
+        
         # 计算每条路径的旅行时间
         path_flows = flows @ self.path_link_matrix
         free_flow_times = np.array([
@@ -52,7 +56,14 @@ class BRUESetSolver(BRUESolver):
             self.config.link_money_cost[i]
             for i in range(1, self.config.num_paths + 1)
         ])
-        return flows @ self.path_link_matrix @ money_costs
+        # 计算每条路径的金钱成本
+        path_money_costs = []
+        for i in range(len(flows)):
+            path_cost = 0
+            for j in range(len(money_costs)):
+                path_cost += self.path_link_matrix[i, j] * money_costs[j]
+            path_money_costs.append(path_cost)
+        return np.array(path_money_costs)
         
     def find_brue_set_grid(self, zeta: float, num_points: int = 50) -> List[Dict[str, Any]]:
         """使用网格搜索方法寻找BRUE集合

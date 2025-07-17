@@ -20,7 +20,7 @@ class BRUEMatlabSolver:
         matrix = np.zeros((num_paths, max_links))
         
         for i, pair in enumerate(pairs):
-            if i < num_paths:  # 确保不超过实际路径数量
+            if i < num_paths and int(pair[1]) <= max_links:  # 确保索引在有效范围内
                 matrix[i, int(pair[1]-1)] = 1
         return matrix
     

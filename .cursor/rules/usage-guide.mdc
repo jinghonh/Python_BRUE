@@ -1,7 +1,6 @@
 ---
-description: 
-globs: 
-alwaysApply: false
+globs: *.py
+alwaysApply: true
 ---
 # BRUE项目使用指南
 

@@ -22,9 +22,16 @@ Python_BRUE/
 ├── brue_set_solver.py        # 集合求解器（帕累托分析）
 ├── brue_matlab_solver.py     # MATLAB接口求解器
 ├── traffic_network_config.py # 网络配置类
+├── test_paper_algorithm.py   # 论文算法测试
+├── test_corrected.py         # 修正测试文件
+├── demo.py                   # 演示文件
+├── temp.py                   # 临时测试文件
 ├── pyproject.toml           # 项目配置文件
+├── uv.lock                  # 依赖锁文件
 ├── README.md               # 项目说明文档
-└── html/                   # MATLAB生成的分析报告
+├── cache/                   # 缓存目录
+├── results/                 # 结果输出目录
+└── analyzeTrafficNetwork.m  # MATLAB分析脚本
 ```
 
 ## 依赖环境
@@ -132,7 +139,7 @@ pareto_results = set_solver.solve_pareto_optimal_set()
 
 ## 网络配置
 
-项目提供三种预定义网络配置：
+项目提供四种预定义网络配置：
 
 ### 1. 基础网络 (create_basic_network)
 - 8条路径，6个起终点对
@@ -147,6 +154,11 @@ pareto_results = set_solver.solve_pareto_optimal_set()
 - 复杂网络，19条路径，14个起终点对
 - 多个OD组，不同权重
 - 适用于复杂场景分析
+
+### 4. 反例网络 (create_anti_example_network)
+- 特殊设计的网络，用于验证算法鲁棒性
+- 10条路径，2个OD组
+- 测试边界情况
 
 ### 自定义网络配置
 
@@ -206,6 +218,21 @@ custom_config = TrafficNetworkConfig(
 - 允许次优路径的存在
 - 反映真实用户决策行为
 
+## 测试和算法验证
+
+### 测试文件说明
+- **test_paper_algorithm.py**: 实现严格按照论文的多OD对BRUE算法
+- **test_corrected.py**: 目前为空，预留用于修正测试
+- **demo.py**: 演示帕累托非支配路径的随机搜索算法
+- **temp.py**: 临时测试文件，用于4维超平面的可视化
+
+### 算法验证
+项目包含多种算法验证方法：
+1. 论文算法的严格实现
+2. 帕累托最优解的计算
+3. 网格搜索验证
+4. 边界情况测试
+
 ## 扩展功能
 
 ### MATLAB接口
@@ -218,6 +245,11 @@ custom_config = TrafficNetworkConfig(
 - 敏感性分析
 - 不同权重下的均衡状态
 - 网络容量影响分析
+
+### 缓存机制
+项目实现了结果缓存机制，缓存文件存储在`cache/`目录中：
+- `cache_*.mat`：MATLAB格式的缓存文件
+- 自动缓存计算结果，提高重复运行效率
 
 ## 故障排除
 
@@ -273,4 +305,4 @@ custom_config = TrafficNetworkConfig(
 
 ---
 
-*最后更新：2025年6月21日*
+*最后更新：2025年7月14日*

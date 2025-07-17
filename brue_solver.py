@@ -886,10 +886,10 @@ class BRUESolver(BRUEBase):
 
 
 def main():
-    base_config = TrafficNetworkConfig.create_basic_network()
-    base_solver = BRUESolver(base_config)
-    base_solver.run_with_iterations()
-    base_solver.plot_initial_costs()
+    # base_config = TrafficNetworkConfig.create_basic_network()
+    # base_solver = BRUESolver(base_config)
+    # base_solver.run_with_iterations()
+    # base_solver.plot_initial_costs()
 
     # # 测试简单网络
     # simple_config = TrafficNetworkConfig.create_single_od_network()
@@ -908,6 +908,12 @@ def main():
     # two_od_solver = BRUESolver(two_od_config)
     # two_od_solver.run_with_iterations()
     # two_od_solver.plot_initial_costs()
+
+    # 测试反例网络
+    anti_example_config = TrafficNetworkConfig.create_anti_example_network()
+    anti_example_solver = BRUESolver(anti_example_config)
+    anti_example_solver.run_with_iterations()
+    anti_example_solver.plot_initial_costs()
 
 
 if __name__ == "__main__":

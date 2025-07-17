@@ -30,7 +30,8 @@ class TrafficNetworkConfig:
         matrix = np.zeros((num_paths, num_links))
 
         for (i, j), v in self.path_link_matrix.items():
-            matrix[i - 1, j - 1] = v
+            if i <= num_paths and j <= num_links:
+                matrix[i - 1, j - 1] = v
 
         return matrix
 
@@ -153,6 +154,39 @@ class TrafficNetworkConfig:
                 (4, 2): 1, (4, 4): 1,
                 (5, 1): 1, 
                 (6, 2): 1,
+            }
+        )
+    
+    #创建一个反例网络配置
+    @classmethod
+    def create_anti_example_network(cls):
+        """创建一个反例网络配置"""
+        return cls(
+            num_paths=12,
+            num_od_pairs=10,
+            total_demand=10000,
+            od_groups={
+                'OD1': list(range(1, 6)),
+                'OD2': list(range(6, 11))
+            },
+            od_demands={
+                'OD1': 5000,
+                'OD2': 5000
+            },
+            free_flow_time={1:4,2:5,3:3,4:2,5:3,6:1,7:1,8:5,9:3,10:4,11:1,12:5},#FFT = [4, 5, 3, 2, 3, 1, 1, 5, 3, 4, 1, 5]
+            link_money_cost={1:2,2:1,3:3,4:4,5:3,6:5,7:5,8:1,9:3,10:2,11:5,12:1},#M = [2, 1, 3, 4, 3, 5, 5, 1, 3, 2, 5, 1] 
+            link_capacity={1:2000,2:2000,3:2000,4:2000,5:2000,6:2000,7:2000,8:2000,9:2000,10:2000,11:2000,12:2000},
+            path_link_matrix={
+                (1, 1): 1, (1, 7): 1,# OD1-Path1
+                (2, 1): 1, (2, 8): 1, (2, 2): 1,# OD1-Path2
+                (3, 2): 1, (3, 9): 1, (3, 12): 1,# OD1-Path3
+                (4, 3): 1, (4, 11): 1,# OD1-Path4
+                (5, 3): 1, (5, 10): 1, (5, 12): 1,# OD1-Path5
+                (6, 6): 1, (6, 11): 1,# OD2-Path1
+                (7, 6): 1, (7, 10): 1, (7, 12): 1,# OD2-Path2
+                (8, 5): 1, (8, 9): 1, (8, 12): 1,# OD2-Path3
+                (9, 4): 1, (9, 7): 1,# OD2-Path4
+                (10, 4): 1, (10, 8): 1, (10, 12): 1,# OD2-Path5
             }
         )
 

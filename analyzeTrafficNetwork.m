@@ -9,8 +9,8 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index)
     %   subset_index - 子集索引，用于选择不同的路径配对
     
     % 检查是否存在缓存文件
-    cacheFileName = sprintf('cache_zeta%d_subset%d.mat', zeta, subset_index);
-    pathConstraintCacheFileName = sprintf('cache_path_only_zeta%d_subset%d.mat', zeta, subset_index);
+    cacheFileName = sprintf('cache/cache_zeta%d_subset%d.mat', zeta, subset_index);
+    pathConstraintCacheFileName = sprintf('cache/cache_path_only_zeta%d_subset%d.mat', zeta, subset_index);
     
     if exist(cacheFileName, 'file') && exist(pathConstraintCacheFileName, 'file')
         fprintf('加载缓存数据...\n');
@@ -20,7 +20,7 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index)
         toc;
         
         % 直接绘图
-        q = 200;
+        q = 10000;
         if ~isempty(totalValidFlow)
             selectedIndices = randperm(size(totalValidFlow, 1), min(q, size(totalValidFlow, 1)));
             % plotResults(totalValidCost, selectedIndices);
@@ -28,7 +28,7 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index)
             % 绘制流量向量可视化
             plotFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, selectedIndices);
             % 绘制三维流量可视化
-            plot3DFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, selectedIndices, subset_index);
+            % plot3DFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, selectedIndices, subset_index);
         end
         return;
     end
@@ -269,17 +269,6 @@ end
 
 function samplesMat = combineSamples(samples, n)
     % 组合采样点
-    
-    % 估计结果大小并预分配内存
-    estSize = 1;
-    for i = 1:min(n-1, numel(samples))
-        estSize = estSize * length(samples{i});
-    end
-    
-    % 限制大小以避免内存溢出
-    if estSize > 1e7
-        estSize = 1e7;
-    end
     
     samplesMat = samples{1}';
     
@@ -603,12 +592,12 @@ function plotFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, sel
             end
         end
         
-        % 按金钱成本排序边界点
-        [leftBoundaryY, sortIdx] = sort(leftBoundaryY);
-        leftBoundaryX = leftBoundaryX(sortIdx);
+        % % 按金钱成本排序边界点
+        % [~, sortIdx] = sort(leftBoundaryY);
+        % leftBoundaryX = leftBoundaryX(sortIdx);
         
-        [rightBoundaryY, sortIdx] = sort(rightBoundaryY);
-        rightBoundaryX = rightBoundaryX(sortIdx);
+        % [~, sortIdx] = sort(rightBoundaryY);
+        % rightBoundaryX = rightBoundaryX(sortIdx);
         
         % 排序上限点
         [upperLimitY, sortIdx] = sort(upperLimitY);
@@ -639,8 +628,8 @@ function plotFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, sel
         
         if ~isempty(uniquePathFlows)
             allFlow = [allFlow; uniquePathFlows];
-            colors = [colors; repmat(pathConstraintColor, size(uniquePathFlows, 1), 1)];
-            markerSizes = [markerSizes; repmat(10, size(uniquePathFlows, 1), 1)];
+            % colors = [colors; repmat(pathConstraintColor, size(uniquePathFlows, 1), 1)];
+            % markerSizes = [markerSizes; repmat(10, size(uniquePathFlows, 1), 1)];
         end
     end
     
@@ -713,7 +702,7 @@ function plotFlowVectors(totalValidFlow, totalPathValidFlow, relationMatrix, sel
         projectedFeasible = projectedFull(feasibleIdx, :);
         projectedInfeasible = projectedFull(infeasibleIdx, :);
     else
-        projectedFull = [];
+        % projectedFull = [];
         projectedFeasible = [];
         projectedInfeasible = [];
     end
