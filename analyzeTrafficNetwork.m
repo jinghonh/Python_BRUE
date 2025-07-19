@@ -14,8 +14,8 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index)
     
     if exist(cacheFileName, 'file') && exist(pathConstraintCacheFileName, 'file')
         fprintf('加载缓存数据...\n');
-        load(cacheFileName, 'totalValidCost', 'totalValidFlow', 'relationMatrix');
-        load(pathConstraintCacheFileName, 'totalPathValidCost', 'totalPathValidFlow');
+        load(cacheFileName, 'totalValidFlow', 'relationMatrix');
+        load(pathConstraintCacheFileName, 'totalPathValidFlow');
         fprintf('加载缓存数据完成...\n');
         toc;
         
@@ -37,9 +37,7 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index)
     
     %% 初始化参数
     n = size(relationMatrix, 1);
-    totalValidCost = [];
     totalValidFlow = [];
-    totalPathValidCost = []; % 只满足路径约束的成本
     totalPathValidFlow = []; % 只满足路径约束的流量
     bound = 0;
     
@@ -64,27 +62,27 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index)
     maxIt = 40;
     
     % 设置数据压缩参数
-    maxPointsPerIteration = 1e5; % 每次迭代最大保留点数
+    maxPointsPerIteration = 1e6; % 每次迭代最大保留点数
 
     % 传统网格采样策略
     for ii = minIt:maxIt
         waitbar((ii-minIt)/(maxIt-minIt), h, sprintf('正在计算第 %d/%d 次迭代...', ii-minIt+1, maxIt-minIt+1));
-        [samplesMat, totalValidCost, totalValidFlow, totalPathValidCost, totalPathValidFlow] = processIteration(ii, n, rangeMin, rangeMax, bound, relationMatrix, totalValidCost, totalValidFlow, totalPathValidCost, totalPathValidFlow, zeta);
+        [samplesMat, totalValidFlow, totalPathValidFlow] = processIteration(ii, n, rangeMin, rangeMax, bound, relationMatrix, totalValidFlow, totalPathValidFlow, zeta);
         
         % 增量数据压缩：当有效点数量超过阈值时进行压缩
-        if size(totalValidCost, 1) > maxPointsPerIteration
-            fprintf('迭代 %d: 压缩全部约束数据点，从 %d 个点压缩...\n', ii, size(totalValidCost, 1));
-            [totalValidCost, totalValidFlow] = reduceDataPoints(totalValidCost, totalValidFlow, maxPointsPerIteration);
+        if size(totalValidFlow, 1) > maxPointsPerIteration
+            fprintf('迭代 %d: 压缩全部约束数据点，从 %d 个点压缩...\n', ii, size(totalValidFlow, 1));
+            totalValidFlow = reduceDataPoints(totalValidFlow, maxPointsPerIteration);
         end
         
         % 增量数据压缩：当路径约束点数量超过阈值时进行压缩
-        if size(totalPathValidCost, 1) > maxPointsPerIteration
-            fprintf('迭代 %d: 压缩路径约束数据点，从 %d 个点压缩...\n', ii, size(totalPathValidCost, 1));
-            [totalPathValidCost, totalPathValidFlow] = reduceDataPoints(totalPathValidCost, totalPathValidFlow, maxPointsPerIteration);
+        if size(totalPathValidFlow, 1) > maxPointsPerIteration
+            fprintf('迭代 %d: 压缩路径约束数据点，从 %d 个点压缩...\n', ii, size(totalPathValidFlow, 1));
+            totalPathValidFlow = reduceDataPoints(totalPathValidFlow, maxPointsPerIteration);
         end
         
         % 更新搜索范围
-        [~, path_err, ~] = evaluateObjective(samplesMat, relationMatrix, zeta);
+        [path_err, ~] = evaluateObjective(samplesMat, relationMatrix, zeta);
         valid = find(path_err == 0);
         
         if ~isempty(valid)
@@ -99,32 +97,30 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index)
     toc
     
     % 保存满足所有约束的结果
-    [totalValidCost,Ia,~]=unique(totalValidCost,"rows");
-    totalValidFlow = totalValidFlow(Ia,:);
+    [totalValidFlow, Ia, ~] = unique(totalValidFlow, "rows");
     
     % 使用网格采样减少数据点数量
     targetSize = 5e5; % 目标数据点数量：十万级别
-    if size(totalValidCost, 1) > targetSize
-        fprintf('正在进行全约束数据压缩，从 %d 个点压缩到目标 %d 个点左右...\n', size(totalValidCost, 1), targetSize);
-        [totalValidCost, totalValidFlow] = reduceDataPoints(totalValidCost, totalValidFlow, targetSize);
+    if size(totalValidFlow, 1) > targetSize
+        fprintf('正在进行全约束数据压缩，从 %d 个点压缩到目标 %d 个点左右...\n', size(totalValidFlow, 1), targetSize);
+        totalValidFlow = reduceDataPoints(totalValidFlow, targetSize);
     end
     
     % 保存满足路径约束的结果
-    [totalPathValidCost,Ia,~]=unique(totalPathValidCost,"rows");
-    totalPathValidFlow = totalPathValidFlow(Ia,:);
+    [totalPathValidFlow, Ia, ~] = unique(totalPathValidFlow, "rows");
     
     % 使用网格采样减少数据点数量
-    if size(totalPathValidCost, 1) > targetSize
-        fprintf('正在进行路径约束数据压缩，从 %d 个点压缩到目标 %d 个点左右...\n', size(totalPathValidCost, 1), targetSize);
-        [totalPathValidCost, totalPathValidFlow] = reduceDataPoints(totalPathValidCost, totalPathValidFlow, targetSize);
+    if size(totalPathValidFlow, 1) > targetSize
+        fprintf('正在进行路径约束数据压缩，从 %d 个点压缩到目标 %d 个点左右...\n', size(totalPathValidFlow, 1), targetSize);
+        totalPathValidFlow = reduceDataPoints(totalPathValidFlow, targetSize);
     end
     
     % 保存结果到缓存文件
-    save(cacheFileName, 'totalValidCost', 'totalValidFlow', 'relationMatrix');
+    save(cacheFileName, 'totalValidFlow', 'relationMatrix');
     fprintf('全部约束结果已保存到缓存文件%s\n', cacheFileName);
     
     % 保存只满足路径约束的数据到缓存文件
-    save(pathConstraintCacheFileName, 'totalPathValidCost', 'totalPathValidFlow', 'relationMatrix');
+    save(pathConstraintCacheFileName, 'totalPathValidFlow', 'relationMatrix');
     fprintf('只满足路径约束的结果已保存到缓存文件%s\n', pathConstraintCacheFileName);
     
     % 设置随机选择的流量向量数量
@@ -184,14 +180,14 @@ function validateInputs(zeta, rangeMin, rangeMax)
     end
 end
 
-function [samplesMat, totalValidCost, totalValidFlow, totalPathValidCost, totalPathValidFlow] = processIteration(ii, n, rangeMin, rangeMax, bound, relationMatrix, totalValidCost, totalValidFlow, totalPathValidCost, totalPathValidFlow, zeta)
+function [samplesMat, totalValidFlow, totalPathValidFlow] = processIteration(ii, n, rangeMin, rangeMax, bound, relationMatrix, totalValidFlow, totalPathValidFlow, zeta)
     % 处理单次迭代
     dimNum = ones(1,n)*ii;
     samples = generateSamples(n, rangeMin-bound, rangeMax+bound, dimNum);
     samplesMat = combineSamples(samples, n);
     
     % 计算目标函数和约束违反
-    [ff, path_err, money_err] = evaluateObjective(samplesMat, relationMatrix, zeta);
+    [path_err, money_err] = evaluateObjective(samplesMat, relationMatrix, zeta);
     
     % 满足所有约束的流量向量
     valid = path_err == 0 & money_err == 0;
@@ -201,11 +197,6 @@ function [samplesMat, totalValidCost, totalValidFlow, totalPathValidCost, totalP
     
     % 更新满足所有约束的结果
     if any(valid)
-        if isempty(totalValidCost)
-            totalValidCost = ff(valid,:);
-        else
-            totalValidCost = [totalValidCost; ff(valid,:)];
-        end
         if isempty(totalValidFlow)
             totalValidFlow = samplesMat(valid,:);
         else
@@ -215,11 +206,6 @@ function [samplesMat, totalValidCost, totalValidFlow, totalPathValidCost, totalP
     
     % 更新只满足路径约束的结果
     if any(path_valid)
-        if isempty(totalPathValidCost)
-            totalPathValidCost = ff(path_valid,:);
-        else
-            totalPathValidCost = [totalPathValidCost; ff(path_valid,:)];
-        end
         if isempty(totalPathValidFlow)
             totalPathValidFlow = samplesMat(path_valid,:);
         else
@@ -293,8 +279,8 @@ function samplesMat = combineSamples(samples, n)
     samplesMat = [samplesMat, lastDim];
 end
 
-function [ff, path_err, money_err] = evaluateObjective(f, M, zeta)
-    % 评估目标函数和约束违反
+function [path_err, money_err] = evaluateObjective(f, M, zeta)
+    % 评估约束违反
     n = size(M,1);
     
     % 使用persistent变量缓存常量以加快计算
@@ -328,8 +314,7 @@ function [ff, path_err, money_err] = evaluateObjective(f, M, zeta)
     % 检查货币约束
     money_err = checkMoneyConstraints(RT, money, n, money_err);
     
-    % 计算目标函数
-    ff = calculateObjectives(f, RT, money);
+    % 不再计算和返回ff（目标函数值）
 end
 
 function RT = calculateRealTime(x, M, freeFlowTime, maxCapacity)
@@ -366,13 +351,6 @@ function err = checkMoneyConstraints(RT, money, n, err)
     err = err + sum(max(RTDiffs .* moneyDiffs, 0), 2);
 end
 
-function ff = calculateObjectives(f, RT, money)
-    % 计算目标函数值
-    ff = zeros(size(f,1), 2);
-    ff(:,1) = sum(f.*RT, 2);
-    ff(:,2) = f * money';
-end
-
 function [rangeMin, rangeMax, bound] = updateSearchRange(validSamples, ii)
     % 更新搜索范围
     rangeMin = min(validSamples);
@@ -389,20 +367,20 @@ function M = pairsToMatrix(pairs)
     end
 end
 
-function [reducedCost, reducedFlow] = reduceDataPoints(totalValidCost, totalValidFlow, targetSize)
-    % 使用自适应网格采样和保留Pareto前沿减少数据点数量
+function reducedFlow = reduceDataPoints(totalValidFlow, targetSize)
+    % 使用自适应网格采样减少数据点数量
     % 同时保持数据分布特性和重要点
     
     % 标准化数据到[0,1]区间
-    minVals = min(totalValidCost, [], 1);
-    maxVals = max(totalValidCost, [], 1);
-    normCost = (totalValidCost - minVals) ./ (maxVals - minVals);
+    minVals = min(totalValidFlow, [], 1);
+    maxVals = max(totalValidFlow, [], 1);
+    normFlow = (totalValidFlow - minVals) ./ (maxVals - minVals);
     
     % 计算每个维度上需要的网格数量，使总网格数接近目标数量
     gridSize = ceil(sqrt(targetSize));
     
     % 计算每个点所在的网格索引
-    gridIndices = floor(normCost * gridSize) + 1;
+    gridIndices = floor(normFlow * gridSize) + 1;
     
     % 确保网格索引在有效范围内
     gridIndices(gridIndices > gridSize) = gridSize;
@@ -427,9 +405,9 @@ function [reducedCost, reducedFlow] = reduceDataPoints(totalValidCost, totalVali
             % 选择网格中心点作为代表
             if length(gridPoints) > 1
                 % 计算网格内所有点的平均位置
-                meanPos = mean(normCost(gridPoints,:), 1);
+                meanPos = mean(normFlow(gridPoints,:), 1);
                 % 找到最接近平均位置的点
-                [~, minIdx] = min(sum((normCost(gridPoints,:) - meanPos).^2, 2));
+                [~, minIdx] = min(sum((normFlow(gridPoints,:) - meanPos).^2, 2));
                 selectedIndices(i) = gridPoints(minIdx);
             else
                 selectedIndices(i) = gridPoints(1);
@@ -442,7 +420,7 @@ function [reducedCost, reducedFlow] = reduceDataPoints(totalValidCost, totalVali
         cellCounts = histcounts(ic, 1:length(uniqueCells)+1);
         
         % 标记Pareto前沿点所在的网格（保证保留这些网格）
-        paretoIndices = findParetoFrontier(totalValidCost);
+        paretoIndices = findParetoFrontier(totalValidFlow);
         paretoCells = unique(cellIndices(paretoIndices));
         
         % 优先选择Pareto前沿点所在的网格
@@ -479,9 +457,9 @@ function [reducedCost, reducedFlow] = reduceDataPoints(totalValidCost, totalVali
                 % 否则选择网格中心点作为代表
                 if length(gridPoints) > 1
                     % 计算网格内所有点的平均位置
-                    meanPos = mean(normCost(gridPoints,:), 1);
+                    meanPos = mean(normFlow(gridPoints,:), 1);
                     % 找到最接近平均位置的点
-                    [~, minIdx] = min(sum((normCost(gridPoints,:) - meanPos).^2, 2));
+                    [~, minIdx] = min(sum((normFlow(gridPoints,:) - meanPos).^2, 2));
                     selectedIndices(i) = gridPoints(minIdx);
                 else
                     selectedIndices(i) = gridPoints(1);
@@ -491,10 +469,9 @@ function [reducedCost, reducedFlow] = reduceDataPoints(totalValidCost, totalVali
     end
     
     % 提取结果
-    reducedCost = totalValidCost(selectedIndices, :);
     reducedFlow = totalValidFlow(selectedIndices, :);
     
-    fprintf('数据点成功从 %d 减少到 %d\n', size(totalValidCost, 1), length(selectedIndices));
+    fprintf('数据点成功从 %d 减少到 %d\n', size(totalValidFlow, 1), length(selectedIndices));
 end
 
 function paretoIndices = findParetoFrontier(points)

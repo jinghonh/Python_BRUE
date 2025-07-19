@@ -12,9 +12,9 @@ class BRUESolver(BRUEBase):
         self.config = config
 
     def initialize_sets(self):
-        self.model.od_pairs = RangeSet(1, self.config.num_od_pairs)
-        self.model.paths = RangeSet(1, self.config.num_paths)
-        self.model.od_demand = Set(initialize=range(1, self.config.num_od_pairs + 1))
+        self.model.od_pairs = RangeSet(1, self.config.num_paths)
+        self.model.paths = RangeSet(1, self.config.num_links)
+        self.model.od_demand = Set(initialize=range(1, self.config.num_paths + 1))
         # 初始化OD组
         for group_name, group_pairs in self.config.od_groups.items():
             setattr(self.model, f'OD_{group_name}', Set(initialize=group_pairs))
@@ -696,7 +696,7 @@ class BRUESolver(BRUEBase):
             
             # 创建组变量
             group_model.od_pairs = Set(initialize=group_pairs)
-            group_model.paths = RangeSet(1, self.config.num_paths)
+            group_model.paths = RangeSet(1, self.config.num_links)
             
             # 创建路径流量变量
             group_model.flow = Var(group_model.od_pairs, domain=NonNegativeReals)
@@ -886,10 +886,10 @@ class BRUESolver(BRUEBase):
 
 
 def main():
-    # base_config = TrafficNetworkConfig.create_basic_network()
-    # base_solver = BRUESolver(base_config)
-    # base_solver.run_with_iterations()
-    # base_solver.plot_initial_costs()
+    base_config = TrafficNetworkConfig.create_basic_network()
+    base_solver = BRUESolver(base_config)
+    base_solver.run_with_iterations()
+    base_solver.plot_initial_costs()
 
     # # 测试简单网络
     # simple_config = TrafficNetworkConfig.create_single_od_network()
@@ -910,10 +910,10 @@ def main():
     # two_od_solver.plot_initial_costs()
 
     # 测试反例网络
-    anti_example_config = TrafficNetworkConfig.create_anti_example_network()
-    anti_example_solver = BRUESolver(anti_example_config)
-    anti_example_solver.run_with_iterations()
-    anti_example_solver.plot_initial_costs()
+    # anti_example_config = TrafficNetworkConfig.create_anti_example_network()
+    # anti_example_solver = BRUESolver(anti_example_config)
+    # anti_example_solver.run_with_iterations()
+    # anti_example_solver.plot_initial_costs()
 
 
 if __name__ == "__main__":

@@ -31,11 +31,11 @@ class BRUESetSolver(BRUESolver):
         path_flows = flows @ self.path_link_matrix
         free_flow_times = np.array([
             self.config.free_flow_time[i]
-            for i in range(1, self.config.num_paths + 1)
+            for i in range(1, self.config.num_links + 1)
         ])
         capacities = np.array([
             self.config.link_capacity[i]
-            for i in range(1, self.config.num_paths + 1)
+            for i in range(1, self.config.num_links + 1)
         ])
         
         # BPR函数计算时间
@@ -54,7 +54,7 @@ class BRUESetSolver(BRUESolver):
         """
         money_costs = np.array([
             self.config.link_money_cost[i]
-            for i in range(1, self.config.num_paths + 1)
+            for i in range(1, self.config.num_links + 1)
         ])
         # 计算每条路径的金钱成本
         path_money_costs = []
@@ -74,7 +74,7 @@ class BRUESetSolver(BRUESolver):
             满足条件的解集合
         """
         # 获取路径数量
-        num_paths = self.config.num_paths  # 直接使用配置中的路径数量
+        num_paths = self.config.num_links  # 直接使用配置中的路径数量
         total_demand = sum(self.config.od_demands.values())
         
         if num_paths > 6:

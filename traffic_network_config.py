@@ -7,8 +7,8 @@ import numpy as np
 class TrafficNetworkConfig:
     """交通网络配置类，用于存储和管理交通网络的所有参数"""
     # 基础参数
-    num_paths: int  # 路径数量
-    num_od_pairs: int  # 起终点对数量
+    num_links: int  # 路径数量
+    num_paths: int  # 起终点对数量
     total_demand: float  # 总交通需求量
     od_groups: Dict[str, List[int]]  # 起终点组
     od_demands: Dict[str, float]  # 每个起终点组的需求量
@@ -25,8 +25,8 @@ class TrafficNetworkConfig:
         """以矩阵形式返回路径-道路段关系"""
         import numpy as np
 
-        num_paths = self.num_od_pairs
-        num_links = self.num_paths
+        num_paths = self.num_paths
+        num_links = self.num_links
         matrix = np.zeros((num_paths, num_links))
 
         for (i, j), v in self.path_link_matrix.items():
@@ -39,8 +39,8 @@ class TrafficNetworkConfig:
     def create_basic_network(cls):
         """创建基础示例网络配置"""
         return cls(
-            num_paths=8,
-            num_od_pairs=6,
+            num_links=8,
+            num_paths=6,
             total_demand=10000,
             od_groups={'ALL': list(range(1, 7))},
             od_demands={'ALL': 10000},
@@ -61,8 +61,8 @@ class TrafficNetworkConfig:
     def create_multi_od_network(cls):
         """创建多起终点对网络配置"""
         return cls(
-            num_paths=19,
-            num_od_pairs=14,
+            num_links=19,
+            num_paths=14,
             total_demand=6000,  # 总需求（OD1+OD2）
             od_groups={
                 'OD1': list(range(1, 9)),
@@ -103,8 +103,8 @@ class TrafficNetworkConfig:
     def create_single_od_network(cls):
         """创建单一起终点对网络配置"""
         return cls(
-            num_paths=19,
-            num_od_pairs=8,  # 只有OD1组的8个OD对
+            num_links=19,
+            num_paths=8,  # 只有OD1组的8个OD对
             total_demand=3000,
             od_groups={'OD1': list(range(1, 9))},  # 只保留OD1组
             od_demands={'OD1': 3000},  # OD1组的需求
@@ -133,8 +133,8 @@ class TrafficNetworkConfig:
     def create_two_od_network(cls):
         """创建两起终点对网络配置"""
         return cls(
-            num_paths=4,
-            num_od_pairs=6,
+            num_links=4,
+            num_paths=6,
             total_demand=3000,
             od_groups={
                 'OD1': list(range(5,7)),
@@ -162,8 +162,8 @@ class TrafficNetworkConfig:
     def create_anti_example_network(cls):
         """创建一个反例网络配置"""
         return cls(
-            num_paths=12,
-            num_od_pairs=10,
+            num_links=12,
+            num_paths=10,
             total_demand=10000,
             od_groups={
                 'OD1': list(range(1, 6)),
