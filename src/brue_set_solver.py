@@ -1,5 +1,5 @@
-from brue_solver import BRUESolver
-from traffic_network_config import TrafficNetworkConfig
+from .brue_solver import BRUESolver
+from .traffic_network_config import TrafficNetworkConfig
 from pyomo.environ import *
 import matplotlib.pyplot as plt
 import numpy as np

@@ -1,5 +1,5 @@
-from brue_base import BRUEBase
-from traffic_network_config import TrafficNetworkConfig
+from .brue_base import BRUEBase
+from .traffic_network_config import TrafficNetworkConfig
 from pyomo.environ import *
 import matplotlib.pyplot as plt
 from rich.console import Console

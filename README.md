@@ -17,21 +17,25 @@
 
 ```
 Python_BRUE/
-├── brue_base.py              # 基础抽象类
-├── brue_solver.py            # 主要求解器实现
-├── brue_set_solver.py        # 集合求解器（帕累托分析）
-├── brue_matlab_solver.py     # MATLAB接口求解器
-├── traffic_network_config.py # 网络配置类
-├── test_paper_algorithm.py   # 论文算法测试
-├── test_corrected.py         # 修正测试文件
-├── demo.py                   # 演示文件
-├── temp.py                   # 临时测试文件
-├── pyproject.toml           # 项目配置文件
-├── uv.lock                  # 依赖锁文件
-├── README.md               # 项目说明文档
-├── cache/                   # 缓存目录
-├── results/                 # 结果输出目录
-└── analyzeTrafficNetwork.m  # MATLAB分析脚本
+├── src/                    # 源代码目录
+│   ├── brue_base.py        # 基础抽象类
+│   ├── brue_solver.py      # 主要求解器实现
+│   ├── brue_set_solver.py  # 集合求解器（帕累托分析）
+│   ├── brue_matlab_solver.py # MATLAB接口求解器
+│   └── traffic_network_config.py # 网络配置类
+├── matlab/                 # MATLAB实现
+│   ├── analyzeTrafficNetwork.m  # 网络分析脚本
+│   ├── plotPathCosts.m     # 成本绘图脚本
+│   ├── main.m              # 主程序
+│   └── test_run.m          # 测试运行脚本
+├── examples/               # 示例代码
+│   └── test.m              # 测试示例
+├── output/                 # 输出目录
+│   └── results/            # 计算结果
+├── cache/                  # 缓存目录
+├── pyproject.toml         # 项目配置文件
+├── uv.lock                # 依赖锁文件
+└── README.md              # 项目说明文档
 ```
 
 ## 依赖环境
@@ -100,8 +104,8 @@ t_a = t_0 * (1 + α * (v_a/C_a)^β)
 ### 基础使用示例
 
 ```python
-from brue_solver import BRUESolver
-from traffic_network_config import TrafficNetworkConfig
+from src.brue_solver import BRUESolver
+from src.traffic_network_config import TrafficNetworkConfig
 
 # 创建网络配置
 config = TrafficNetworkConfig.create_basic_network()
@@ -130,7 +134,7 @@ results = multi_solver.run_with_iterations()
 ### 帕累托分析
 
 ```python
-from brue_set_solver import BRUESetSolver
+from src.brue_set_solver import BRUESetSolver
 
 # 使用集合求解器进行帕累托分析
 set_solver = BRUESetSolver(config)
@@ -163,23 +167,23 @@ pareto_results = set_solver.solve_pareto_optimal_set()
 ### 自定义网络配置
 
 ```python
-from traffic_network_config import TrafficNetworkConfig
+from src.traffic_network_config import TrafficNetworkConfig
 
 # 创建自定义配置
 custom_config = TrafficNetworkConfig(
-    num_paths=6,
-    num_od_pairs=4,
-    total_demand=5000,
-    od_groups={'Group1': [1, 2], 'Group2': [3, 4]},
-    od_demands={'Group1': 3000, 'Group2': 2000},
-    free_flow_time={1: 15, 2: 20, 3: 10, 4: 25, 5: 5, 6: 8},
-    link_money_cost={1: 10, 2: 15, 3: 0, 4: 5, 5: 0, 6: 2},
-    link_capacity={1: 2000, 2: 2500, 3: 1500, 4: 1800, 5: 1200, 6: 1600},
-    path_link_matrix={
-        # (路径, 路段): 关联关系 (0或1)
-        (1, 1): 1, (1, 2): 0, # 路径1使用路段1
-        # ... 其他关联关系
-    }
+   num_links=6,
+   num_paths=4,
+   total_demand=5000,
+   od_groups={'Group1': [1, 2], 'Group2': [3, 4]},
+   od_demands={'Group1': 3000, 'Group2': 2000},
+   free_flow_time={1: 15, 2: 20, 3: 10, 4: 25, 5: 5, 6: 8},
+   link_money_cost={1: 10, 2: 15, 3: 0, 4: 5, 5: 0, 6: 2},
+   link_capacity={1: 2000, 2: 2500, 3: 1500, 4: 1800, 5: 1200, 6: 1600},
+   path_link_matrix={
+      # (路径, 路段): 关联关系 (0或1)
+      (1, 1): 1, (1, 2): 0,  # 路径1使用路段1
+      # ... 其他关联关系
+   }
 )
 ```
 
@@ -217,6 +221,15 @@ custom_config = TrafficNetworkConfig(
 - 引入感知误差ε
 - 允许次优路径的存在
 - 反映真实用户决策行为
+
+## MATLAB接口
+项目包含MATLAB接口文件，支持：
+- `analyzeTrafficNetwork.m`：网络分析主函数
+- `plotPathCosts.m`：成本可视化
+- `main.m`：主要分析脚本
+
+## 缓存机制
+项目实现了结果缓存机制，缓存文件存储在`cache/`目录中
 
 ## 测试和算法验证
 

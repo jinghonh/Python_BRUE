@@ -1,3 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.python-version
+
+# 虚拟环境
+.venv/
+venv/
+ENV/
+
+# 缓存和输出
+cache/
+output/results/
+
+# IDE
+.idea/
+.cursor/
+.vscode/
+
+# Mac
+.DS_Store
+
+# 临时文件
+temp.py
+*.ipynb_checkpoints/
+
+# MATLAB
+*.mat
+*.asv
+
 # 默认忽略的文件
 /shelf/
 /workspace.xml
@@ -16,6 +47,3 @@
 *.svg
 *.html
 *.pyc
-.DS_Store
-*.mat
-
