@@ -319,3 +319,101 @@ custom_config = TrafficNetworkConfig(
 ---
 
 *最后更新：2025年7月14日*
+
+# BRUE项目使用指南
+
+## 基本使用流程
+
+1. 创建交通网络配置
+2. 初始化求解器（有多种选择：BRUE, UE, δ-EBR-MUE）
+3. 运行迭代求解过程
+4. 分析路径成本和流量分配结果
+
+## 网络配置
+
+[traffic_network_config.py](src/traffic_network_config.py)提供了多种预设网络配置：
+
+- `create_basic_network()`: 基础测试网络
+- `create_single_od_network()`: 单一OD对网络
+- `create_multi_od_network()`: 多OD对网络
+- `create_two_od_network()`: 两个OD对网络
+- `create_large_single_od_network()`: 大型单OD对网络，具有15条路径
+
+## 求解器选项
+
+### BRUE求解器
+
+```python
+from src import BRUESolver
+from src import TrafficNetworkConfig
+
+config = TrafficNetworkConfig.create_multi_od_network()
+solver = BRUESolver(config)
+results = solver.run_with_iterations()
+```
+
+### 用户均衡(UE)求解器
+
+```python
+from src import UESolver
+from src import TrafficNetworkConfig
+
+config = TrafficNetworkConfig.create_multi_od_network()
+solver = UESolver(config)
+results = solver.run()
+```
+
+### δ-EBR-MUE求解器
+
+这是最新添加的求解器，实现了δ-有界ε-非严格支配的多目标用户均衡模型。
+
+```python
+from src import DeltaEBRMUESolver
+from src import TrafficNetworkConfig
+
+config = TrafficNetworkConfig.create_multi_od_network()
+delta = 2.0  # 时间容忍度
+epsilon = (0.5, 0.5)  # 支配容忍度向量(时间, 金钱)
+
+# 使用凸优化方法
+solver = DeltaEBRMUESolver(config, delta=delta, epsilon=epsilon)
+result = solver.run(use_epsilon=True, solver_method='convex')
+
+# 使用变分不等式(VI)方法
+vi_result = solver.run(use_epsilon=True, solver_method='vi')
+```
+
+## δ-EBR-MUE求解方法比较
+
+δ-EBR-MUE求解器实现了两种子问题求解方法：
+
+1. **凸优化方法**：基于Beckmann公式，通过求解等价的凸优化问题获取均衡流量
+2. **变分不等式(VI)方法**：直接基于VI理论，使用投影梯度法求解变分不等式问题
+
+测试结果显示，两种方法在性能和结果上存在差异：
+
+| 对比项 | 凸优化方法 | VI方法 |
+| ------ | ---------- | ------ |
+| 求解时间 | 更快 | 约为凸优化方法的4倍 |
+| 收敛性 | 更好，通常能快速收敛 | 收敛性较差，可能需要更多迭代 |
+| 路径选择 | 倾向于选择更少的路径 | 倾向于分散流量到更多路径 |
+| 时间成本 | 通常更低 | 通常更高 |
+| 金钱成本 | 通常更高 | 通常更低 |
+
+两种方法的主要理论差异：
+
+- **凸优化方法**：适用于对称问题（雅可比矩阵对称），计算效率高
+- **VI方法**：适用范围更广，可处理非对称/非单调问题，但计算效率较低
+
+**使用建议**：
+- 对于标准交通分配问题，凸优化方法效率更高、收敛性更好
+- 对于复杂非对称问题或需要考虑多目标权衡的情况，VI方法可能提供更多样化的解
+
+## 结果分析
+
+求解器提供多种结果分析和可视化方法：
+
+- `display_results()`: 显示计算结果表格
+- `analyze_path_costs()`: 分析路径成本和有效路径
+- `plot_cost_analysis()`: 可视化路径成本分析
+- `plot_initial_costs()`: 比较不同场景下的路径成本

@@ -190,3 +190,47 @@ class TrafficNetworkConfig:
             }
         )
 
+    @classmethod
+    def create_large_single_od_network(cls):
+        """创建单一OD对多路径网络配置（至少15条路径）"""
+        num_paths = 15
+        num_links = 30
+        
+        # 初始化空的path_link_matrix字典
+        path_link_matrix = {}
+        
+        # 创建每条路径的link连接
+        for i in range(1, num_paths + 1):
+            # 为每条路径分配2-4条link
+            num_links_for_path = min(2 + (i % 3), 4)  # 使用2到4条link
+            
+            # 选择连续的link作为这条路径的组成部分
+            start_link = (i % (num_links - num_links_for_path)) + 1
+            
+            # 为每条路径创建link连接
+            for j in range(start_link, start_link + num_links_for_path):
+                path_link_matrix[(i, j)] = 1
+        
+        # 创建link参数
+        free_flow_time = {}
+        link_money_cost = {}
+        link_capacity = {}
+        
+        for j in range(1, num_links + 1):
+            # 随机分配参数，但保持一定的模式
+            free_flow_time[j] = 10 + (j % 10) * 2  # 10-28的自由流时间
+            link_money_cost[j] = 5 + j % 15  # 5-19的金钱成本
+            link_capacity[j] = 2000 + (j % 5) * 200  # 2000-2800的通行能力
+        
+        return cls(
+            num_links=num_links,
+            num_paths=num_paths,
+            total_demand=5000,
+            od_groups={'OD1': list(range(1, num_paths + 1))},  # 单OD对，15条路径
+            od_demands={'OD1': 5000},  # OD1组的需求
+            free_flow_time=free_flow_time,
+            link_money_cost=link_money_cost,
+            link_capacity=link_capacity,
+            path_link_matrix=path_link_matrix
+        )
+

@@ -47,3 +47,9 @@ temp.py
 *.svg
 *.html
 *.pyc
+reference/ref.aux
+reference/ref.log
+.gitignore
+.gitignore
+reference/ref.out
+.gitignore
