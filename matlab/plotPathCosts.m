@@ -257,9 +257,6 @@ function plotPathCostsWithUpperLimit(allPathCosts, boundary, colorVariations, pa
     % Add legend
     addLegendForUpperLimitPlot(h_legend, feasiblePaths, infeasiblePaths);
     
-    % Print feasibility results
-    printFeasibilityResults(feasiblePaths, infeasiblePaths);
-    
     % Save figure
     saveFigure(fig, [params.SavePath 'path_costs_with_upper_limit_']);
 end
@@ -520,16 +517,49 @@ function addLegendForUpperLimitPlot(h_legend, feasiblePaths, infeasiblePaths)
         'Box', 'on');
 end
 
-function printFeasibilityResults(feasiblePaths, infeasiblePaths)
-    % Print feasibility results
-    fprintf('可行流量方案索引: %s\n', mat2str(feasiblePaths));
-    fprintf('不可行流量方案索引: %s\n', mat2str(infeasiblePaths));
-end
+% function printFeasibilityResults(feasiblePaths, infeasiblePaths)
+%     % Print feasibility results
+%     fprintf('可行流量方案索引: %s\n', mat2str(feasiblePaths));
+%     fprintf('不可行流量方案索引: %s\n', mat2str(infeasiblePaths));
+% end
 
 function saveFigure(fig, baseFilename)
-    % Save figure with timestamp
-    figFile = sprintf('%s%s.png', baseFilename, datestr(now, 'yyyymmdd_HHMMSS'));
-    print(figFile, '-dpng', '-r300');
+    % Save figure as PDF with formatted filename including zeta and subset_index
+    
+    % 获取当前的zeta和subset_index值
+    zeta = getappdata(0, 'current_zeta');
+    subset_index = getappdata(0, 'current_subset_index');
+    
+    % 如果找不到参数，使用默认保存方式
+    if isempty(zeta) || isempty(subset_index)
+        % 保存为PNG格式，带时间戳
+        figFile = sprintf('%s%s.png', baseFilename, datestr(now, 'yyyymmdd_HHMMSS'));
+        print(fig, figFile, '-dpng', '-r300');
+    else
+        % 保存为PDF格式，使用参数化文件名，不包含时间戳
+        if contains(baseFilename, 'path_time_money_relationship')
+            figFile = sprintf('%spath_time_money_zeta%d_subset%d.pdf', ...
+                     regexprep(baseFilename, 'path_time_money_relationship_.*', ''), ...
+                     zeta, subset_index);
+        elseif contains(baseFilename, 'path_costs_with_upper_limit')
+            figFile = sprintf('%spath_costs_upper_limit_zeta%d_subset%d.pdf', ...
+                     regexprep(baseFilename, 'path_costs_with_upper_limit_.*', ''), ...
+                     zeta, subset_index);
+        else
+            figFile = sprintf('%s_zeta%d_subset%d.pdf', baseFilename, zeta, subset_index);
+        end
+        
+        % 确保目录存在
+        [directory,~,~] = fileparts(figFile);
+        if ~isempty(directory) && ~exist(directory, 'dir')
+            mkdir(directory);
+        end
+        
+        % 保存为PDF格式
+        print(fig, figFile, '-dpdf', '-r300');
+        fprintf('图像已保存为: %s\n', figFile);
+    end
+    
     hold off;
 end
 

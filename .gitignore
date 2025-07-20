@@ -53,3 +53,4 @@ reference/ref.log
 .gitignore
 reference/ref.out
 .gitignore
+matlab/results/pdf_outputs/

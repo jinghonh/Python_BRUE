@@ -13,6 +13,8 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index, varargin)
     %                   'FontName': 字体名称 (默认: 'Arial')
     %                   'FontSize': 字体大小 (默认: 10)
     %                   'ShowGrid': 是否显示网格 (默认: true)
+    %                   'ZetaValue': 用于文件名的zeta值 (默认: zeta参数值)
+    %                   'SubsetIndex': 用于文件名的subset_index值 (默认: subset_index参数值)
     
     % 解析可选参数
     p = inputParser;
@@ -27,9 +29,15 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index, varargin)
     addParameter(p, 'FontName', defaultFontName);
     addParameter(p, 'FontSize', defaultFontSize);
     addParameter(p, 'ShowGrid', defaultShowGrid);
+    addParameter(p, 'ZetaValue', zeta);
+    addParameter(p, 'SubsetIndex', subset_index);
     
     parse(p, varargin{:});
     plotParams = p.Results;
+    
+    % 存储zeta和subset_index用于文件命名
+    setappdata(0, 'current_zeta', plotParams.ZetaValue);
+    setappdata(0, 'current_subset_index', plotParams.SubsetIndex);
     
     % 确保结果目录存在
     if ~exist(plotParams.SavePath, 'dir')
@@ -53,7 +61,7 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index, varargin)
         toc;
         
         % 直接绘图
-        q = 10000;
+        q = 1000;
         if ~isempty(totalValidFlow)
             selectedIndices = randperm(size(totalValidFlow, 1), min(q, size(totalValidFlow, 1)));
             plotPathCosts(totalValidFlow, relationMatrix, selectedIndices, ...
