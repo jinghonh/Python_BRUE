@@ -1,4 +1,4 @@
-function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index)
+function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index, varargin)
     % 交通网络分析主函数
     % 实现交通流量分配和路径时间计算
     %
@@ -7,6 +7,39 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index)
     %   rangeMin     - 每个维度的最小值数组 [d1_min, d2_min, ...]
     %   rangeMax     - 每个维度的最大值数组 [d1_max, d2_max, ...]
     %   subset_index - 子集索引，用于选择不同的路径配对
+    %   varargin     - 可选参数:
+    %                   'SavePath': 图像保存路径 (默认: 'results/')
+    %                   'FigurePosition': 图像位置和大小 (默认: [100, 100, 800, 600])
+    %                   'FontName': 字体名称 (默认: 'Arial')
+    %                   'FontSize': 字体大小 (默认: 10)
+    %                   'ShowGrid': 是否显示网格 (默认: true)
+    
+    % 解析可选参数
+    p = inputParser;
+    defaultSavePath = 'results/';
+    defaultFigPosition = [100, 100, 800, 600];
+    defaultFontName = 'Arial';
+    defaultFontSize = 10;
+    defaultShowGrid = true;
+    
+    addParameter(p, 'SavePath', defaultSavePath);
+    addParameter(p, 'FigurePosition', defaultFigPosition);
+    addParameter(p, 'FontName', defaultFontName);
+    addParameter(p, 'FontSize', defaultFontSize);
+    addParameter(p, 'ShowGrid', defaultShowGrid);
+    
+    parse(p, varargin{:});
+    plotParams = p.Results;
+    
+    % 确保结果目录存在
+    if ~exist(plotParams.SavePath, 'dir')
+        mkdir(plotParams.SavePath);
+    end
+    
+    % 确保缓存目录存在
+    if ~exist('cache', 'dir')
+        mkdir('cache');
+    end
     
     % 检查是否存在缓存文件
     cacheFileName = sprintf('cache/cache_zeta%d_subset%d.mat', zeta, subset_index);
@@ -23,7 +56,12 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index)
         q = 10000;
         if ~isempty(totalValidFlow)
             selectedIndices = randperm(size(totalValidFlow, 1), min(q, size(totalValidFlow, 1)));
-            plotPathCosts(totalValidFlow, relationMatrix, selectedIndices);
+            plotPathCosts(totalValidFlow, relationMatrix, selectedIndices, ...
+                'SavePath', plotParams.SavePath, ...
+                'FigurePosition', plotParams.FigurePosition, ...
+                'FontName', plotParams.FontName, ...
+                'FontSize', plotParams.FontSize, ...
+                'ShowGrid', plotParams.ShowGrid);
         end
         return;
     end
@@ -130,7 +168,12 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index)
     if ~isempty(totalValidFlow)
         selectedIndices = randperm(size(totalValidFlow, 1), min(q, size(totalValidFlow, 1)));
         % 调用路径成本绘图函数
-        plotPathCosts(totalValidFlow, relationMatrix, selectedIndices);
+        plotPathCosts(totalValidFlow, relationMatrix, selectedIndices, ...
+            'SavePath', plotParams.SavePath, ...
+            'FigurePosition', plotParams.FigurePosition, ...
+            'FontName', plotParams.FontName, ...
+            'FontSize', plotParams.FontSize, ...
+            'ShowGrid', plotParams.ShowGrid);
     else
         warning('没有找到可行解');
     end
