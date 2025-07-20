@@ -538,26 +538,43 @@ function saveFigure(fig, baseFilename)
     else
         % 保存为PDF格式，使用参数化文件名，不包含时间戳
         if contains(baseFilename, 'path_time_money_relationship')
-            figFile = sprintf('%spath_time_money_zeta%d_subset%d.pdf', ...
+            baseOutputFile = sprintf('%spath_time_money_zeta%d_subset%d', ...
                      regexprep(baseFilename, 'path_time_money_relationship_.*', ''), ...
                      zeta, subset_index);
         elseif contains(baseFilename, 'path_costs_with_upper_limit')
-            figFile = sprintf('%spath_costs_upper_limit_zeta%d_subset%d.pdf', ...
+            baseOutputFile = sprintf('%spath_costs_upper_limit_zeta%d_subset%d', ...
                      regexprep(baseFilename, 'path_costs_with_upper_limit_.*', ''), ...
                      zeta, subset_index);
         else
-            figFile = sprintf('%s_zeta%d_subset%d.pdf', baseFilename, zeta, subset_index);
+            baseOutputFile = sprintf('%s_zeta%d_subset%d', baseFilename, zeta, subset_index);
         end
         
+        % 生成PDF和FIG文件名
+        pdfFile = [baseOutputFile '.pdf'];
+        figFile = [baseOutputFile '.fig'];
+        
         % 确保目录存在
-        [directory,~,~] = fileparts(figFile);
+        [directory,~,~] = fileparts(pdfFile);
         if ~isempty(directory) && ~exist(directory, 'dir')
             mkdir(directory);
         end
         
-        % 保存为PDF格式
-        print(fig, figFile, '-dpdf', '-r300');
-        fprintf('图像已保存为: %s\n', figFile);
+        % 设置PDF大小与图窗大小一致
+        set(fig, 'Units', 'inches');
+        figPos = get(fig, 'Position');
+        
+        % 设置纸张大小与图窗大小一致
+        set(fig, 'PaperPositionMode', 'auto');
+        set(fig, 'PaperUnits', 'inches');
+        set(fig, 'PaperSize', [figPos(3), figPos(4)]);
+        
+        % 保存为PDF格式，使用矢量渲染引擎
+        print(fig, pdfFile, '-dpdf', '-painters');
+        fprintf('PDF图像已保存为: %s (大小: %.1f × %.1f 英寸)\n', pdfFile, figPos(3), figPos(4));
+        
+        % 保存为FIG格式，便于将来编辑
+        savefig(fig, figFile);
+        fprintf('MATLAB图形已保存为: %s\n', figFile);
     end
     
     hold off;
