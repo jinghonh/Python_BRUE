@@ -54,7 +54,7 @@ function params = parseInputParameters(varargin)
     addParameter(p, 'ShowGrid', defaultShowGrid);
     
     % Parse inputs
-    parse(p, varargin);
+    parse(p, varargin{:});
     
     % Get results
     params = p.Results;
@@ -226,6 +226,9 @@ function plotPathCostsWithUpperLimit(allPathCosts, boundary, colorVariations, pa
     upperLimitX = calculateUpperLimit(boundary.leftX, boundary.rightX);
     upperLimitY = boundary.leftY;  % Money cost is the same
     
+    % Calculate equilibrium line (T_eqm) - position varies based on money cost
+    eqmLimitX = calculateEquilibriumLine(boundary.leftX, upperLimitX, upperLimitY);
+    
     % Create figure
     fig = figure('Name', 'Path Costs with Upper Limit', 'NumberTitle', 'off', ...
           'Position', params.FigurePosition);
@@ -242,8 +245,11 @@ function plotPathCostsWithUpperLimit(allPathCosts, boundary, colorVariations, pa
     [h_legend, h_infeasible] = drawPathsAndRegions(h_legend, allPathCosts, feasiblePaths, infeasiblePaths, ...
         feasibleCosts, feasibleColors, colorVariations);
     
-    % Draw upper limit line
-    h_legend(3) = plot(upperLimitX, upperLimitY, '--', 'Color', [0.8 0.2 0.2], 'LineWidth', 2);
+    % Draw equilibrium line (T_eqm) - use a distinctive purple color and thicker dash-dot pattern
+    h_legend(3) = plot(eqmLimitX, upperLimitY, '-.', 'Color', [0.5 0.0 0.8], 'LineWidth', 2.5);
+    
+    % Draw upper limit line (T_max)
+    h_legend(7) = plot(upperLimitX, upperLimitY, '-.', 'Color', [0.8 0.2 0.2], 'LineWidth', 2);
     
     % Configure axes
     configureAxes(params);
@@ -261,6 +267,30 @@ end
 function upperLimitX = calculateUpperLimit(leftBoundaryX, rightBoundaryX)
     % Calculate the upper limit X values (time costs) as midpoints between boundaries
     upperLimitX = (leftBoundaryX + rightBoundaryX) / 2;
+end
+
+function eqmLimitX = calculateEquilibriumLine(leftBoundaryX, upperLimitX, upperLimitY)
+    % Calculate equilibrium line position between left boundary and upper limit
+    % The width between eqmLimitX and upperLimitX increases as money cost decreases
+    
+    % Get normalized money costs
+    moneyMax = max(upperLimitY);
+    moneyMin = min(upperLimitY);
+    moneyRange = moneyMax - moneyMin;
+    
+    if moneyRange > 0
+        % Calculate weights: lower money costs get higher weights
+        % These weights determine distance from upperLimitX (T_max)
+        % When money cost is low, weight is high, distance from T_max is large
+        weights = 0.7 + 0.1 * ((upperLimitY - moneyMin) / moneyRange);
+    else
+        weights = 0.5 * ones(size(upperLimitY));
+    end
+    
+    % Calculate equilibrium line position
+    % With low money cost (small weight), eqmLimitX will be closer to leftBoundaryX
+    % With high money cost (large weight), eqmLimitX will be closer to upperLimitX
+    eqmLimitX = leftBoundaryX + (upperLimitX - leftBoundaryX) .* weights;
 end
 
 function [h_legend, boundaryX, boundaryY] = drawFeasibleRegion(boundary)
@@ -285,13 +315,13 @@ function [h_legend, boundaryX, boundaryY] = drawFeasibleRegion(boundary)
 end
 
 function [feasiblePaths, infeasiblePaths, feasibleCosts, feasibleColors] = ...
-    checkPathFeasibility(allPathCosts, upperLimitX, upperLimitY)
+    checkPathFeasibility(allPathCosts, eqmLimitX, upperLimitY)
     % Check which path flow vectors are feasible based on upper limit
     
     % Preallocate result arrays
     feasible_flags = cellfun(@(costs) ...
         ~isempty(costs) && ...
-        all(costs(:,1) <= interp1(upperLimitY, upperLimitX, costs(:,2), 'nearest', 'extrap')), ...
+        all(costs(:,1) <= interp1(upperLimitY, eqmLimitX, costs(:,2), 'nearest', 'extrap')), ...
         allPathCosts);
 
     % Get feasible and infeasible paths using logical indexing
@@ -421,9 +451,9 @@ function [feasibleRegion, h_feasible_region] = calculateAndDrawFeasibleRegion(fe
         boundX = [leftBoundX; flipud(rightBoundX)];
         boundY = [leftBoundY; flipud(rightBoundY)];
         
-        % Draw feasible region
-        h_feasible_region = fill(boundX, boundY, [0.8, 1, 0.8], ...
-            'FaceAlpha', 0.5, 'EdgeColor', [0.4, 0.5, 0.8], 'LineWidth', 0.1);
+        % Draw feasible region - use a more distinct light green color
+        h_feasible_region = fill(boundX, boundY, [0.7, 0.95, 0.7], ...
+            'FaceAlpha', 0.5, 'EdgeColor', [0.4, 0.6, 0.4], 'LineWidth', 0.1);
         
         feasibleRegion = [boundX, boundY];
     catch e
@@ -453,23 +483,34 @@ function configureAxes(params)
 end
 
 function addLegendForUpperLimitPlot(h_legend, feasiblePaths, infeasiblePaths)
-    % Add legend to upper limit plot
-    legendItems = {'Feasible Region', 'Boundary', 'Cost Upper Limit'};
-    legendHandles = [h_legend(1), h_legend(2), h_legend(3)];
+    % Add legend to upper limit plot with simplified labels
     
-    if ~isempty(feasiblePaths)
-        legendItems{end+1} = 'Feasible Flow Vectors';
-        legendHandles(end+1) = h_legend(4);
-        
-        if length(h_legend) >= 6 && h_legend(6) ~= 0
-            legendItems{end+1} = 'Feasible Flow Region';
-            legendHandles(end+1) = h_legend(6);
-        end
+    % Create arrays for legend handles and labels
+    legendHandles = [];
+    legendItems = {};
+    
+    % 1. Feasible Region (always show first)
+    if h_legend(1) ~= 0
+        legendHandles(end+1) = h_legend(1);
+        legendItems{end+1} = 'Feasible Region';
     end
     
-    if ~isempty(infeasiblePaths)
-        legendItems{end+1} = 'Infeasible Flow Vectors';
-        legendHandles(end+1) = h_legend(5);
+    % 2. Feasible Flow Region (show second if available)
+    if ~isempty(feasiblePaths) && length(h_legend) >= 6 && h_legend(6) ~= 0
+        legendHandles(end+1) = h_legend(6);
+        legendItems{end+1} = 'Feasible Flow Region';
+    end
+    
+    % 3. T_eqm
+    if h_legend(3) ~= 0
+        legendHandles(end+1) = h_legend(3);
+        legendItems{end+1} = 'T_{eqm}';
+    end
+    
+    % 4. T_max
+    if length(h_legend) >= 7 && h_legend(7) ~= 0
+        legendHandles(end+1) = h_legend(7);
+        legendItems{end+1} = 'T_{max}';
     end
     
     legend(legendHandles, legendItems, ...
