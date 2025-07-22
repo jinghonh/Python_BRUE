@@ -52,100 +52,122 @@ function plotComparisonPathCosts(totalValidFlow, totalPathValidFlow, relationMat
     standardTotalValidFlow = standardizeFlowData(totalValidFlow, pathIndices, 6);
     standardTotalPathValidFlow = standardizeFlowData(totalPathValidFlow, pathIndices, 6);
 
-    % 固定种子
-    rng(4);
-    
-    % 随机选择流量
-    if ~isempty(standardTotalValidFlow) && ~isempty(standardTotalPathValidFlow)
-        % 从满足所有约束的流量中随机选择
-        validIndices = randperm(size(standardTotalValidFlow, 1), min(numFlows, size(standardTotalValidFlow, 1)));
-        selectedTotalValid = standardTotalValidFlow(validIndices, :);
-        
-        % 从只满足路径约束的流量中随机选择
-        pathValidIndices = randperm(size(standardTotalPathValidFlow, 1), min(numFlows, size(standardTotalPathValidFlow, 1)));
-        selectedPathValid = standardTotalPathValidFlow(pathValidIndices, :);
-        
-        % 组合选择的流量
-        selectedFlows = [selectedTotalValid; selectedPathValid];
-        numSelected = size(selectedFlows, 1);
-        
-        % 打印选择的流量方案
-        fprintf('\n========= 选择的流量方案 =========\n');
-        fprintf('满足全部约束的流量方案:\n');
-        for i = 1:size(selectedTotalValid, 1)
-            fprintf('方案 %d: [', i);
-            fprintf(' %.2f', selectedTotalValid(i, :));
-            fprintf(' ]\n');
-        end
-        
-        fprintf('\n只满足路径约束的流量方案:\n');
-        for i = 1:size(selectedPathValid, 1)
-            fprintf('方案 %d: [', i);
-            fprintf(' %.2f', selectedPathValid(i, :));
-            fprintf(' ]\n');
-        end
-        fprintf('==================================\n\n');
-        
-        % 计算每个选择的流量对应的所有路径成本
-        allPathCosts = cell(numSelected, 1);
-        
-        % 计算每个流量对应的所有路径成本
-        for i = 1:numSelected
-            flow = selectedFlows(i, :);
-            pathCosts = calculateAllPathCosts(flow, fullRelationMatrix);
-            allPathCosts{i} = pathCosts;
-        end
-        
-        % 创建两组不同的颜色方案，与plotThreeRegionsPathCosts.m保持一致
-        % 第一组: 蓝色系 (满足所有约束，对应plotThreeRegionsPathCosts中的区域3)
-        % 第二组: 绿色系 (只满足路径约束，对应plotThreeRegionsPathCosts中的区域1)
-        colorGroup1 = [
-            0.0, 0.4, 0.8;  % 深蓝，与plotThreeRegionsPathCosts中的区域3一致
-            0.0, 0.4, 0.8;  % 相同深蓝
-            0.0, 0.4, 0.8   % 相同深蓝
-        ];
-        
-        colorGroup2 = [
-            0.0, 0.6, 0.3;  % 绿色，与plotThreeRegionsPathCosts中的区域1一致
-            0.0, 0.6, 0.3;  % 相同绿色
-            0.0, 0.6, 0.3   % 相同绿色
-        ];
-        
-        % 确保颜色足够
-        while size(colorGroup1, 1) < numFlows
-            colorGroup1 = [colorGroup1; colorGroup1(end,:) * 0.9];
-        end
-        while size(colorGroup2, 1) < numFlows
-            colorGroup2 = [colorGroup2; colorGroup2(end,:) * 0.9];
-        end
-        
-        % 合并颜色
-        colorVariations = [
-            colorGroup1(1:numFlows, :); 
-            colorGroup2(1:numFlows, :)
-        ];
-        
-        % 创建图例标签
-        legendLabels = cell(numSelected, 1);
-        for i = 1:numFlows
-            if i <= size(selectedTotalValid, 1)
-                legendLabels{i} = sprintf('$BS_0^{\\zeta}$ %d', i); % 使用latex格式
-            end
-        end
-        for i = 1:numFlows
-            if i <= size(selectedPathValid, 1)
-                legendLabels{i+numFlows} = sprintf('$S_0^{\\zeta}$ %d', i); % 使用latex格式
-            end
-        end
-        
-        % 绘制对比图
-        plotPathComparison(allPathCosts, colorVariations, legendLabels, params, selectedFlows);
-    else
+    % 如果数据为空，直接返回
+    if isempty(standardTotalValidFlow) || isempty(standardTotalPathValidFlow)
         warning('输入的流量数据为空，无法绘图');
+        return;
     end
+
+    % 固定种子
+    % 如果三区域函数已存储选中的方案，则直接复用，以保证一致性
+    storedValidFlows = getappdata(0, 'region3_flows');   % 满足全部约束且满足Tmax (区域3)
+    storedPathFlows  = getappdata(0, 'region1_flows');   % 只满足路径约束 (区域1)
+
+    % ----- 选择流量方案 -----
+    selectedTotalValid = [];
+    selectedPathValid  = [];
+
+    % 辅助函数: 在数据集中匹配存储的流量
+    findMatchingRows = @(data, targets) arrayfun(@(rowIdx) helperMatchRow(data, targets(rowIdx,:)), 1:size(targets,1))';
+
+    % 内部辅助函数：匹配单行
+    function idx = helperMatchRow(dataMat, targetRow)
+        % 由于浮点和采样可能导致轻微差异，这里放宽容差至 0.1
+        idxFound = find(all(abs(dataMat - targetRow) < 1e-1, 2), 1, 'first');
+        if isempty(idxFound)
+            idx = NaN;
+        else
+            idx = idxFound;
+        end
+    end
+
+    % 初始化索引变量
+    matchIdx = [];
+    matchIdxPath = [];
+
+    % 1) 尝试使用已保存的满足约束方案
+    if ~isempty(storedValidFlows)
+        matchIdx = findMatchingRows(standardTotalValidFlow, storedValidFlows);
+        matchIdx = matchIdx(~isnan(matchIdx));
+        if ~isempty(matchIdx)
+            selectedTotalValid = standardTotalValidFlow(matchIdx(1:min(numFlows, length(matchIdx))), :);
+        end
+    end
+
+    % 如果仍不足，补充前若干行
+    if isempty(selectedTotalValid)
+        selectedTotalValid = standardTotalValidFlow(1:min(numFlows, size(standardTotalValidFlow, 1)), :);
+    elseif size(selectedTotalValid,1) < numFlows
+        remaining = setdiff(1:size(standardTotalValidFlow,1), matchIdx, 'stable');
+        needed = numFlows - size(selectedTotalValid,1);
+        selectedTotalValid = [selectedTotalValid; standardTotalValidFlow(remaining(1:needed), :)];
+    end
+
+    % 2) 尝试使用已保存的路径约束方案
+    if ~isempty(storedPathFlows)
+        matchIdxPath = findMatchingRows(standardTotalPathValidFlow, storedPathFlows);
+        matchIdxPath = matchIdxPath(~isnan(matchIdxPath));
+        if ~isempty(matchIdxPath)
+            selectedPathValid = standardTotalPathValidFlow(matchIdxPath(1:min(numFlows, length(matchIdxPath))), :);
+        end
+    end
+
+    % 如果仍不足，补充前若干行
+    if isempty(selectedPathValid)
+        selectedPathValid = standardTotalPathValidFlow(1:min(numFlows, size(standardTotalPathValidFlow, 1)), :);
+    elseif size(selectedPathValid,1) < numFlows
+        remainingP = setdiff(1:size(standardTotalPathValidFlow,1), matchIdxPath, 'stable');
+        neededP = numFlows - size(selectedPathValid,1);
+        selectedPathValid = [selectedPathValid; standardTotalPathValidFlow(remainingP(1:neededP), :)];
+    end
+
+    % -----------------------------------
+
+    % 组合选择的流量
+    selectedFlows = [selectedTotalValid; selectedPathValid];
+    numSelected = size(selectedFlows, 1);
+
+    % 打印所选流量方案
+    fprintf('\n========= 选择的流量方案 =========\n');
+    fprintf('满足全部约束的流量方案:\n');
+    for i = 1:size(selectedTotalValid, 1)
+        fprintf('方案 %d: [', i); fprintf(' %.2f', selectedTotalValid(i, :)); fprintf(' ]\n');
+    end
+    fprintf('\n只满足路径约束的流量方案:\n');
+    for i = 1:size(selectedPathValid, 1)
+        fprintf('方案 %d: [', i); fprintf(' %.2f', selectedPathValid(i, :)); fprintf(' ]\n');
+    end
+    fprintf('==================================\n\n');
+
+    % 计算路径成本
+    allPathCosts = cell(numSelected, 1);
+    for i = 1:numSelected
+        flow = selectedFlows(i, :);
+        allPathCosts{i} = calculateAllPathCosts(flow, fullRelationMatrix);
+    end
+
+    % -- 颜色保持不变，与之前一致 --
+    colorGroup1 = repmat([0.0, 0.4, 0.8], numFlows, 1); % 满足全部约束 - 蓝色
+    colorGroup2 = repmat([0.0, 0.6, 0.3], numFlows, 1); % 只满足路径约束 - 绿色
+    colorVariations = [colorGroup1(1:size(selectedTotalValid,1), :); colorGroup2(1:size(selectedPathValid,1), :)];
+
+    % 图例标签
+    legendLabels = cell(numSelected,1);
+    for i=1:size(selectedTotalValid,1)
+        legendLabels{i} = sprintf('$BS_0^{\\zeta}$ %d', i);
+    end
+    for i=1:size(selectedPathValid,1)
+        legendLabels{i+size(selectedTotalValid,1)} = sprintf('$S_0^{\\zeta}$ %d', i);
+    end
+
+    % ---- 调整绘图调用，传递满足全部约束方案数量以设置标记 ----
+    plotPathComparison(allPathCosts, colorVariations, legendLabels, params, selectedFlows, size(selectedTotalValid,1));
+
+    return; % 绘制完成后退出函数
+    warning('输入的流量数据为空，无法绘图');
 end
 
-function plotPathComparison(allPathCosts, colorVariations, legendLabels, params, selectedFlows)
+function plotPathComparison(allPathCosts, colorVariations, legendLabels, params, selectedFlows, validCount)
     % 绘制路径成本对比图
     
     % 创建图形
@@ -153,9 +175,10 @@ function plotPathComparison(allPathCosts, colorVariations, legendLabels, params,
           'Position', params.FigurePosition);
     configureFigure(fig, params);
 
-    % 创建不同的标记样式
-    markerStyles = {'o', 's', 'd', '^', 'v', '>', 'p', 'h'};  % 为不同流量方案使用不同标记
-    
+    % 固定区域标记样式
+    markerValid = 'd';  % 满足全部约束
+    markerPathOnly = 'o'; % 只满足路径约束
+
     % 创建不同的线形样式
     lineStyles = {'-', '--', ':', '-.', '-', '--', ':', '-.'};  % 为不同流量方案使用不同线形
     
@@ -169,13 +192,17 @@ function plotPathComparison(allPathCosts, colorVariations, legendLabels, params,
     for i = 1:q
         costs = allPathCosts{i};
         if ~isempty(costs)
-            % 确保markerStyles数组足够长
-            markerIdx = mod(i-1, length(markerStyles)) + 1;
+            % 根据区域选择标记样式
+            if i <= validCount
+                marker = markerValid;
+            else
+                marker = markerPathOnly;
+            end
             % 确保lineStyles数组足够长
             lineIdx = mod(i-1, length(lineStyles)) + 1;
             
             % 先画散点 - 使用不同流量方案的不同标记
-            h = scatter(costs(:,1), costs(:,2), 60, colorVariations(i,:), markerStyles{markerIdx}, ...
+            h = scatter(costs(:,1), costs(:,2), 60, colorVariations(i,:), marker, ...
                 'filled', 'MarkerEdgeColor', 'none');
             hold on;
             

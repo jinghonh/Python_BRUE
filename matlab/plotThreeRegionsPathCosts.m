@@ -146,6 +146,12 @@ function plotThreeRegionsPathCosts(totalValidFlow, totalPathValidFlow, relationM
         allRegion3Costs = allRegion3Costs(:);
         allPathCosts   = [allRegion1Costs; allRegion2Costs; allRegion3Costs];
 
+        % --- 新增: 将选中的流量方案存入全局 appdata，供其它绘图函数复用 ---
+        setappdata(0, 'region1_flows', selectedRegion1);
+        setappdata(0, 'region2_flows', selectedRegion2);
+        setappdata(0, 'region3_flows', selectedRegion3);
+        % --------------------------------------------------------------
+
         % 重新分配颜色与图例（一次性精确匹配）
         colorRegion1 = [0.0, 0.6, 0.3];   % 绿色系
         colorRegion2 = [0.85, 0.4, 0.0];  % 橙色系
@@ -172,116 +178,92 @@ function plotThreeRegionsPathCosts(totalValidFlow, totalPathValidFlow, relationM
         % 打印信息
         printSelectedFlows_New(selectedRegion1, selectedRegion2, selectedRegion3);
 
-        % 调用绘图
-        plotThreeRegionsComparison(allPathCosts, colorVariations, legendLabels, params, selectedFlows, upperLimitX, upperLimitY, boundary);
+        % ---- 调整函数调用，传递区域流量数量以便统一标记样式 ----
+        plotThreeRegionsComparison(allPathCosts, colorVariations, legendLabels, params, selectedFlows, upperLimitX, upperLimitY, boundary, size(selectedRegion1,1), size(selectedRegion2,1));
+        % --------------------------------------------------------------
     else
         warning('输入的流量数据为空，无法绘图');
     end
 end
 
-function plotThreeRegionsComparison(allPathCosts, colorVariations, legendLabels, params, selectedFlows, upperLimitX, upperLimitY, boundary)
-    % 绘制三个区域的路径成本对比图
-    
+function plotThreeRegionsComparison(allPathCosts, colorVariations, legendLabels, params, selectedFlows, upperLimitX, upperLimitY, boundary, region1Count, region2Count)
+    % 绘制三个区域的路径成本对比图 (区域1: S0^zeta, 区域2: BS0^zeta\Tmax, 区域3: BS0^zeta∩Tmax)
+
     % 创建图形
     fig = figure('Name', '三区域路径成本对比图', 'NumberTitle', 'off', ...
           'Position', params.FigurePosition);
     configureFigure(fig, params);
 
-    % 创建不同的标记样式
-    markerStyles = {'o', 's', 'd', '^', 'v', '>', 'p', 'h'};  % 为不同流量方案使用不同标记
-    
-    % 创建不同的线形样式
-    lineStyles = {'-', '--', ':', '-.', '-', '--', ':', '-.'};  % 为不同流量方案使用不同线形
-    
+    % 区域固定标记样式
+    markerRegion1 = 'o';   % 圆形
+    markerRegion2 = 's';   % 方形
+    markerRegion3 = 'd';   % 菱形
+
+    % 创建不同的线形样式（仍保持多样）
+    lineStyles = {'-', '--', ':', '-.', '-', '--', ':', '-.'};
+
     % 绘制所有点和连接线
     flowLegendHandles = [];
-    flowLegendLabels = {};
-    
-    % 绘制边界区域
+    flowLegendLabels  = {};
+
+    % 绘制边界和 Tmax
     h_boundary = plot([boundary.leftX; boundary.rightX], [boundary.leftY; boundary.rightY], ':', 'Color', [0.7 0.7 0.7], 'LineWidth', 1);
     hold on;
-    
-    % 绘制T_max上限线
     h_tmax = plot(upperLimitX, upperLimitY, '-.', 'Color', [0.8 0.2 0.2], 'LineWidth', 2);
 
-    % 使用 allPathCosts 的长度作为循环上限，避免越界
-    q = numel(allPathCosts);
-    % colorVariations 已与 allPathCosts 对齐，如存在长度不一致则截断或补齐为黑色
-    if size(colorVariations,1) < q
-        colorVariations(end+1:q, :) = repmat([0,0,0], q - size(colorVariations,1), 1); % 备用黑色
-    elseif size(colorVariations,1) > q
-        colorVariations = colorVariations(1:q, :);
-    end
-
-    for i = 1:q
+    totalFlows = numel(allPathCosts);
+    for i = 1:totalFlows
         costs = allPathCosts{i};
         if ~isempty(costs)
-            % 确保markerStyles数组足够长
-            markerIdx = mod(i-1, length(markerStyles)) + 1;
-            % 确保lineStyles数组足够长
+            % 选择区域对应的标记
+            if i <= region1Count
+                marker = markerRegion1;
+            elseif i <= region1Count + region2Count
+                marker = markerRegion2;
+            else
+                marker = markerRegion3;
+            end
+            % 选择线形
             lineIdx = mod(i-1, length(lineStyles)) + 1;
-            
-            % 先画散点 - 使用不同流量方案的不同标记
-            h = scatter(costs(:,1), costs(:,2), 60, colorVariations(i,:), markerStyles{markerIdx}, ...
-                'filled', 'MarkerEdgeColor', 'none');
+            % 画散点
+            h = scatter(costs(:,1), costs(:,2), 60, colorVariations(i,:), marker, 'filled', 'MarkerEdgeColor', 'none');
             hold on;
-            
+
             % 获取当前流量方案
             flow = selectedFlows(i, :);
-            
-            % 找出流量大于0的路径索引
-            positiveFlowIdx = find(flow > 0);
-            
-            % 只对流量大于0的路径进行连线
-            if ~isempty(positiveFlowIdx)
-                % 提取流量大于0的路径成本
-                positiveCosts = costs(positiveFlowIdx, :);
-                
-                % 按金钱成本排序
+            positiveIdx = find(flow > 0);
+            if ~isempty(positiveIdx)
+                positiveCosts = costs(positiveIdx, :);
                 [~, sortIdx] = sort(positiveCosts(:,2));
-                sortedPositiveCosts = positiveCosts(sortIdx,:);
-                
-                % 画连接线 - 使用不同流量方案的不同线形
+                sortedPositiveCosts = positiveCosts(sortIdx, :);
                 plot(sortedPositiveCosts(:,1), sortedPositiveCosts(:,2), lineStyles{lineIdx}, 'Color', colorVariations(i,:), 'LineWidth', 1.5);
             end
-            
-            % 记录流量图例句柄
+
             flowLegendHandles = [flowLegendHandles; h];
             if i <= length(legendLabels)
                 flowLegendLabels = [flowLegendLabels; legendLabels{i}];
             end
-            
-            % 添加路径编号标签
-            for j = 1:size(costs, 1)
-                text(costs(j,1), costs(j,2)-1, sprintf('P%d', j), ...
-                    'FontSize', 8, 'HorizontalAlignment', 'center', ...
-                    'VerticalAlignment', 'bottom', 'Color', [0.3 0.3 0.3]);
+
+            % 添加路径编号
+            for j = 1:size(costs,1)
+                text(costs(j,1), costs(j,2)-1, sprintf('P%d', j), 'FontSize', 8, 'HorizontalAlignment', 'center', 'VerticalAlignment', 'bottom', 'Color', [0.3 0.3 0.3]);
             end
         end
     end
-    
-    % 配置坐标轴和标签
+
+    % 坐标轴与网格
     xlabel('Time Cost', 'FontName', params.FontName, 'FontSize', params.FontSize);
     ylabel('Money Cost', 'FontName', params.FontName, 'FontSize', params.FontSize);
-    
     if params.ShowGrid
-        grid on;
-        grid minor;
+        grid on; grid minor;
     end
-    
-    % 添加T_max线到图例
+
+    % 图例 (添加 Tmax)
     flowLegendHandles = [flowLegendHandles; h_tmax];
-    flowLegendLabels = [flowLegendLabels; '$T_{max}$'];
-    
-    % 添加图例
-    legend(flowLegendHandles, flowLegendLabels, ...
-        'Location', 'northeast', ...
-        'FontName', params.FontName, 'FontSize', params.FontSize-1, ...
-        'EdgeColor', [0.7, 0.7, 0.7], ...
-        'Box', 'on', ...
-        'Interpreter', 'latex');
-    
-    % 保存图形
+    flowLegendLabels  = [flowLegendLabels; '$T_{max}$'];
+    legend(flowLegendHandles, flowLegendLabels, 'Location', 'northeast', 'FontName', params.FontName, 'FontSize', params.FontSize-1, 'EdgeColor', [0.7 0.7 0.7], 'Box', 'on', 'Interpreter', 'latex');
+
+    % 保存并关闭
     saveFigure(fig);
 end
 
