@@ -169,14 +169,14 @@ function plotThreeRegionsPathCosts(totalValidFlow, totalPathValidFlow, relationM
             legendLabels{end+1} = sprintf('$S_0^{\\zeta}$ %d',i); %#ok<AGROW>
         end
         for i=1:size(selectedRegion2,1)
-            legendLabels{end+1} = sprintf('$BS_0^{\\zeta} \\setminus T_{max}$ %d',i); %#ok<AGROW>
+            legendLabels{end+1} = sprintf('$BS_0^{\\zeta}$ %d',i); %#ok<AGROW>
         end
         for i=1:size(selectedRegion3,1)
-            legendLabels{end+1} = sprintf('$BS_0^{\\zeta} \cap T_{max}$ %d',i); %#ok<AGROW>
+            legendLabels{end+1} = sprintf('$RS_0^{\\zeta}$ %d',i); %#ok<AGROW>
         end
 
         % 打印信息
-        printSelectedFlows_New(selectedRegion1, selectedRegion2, selectedRegion3);
+        printSelectedFlows_New(selectedRegion1, selectedRegion2, selectedRegion3, allRegion1Costs, allRegion2Costs, allRegion3Costs);
 
         % ---- 调整函数调用，传递区域流量数量以便统一标记样式 ----
         plotThreeRegionsComparison(allPathCosts, colorVariations, legendLabels, params, selectedFlows, upperLimitX, upperLimitY, boundary, size(selectedRegion1,1), size(selectedRegion2,1));
@@ -200,14 +200,14 @@ function plotThreeRegionsComparison(allPathCosts, colorVariations, legendLabels,
     markerRegion3 = 'd';   % 菱形
 
     % 创建不同的线形样式（仍保持多样）
-    lineStyles = {'-', '--', ':', '-.', '-', '--', ':', '-.'};
+    lineStyles = {'-', '-', '-', '-', '-', '-', '-', '-'};
 
     % 绘制所有点和连接线
     flowLegendHandles = [];
     flowLegendLabels  = {};
 
     % 绘制边界和 Tmax
-    h_boundary = plot([boundary.leftX; boundary.rightX], [boundary.leftY; boundary.rightY], ':', 'Color', [0.7 0.7 0.7], 'LineWidth', 1);
+    % h_boundary = plot([boundary.leftX; boundary.rightX], [boundary.leftY; boundary.rightY], ':', 'Color', [0.7 0.7 0.7], 'LineWidth', 1);
     hold on;
     h_tmax = plot(upperLimitX, upperLimitY, '-.', 'Color', [0.8 0.2 0.2], 'LineWidth', 2);
 
@@ -290,34 +290,6 @@ function filteredFlow = filterOutOverlappingFlows(flowA, flowB)
     
     % 返回不重叠的流量向量
     filteredFlow = flowA(nonOverlappingIndices, :);
-end
-
-
-
-function printSelectedFlows(selectedTotalValid, selectedPathOnly, selectedTmaxFeasible)
-    % 打印选择的流量方案
-    fprintf('\n========= 选择的流量方案 =========\n');
-    fprintf('满足全部约束的流量方案 (BS_0^{zeta}):\n');
-    for i = 1:size(selectedTotalValid, 1)
-        fprintf('方案 %d: [', i);
-        fprintf(' %.2f', selectedTotalValid(i, :));
-        fprintf(' ]\n');
-    end
-    
-    fprintf('\n只满足路径约束的流量方案 (S_0^{zeta}):\n');
-    for i = 1:size(selectedPathOnly, 1)
-        fprintf('方案 %d: [', i);
-        fprintf(' %.2f', selectedPathOnly(i, :));
-        fprintf(' ]\n');
-    end
-    
-    fprintf('\n满足T_max上限约束的流量方案 (T_max):\n');
-    for i = 1:size(selectedTmaxFeasible, 1)
-        fprintf('方案 %d: [', i);
-        fprintf(' %.2f', selectedTmaxFeasible(i, :));
-        fprintf(' ]\n');
-    end
-    fprintf('==================================\n\n');
 end
 
 function boundary = calculateFeasibleRegionBoundary(allPathTimeCosts, allPathMoneyCosts)
@@ -452,6 +424,17 @@ function saveFigure(fig)
         fileName = sprintf('%sthree_regions_comparison_zeta%d_subset%d.pdf', outputDir, zeta, subset_index);
     end
     
+    % 获取图形的实际大小
+    figPos = get(fig, 'Position');
+    figWidth = figPos(3);
+    figHeight = figPos(4);
+    
+    % 设置纸张大小与图形大小一致
+    set(fig, 'PaperPositionMode', 'manual');
+    set(fig, 'PaperUnits', 'points');
+    set(fig, 'PaperSize', [figWidth figHeight]);
+    set(fig, 'PaperPosition', [0 0 figWidth figHeight]);
+
     % 保存图形为PDF
     print(fig, fileName, '-dpdf', '-r300');
     fprintf('图形已保存为: %s\n', fileName);
@@ -558,19 +541,31 @@ function M = createFullRelationMatrix(fullOrderedPair)
     M(6, 7) = 1;
 end 
 
-function printSelectedFlows_New(region1, region2, region3)
+function printSelectedFlows_New(region1, region2, region3, costs1, costs2, costs3)
     fprintf('\n========= 选择的流量方案 =========\n');
     fprintf('区域1: 只满足路径约束 (S_0^{zeta})\n');
     for i=1:size(region1,1)
         fprintf('方案 %d: [',i); fprintf(' %.2f',region1(i,:)); fprintf(' ]\n');
+        pathCosts = costs1{i};
+        for j = 1:size(pathCosts, 1)
+            fprintf('  路径 %d 成本: [时间: %.2f, 金钱: %.2f]\n', j, pathCosts(j, 1), pathCosts(j, 2));
+        end
     end
     fprintf('\n区域2: 满足全部约束但违反T_{max} (BS_0^{zeta} \\ T_{max})\n');
     for i=1:size(region2,1)
         fprintf('方案 %d: [',i); fprintf(' %.2f',region2(i,:)); fprintf(' ]\n');
+        pathCosts = costs2{i};
+        for j = 1:size(pathCosts, 1)
+            fprintf('  路径 %d 成本: [时间: %.2f, 金钱: %.2f]\n', j, pathCosts(j, 1), pathCosts(j, 2));
+        end
     end
     fprintf('\n区域3: 满足全部约束且满足T_{max} (BS_0^{zeta} ∩ T_{max})\n');
     for i=1:size(region3,1)
         fprintf('方案 %d: [',i); fprintf(' %.2f',region3(i,:)); fprintf(' ]\n');
+        pathCosts = costs3{i};
+        for j = 1:size(pathCosts, 1)
+            fprintf('  路径 %d 成本: [时间: %.2f, 金钱: %.2f]\n', j, pathCosts(j, 1), pathCosts(j, 2));
+        end
     end
     fprintf('==================================\n\n');
 end 

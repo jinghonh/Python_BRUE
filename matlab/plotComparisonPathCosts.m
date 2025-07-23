@@ -127,24 +127,25 @@ function plotComparisonPathCosts(totalValidFlow, totalPathValidFlow, relationMat
     selectedFlows = [selectedTotalValid; selectedPathValid];
     numSelected = size(selectedFlows, 1);
 
-    % 打印所选流量方案
-    fprintf('\n========= 选择的流量方案 =========\n');
-    fprintf('满足全部约束的流量方案:\n');
-    for i = 1:size(selectedTotalValid, 1)
-        fprintf('方案 %d: [', i); fprintf(' %.2f', selectedTotalValid(i, :)); fprintf(' ]\n');
-    end
-    fprintf('\n只满足路径约束的流量方案:\n');
-    for i = 1:size(selectedPathValid, 1)
-        fprintf('方案 %d: [', i); fprintf(' %.2f', selectedPathValid(i, :)); fprintf(' ]\n');
-    end
-    fprintf('==================================\n\n');
-
     % 计算路径成本
     allPathCosts = cell(numSelected, 1);
-    for i = 1:numSelected
-        flow = selectedFlows(i, :);
-        allPathCosts{i} = calculateAllPathCosts(flow, fullRelationMatrix);
+    allTotalValidCosts = {};
+    allPathValidCosts = {};
+    for i = 1:size(selectedTotalValid, 1)
+        flow = selectedTotalValid(i, :);
+        costs = calculateAllPathCosts(flow, fullRelationMatrix);
+        allPathCosts{i} = costs;
+        allTotalValidCosts{end+1} = costs;
     end
+    for i = 1:size(selectedPathValid, 1)
+        flow = selectedPathValid(i, :);
+        costs = calculateAllPathCosts(flow, fullRelationMatrix);
+        allPathCosts{size(selectedTotalValid, 1) + i} = costs;
+        allPathValidCosts{end+1} = costs;
+    end
+
+    % 打印所选流量方案
+    printSelectedFlows(selectedTotalValid, selectedPathValid, allTotalValidCosts, allPathValidCosts);
 
     % -- 颜色保持不变，与之前一致 --
     colorGroup1 = repmat([0.0, 0.4, 0.8], numFlows, 1); % 满足全部约束 - 蓝色
@@ -167,6 +168,27 @@ function plotComparisonPathCosts(totalValidFlow, totalPathValidFlow, relationMat
     warning('输入的流量数据为空，无法绘图');
 end
 
+function printSelectedFlows(totalValid, pathValid, totalValidCosts, pathValidCosts)
+    fprintf('\n========= 选择的流量方案 =========\n');
+    fprintf('满足全部约束的流量方案:\n');
+    for i = 1:size(totalValid, 1)
+        fprintf('方案 %d: [', i); fprintf(' %.2f', totalValid(i, :)); fprintf(' ]\n');
+        pathCosts = totalValidCosts{i};
+        for j = 1:size(pathCosts, 1)
+            fprintf('  路径 %d 成本: [时间: %.2f, 金钱: %.2f]\n', j, pathCosts(j, 1), pathCosts(j, 2));
+        end
+    end
+    fprintf('\n只满足路径约束的流量方案:\n');
+    for i = 1:size(pathValid, 1)
+        fprintf('方案 %d: [', i); fprintf(' %.2f', pathValid(i, :)); fprintf(' ]\n');
+        pathCosts = pathValidCosts{i};
+        for j = 1:size(pathCosts, 1)
+            fprintf('  路径 %d 成本: [时间: %.2f, 金钱: %.2f]\n', j, pathCosts(j, 1), pathCosts(j, 2));
+        end
+    end
+    fprintf('==================================\n\n');
+end
+
 function plotPathComparison(allPathCosts, colorVariations, legendLabels, params, selectedFlows, validCount)
     % 绘制路径成本对比图
     
@@ -180,7 +202,7 @@ function plotPathComparison(allPathCosts, colorVariations, legendLabels, params,
     markerPathOnly = 'o'; % 只满足路径约束
 
     % 创建不同的线形样式
-    lineStyles = {'-', '--', ':', '-.', '-', '--', ':', '-.'};  % 为不同流量方案使用不同线形
+    lineStyles = {'-', '-', '-', '-', '-', '-', '-', '-'};
     
     % 创建隐藏的图例句柄
     q = size(colorVariations, 1);
@@ -333,6 +355,17 @@ function saveFigure(fig)
         fileName = sprintf('%spath_costs_comparison_zeta%d_subset%d.pdf', outputDir, zeta, subset_index);
     end
     
+    % 获取图形的实际大小
+    figPos = get(fig, 'Position');
+    figWidth = figPos(3);
+    figHeight = figPos(4);
+    
+    % 设置纸张大小与图形大小一致
+    set(fig, 'PaperPositionMode', 'manual');
+    set(fig, 'PaperUnits', 'points');
+    set(fig, 'PaperSize', [figWidth figHeight]);
+    set(fig, 'PaperPosition', [0 0 figWidth figHeight]);
+
     % 保存图形为PDF
     print(fig, fileName, '-dpdf', '-r300');
     fprintf('图形已保存为: %s\n', fileName);
