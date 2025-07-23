@@ -35,6 +35,28 @@ function plotThreeRegionsPathCosts(totalValidFlow, totalPathValidFlow, relationM
     parse(p, varargin{:});
     params = p.Results;
     
+    % 在函数开头添加，从varargin中提取zeta和subset_index
+    zeta = [];
+    subset_index = [];
+    
+    % 查找varargin中是否有zeta和subset_index参数
+    for i = 1:2:length(varargin)
+        if strcmpi(varargin{i}, 'zeta')
+            zeta = varargin{i+1};
+        elseif strcmpi(varargin{i}, 'subset_index')
+            subset_index = varargin{i+1};
+        end
+    end
+    
+    % 如果参数中没有，尝试从应用数据获取
+    if isempty(zeta)
+        zeta = getappdata(0, 'current_zeta');
+    end
+    
+    if isempty(subset_index)
+        subset_index = getappdata(0, 'current_subset_index');
+    end
+    
     % 确保结果目录存在
     if ~exist(params.SavePath, 'dir')
         mkdir(params.SavePath);
@@ -181,6 +203,17 @@ function plotThreeRegionsPathCosts(totalValidFlow, totalPathValidFlow, relationM
         % ---- 调整函数调用，传递区域流量数量以便统一标记样式 ----
         plotThreeRegionsComparison(allPathCosts, colorVariations, legendLabels, params, selectedFlows, upperLimitX, upperLimitY, boundary, size(selectedRegion1,1), size(selectedRegion2,1));
         % --------------------------------------------------------------
+
+        % 先存储到应用数据中
+        setappdata(0, 'current_zeta', zeta);
+        setappdata(0, 'current_subset_index', subset_index);
+
+        % 从应用数据中重新获取值，确保变量已定义
+        zeta = getappdata(0, 'current_zeta');
+        subset_index = getappdata(0, 'current_subset_index');
+
+        % 现在调用saveTmaxData时，zeta和subset_index已定义
+        saveTmaxData(upperLimitX, upperLimitY, zeta, subset_index);
     else
         warning('输入的流量数据为空，无法绘图');
     end
@@ -568,4 +601,71 @@ function printSelectedFlows_New(region1, region2, region3, costs1, costs2, costs
         end
     end
     fprintf('==================================\n\n');
+end 
+
+function saveTmaxData(limitX, limitY, zeta, subset_index)
+    % 如果 zeta 和 subset_index 为空，使用默认值
+    if isempty(zeta) || isempty(subset_index)
+        zeta = 0;
+        subset_index = 0;
+    end
+    
+    % 确保是数值
+    if ~isnumeric(zeta)
+        zeta = str2double(char(zeta));
+    end
+    if ~isnumeric(subset_index)
+        subset_index = str2double(char(subset_index));
+    end
+    
+    % 创建 T_max 数据表 - 使用英文字段名
+    tmax_data = table();
+    tmax_data.zeta = repmat(zeta, length(limitX), 1);
+    tmax_data.type = repmat({'T_max'}, length(limitX), 1);
+    tmax_data.time_cost = limitX;
+    tmax_data.money_cost = limitY;
+    
+    % 保存文件路径
+    csvFile = sprintf('results/tmax_data_zeta%d_subset%d.csv', zeta, subset_index);
+    
+    % 设置列名
+    tmax_data.Properties.VariableNames = {'zeta值', '数据类型', '时间成本', '金钱成本'};
+    
+    % 确保目录存在
+    if ~exist('results', 'dir')
+        mkdir('results');
+    end
+    
+    % 写入CSV
+    writetable(tmax_data, csvFile);
+    fprintf('T_max 数据已保存至: %s\n', csvFile);
+    
+    % 同时将结果附加到 result.csv，确保格式兼容
+    resultFile = 'results/result.csv';
+    if exist(resultFile, 'file')
+        % 读取现有数据
+        existing_data = readtable(resultFile);
+        
+        % 准备T_max数据，与结果文件格式保持一致
+        point_count = length(limitX);
+        tmax_for_result = table();
+        tmax_for_result.zeta = repmat(zeta, point_count, 1);
+        tmax_for_result.region = repmat(4, point_count, 1); 
+        tmax_for_result.desc = repmat({'T_max上限曲线'}, point_count, 1);
+        tmax_for_result.scheme = repmat(1, point_count, 1);
+        tmax_for_result.path = (1:point_count)';
+        tmax_for_result.flow = zeros(point_count, 1);
+        tmax_for_result.time = limitX;
+        tmax_for_result.money = limitY;
+        
+        % 设置列名与result.csv匹配
+        tmax_for_result.Properties.VariableNames = {'zeta值', '区域', '区域描述', '方案编号', '路径编号', '流量分配', '时间成本', '金钱成本'};
+        
+        % 合并并重新保存
+        updated_data = [existing_data; tmax_for_result];
+        writetable(updated_data, resultFile);
+        fprintf('T_max 数据已附加至结果文件: %s\n', resultFile);
+    else
+        fprintf('警告: 结果文件 %s 不存在，无法附加 T_max 数据\n', resultFile);
+    end
 end 
