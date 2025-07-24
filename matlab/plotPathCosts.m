@@ -462,10 +462,10 @@ function [feasibleRegion, h_feasible_region] = calculateAndDrawFeasibleRegion(fe
         % Sort boundary points
         [leftBoundY, sortIdx] = sort(leftBoundY);
         leftBoundX = leftBoundX(sortIdx);
+        leftBoundX = ones(length(leftBoundY),1)*(min(leftBoundX)-1);
         
         [rightBoundY, sortIdx] = sort(rightBoundY);
         rightBoundX = rightBoundX(sortIdx);
-        
         % Form closed region
         boundX = [leftBoundX; flipud(rightBoundX)];
         boundY = [leftBoundY; flipud(rightBoundY)];
