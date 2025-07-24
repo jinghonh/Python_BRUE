@@ -250,7 +250,8 @@ function plotPathCostsWithUpperLimit(allPathCosts, boundary, colorVariations, pa
     h_legend(3) = plot(eqmLimitX, upperLimitY, '-.', 'Color', [0.5 0.0 0.8], 'LineWidth', 2.5);
     
     % Draw upper limit line (T_max)
-    h_legend(7) = plot(T, M, '-.', 'Color', [0.8 0.2 0.2], 'LineWidth', 2);
+    h_legend(7) = plot(upperLimitX, upperLimitY, '-.', 'Color', [0.8 0.2 0.2], 'LineWidth', 2);
+    % h_legend(7) = plot(T, M, '-.', 'Color', [0.8 0.2 0.2], 'LineWidth', 2);
     
     % Configure axes
     configureAxes(params);
@@ -288,7 +289,7 @@ function eqmLimitX = calculateEquilibriumLine(leftBoundaryX, upperLimitX, upperL
     % Calculate equilibrium line position
     % With low money cost (small weight), eqmLimitX will be closer to leftBoundaryX
     % With high money cost (large weight), eqmLimitX will be closer to upperLimitX
-    eqmLimitX = upperLimitX - 50/(10+upperLimitY);
+    eqmLimitX = upperLimitX - 50./(10+upperLimitY);
 end
 
 
