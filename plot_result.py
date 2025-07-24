@@ -163,6 +163,10 @@ def calculate_tmax_from_mat(mat_file_path):
         min_len = min(len(upper_limit_x), len(upper_limit_y))
         upper_limit_x = upper_limit_x[:min_len]
         upper_limit_y = upper_limit_y[:min_len]
+
+        print("upper_limit_x:", upper_limit_x)
+        print("T_eqm:", upper_limit_x-(50/(10+upper_limit_y)))
+        print("upper_limit_y:", upper_limit_y)
         
         return upper_limit_x, upper_limit_y
         
