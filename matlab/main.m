@@ -5,7 +5,7 @@ close all;
 
 
 % 设置参数
-zeta = 31;          % 可选值：15 或 31
+zeta = 15;          % 可选值：15 或 31
 subset_index = 0;   % zeta=15时可选0,1；zeta=31时可选0,1,2
 
 % 验证输入参数
@@ -77,11 +77,3 @@ end
 tic
 analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index); 
 toc
-
-% 保存当前的时间作为结果标识
-timestamp = string(datetime("now"), "yyyyMMdd_HHmmss");
-resultFile = sprintf('results/result_zeta%d_subset%d_%s.mat', zeta, subset_index, timestamp);
-
-% 保存所有工作区变量
-save(resultFile);
-fprintf('所有结果已保存到: %s\n', resultFile);

@@ -1,0 +1,184 @@
+{
+    "zeta31": {
+      "regions": {
+        "region1": {
+          "name": "只满足路径约束 (S_0^{zeta})",
+          "plans": [
+            {
+              "plan_id": 1,
+              "flow_distribution": [4873.88, 4539.79, 0.00, 0.00, 586.33, 0.00],
+              "paths": [
+                {"path_id": 1, "costs": {"time": 33.34, "money": 20.00}},
+                {"path_id": 2, "costs": {"time": 37.97, "money": 15.00}},
+                {"path_id": 3, "costs": {"time": 43.72, "money": 1.00}},
+                {"path_id": 4, "costs": {"time": 43.72, "money": 1.00}},
+                {"path_id": 5, "costs": {"time": 32.61, "money": 2.00}},
+                {"path_id": 6, "costs": {"time": 63.91, "money": 0.00}}
+              ]
+            },
+            {
+              "plan_id": 2,
+              "flow_distribution": [3416.82, 4652.72, 0.00, 0.00, 1930.47, 0.00],
+              "paths": [
+                {"path_id": 1, "costs": {"time": 25.17, "money": 20.00}},
+                {"path_id": 2, "costs": {"time": 38.99, "money": 15.00}},
+                {"path_id": 3, "costs": {"time": 46.42, "money": 1.00}},
+                {"path_id": 4, "costs": {"time": 46.42, "money": 1.00}},
+                {"path_id": 5, "costs": {"time": 38.67, "money": 2.00}},
+                {"path_id": 6, "costs": {"time": 63.91, "money": 0.00}}
+              ]
+            }
+          ]
+        },
+        "region2": {
+          "name": "满足全部约束但违反T_{max} (BS_0^{zeta} \\ T_{max})",
+          "plans": [
+            {
+              "plan_id": 1,
+              "flow_distribution": [4668.28, 3666.59, 0.00, 0.00, 1665.12, 0.00],
+              "paths": [
+                {"path_id": 1, "costs": {"time": 31.65, "money": 20.00}},
+                {"path_id": 2, "costs": {"time": 32.24, "money": 15.00}},
+                {"path_id": 3, "costs": {"time": 45.21, "money": 1.00}},
+                {"path_id": 4, "costs": {"time": 45.21, "money": 1.00}},
+                {"path_id": 5, "costs": {"time": 35.95, "money": 2.00}},
+                {"path_id": 6, "costs": {"time": 63.91, "money": 0.00}}
+              ]
+            },
+            {
+              "plan_id": 2,
+              "flow_distribution": [4309.03, 3078.30, 0.00, 0.00, 2612.68, 0.00],
+              "paths": [
+                {"path_id": 1, "costs": {"time": 29.17, "money": 20.00}},
+                {"path_id": 2, "costs": {"time": 30.08, "money": 15.00}},
+                {"path_id": 3, "costs": {"time": 52.77, "money": 1.00}},
+                {"path_id": 4, "costs": {"time": 52.77, "money": 1.00}},
+                {"path_id": 5, "costs": {"time": 52.75, "money": 2.00}},
+                {"path_id": 6, "costs": {"time": 63.91, "money": 0.00}}
+              ]
+            }
+          ]
+        },
+        "region3": {
+          "name": "满足全部约束且满足T_{max} (BS_0^{zeta} ∩ T_{max})",
+          "plans": [
+            {
+              "plan_id": 1,
+              "flow_distribution": [4038.87, 3976.04, 0.00, 0.00, 1985.09, 0.00],
+              "paths": [
+                {"path_id": 1, "costs": {"time": 27.67, "money": 20.00}},
+                {"path_id": 2, "costs": {"time": 33.87, "money": 15.00}},
+                {"path_id": 3, "costs": {"time": 46.74, "money": 1.00}},
+                {"path_id": 4, "costs": {"time": 46.74, "money": 1.00}},
+                {"path_id": 5, "costs": {"time": 39.39, "money": 2.00}},
+                {"path_id": 6, "costs": {"time": 63.91, "money": 0.00}}
+              ]
+            },
+            {
+              "plan_id": 2,
+              "flow_distribution": [3645.59, 4155.14, 0.00, 0.00, 2199.28, 0.00],
+              "paths": [
+                {"path_id": 1, "costs": {"time": 25.95, "money": 20.00}},
+                {"path_id": 2, "costs": {"time": 35.01, "money": 15.00}},
+                {"path_id": 3, "costs": {"time": 48.27, "money": 1.00}},
+                {"path_id": 4, "costs": {"time": 48.27, "money": 1.00}},
+                {"path_id": 5, "costs": {"time": 42.81, "money": 2.00}},
+                {"path_id": 6, "costs": {"time": 63.91, "money": 0.00}}
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "zeta15": {
+      "regions": {
+        "region1": {
+          "name": "只满足路径约束 (S_0^{zeta})",
+          "plans": [
+            {
+              "plan_id": 1,
+              "flow_distribution": [5373.80, 4413.76, 0.00, 0.00, 212.44, 0.00],
+              "paths": [
+                {"path_id": 1, "costs": {"time": 38.40, "money": 20.00}},
+                {"path_id": 2, "costs": {"time": 36.91, "money": 15.00}},
+                {"path_id": 3, "costs": {"time": 43.70, "money": 1.00}},
+                {"path_id": 4, "costs": {"time": 43.70, "money": 1.00}},
+                {"path_id": 5, "costs": {"time": 32.55, "money": 2.00}},
+                {"path_id": 6, "costs": {"time": 63.91, "money": 0.00}}
+              ]
+            },
+            {
+              "plan_id": 2,
+              "flow_distribution": [4582.07, 3312.18, 0.00, 0.00, 2105.75, 0.00],
+              "paths": [
+                {"path_id": 1, "costs": {"time": 31.00, "money": 20.00}},
+                {"path_id": 2, "costs": {"time": 30.81, "money": 15.00}},
+                {"path_id": 3, "costs": {"time": 47.55, "money": 1.00}},
+                {"path_id": 4, "costs": {"time": 47.55, "money": 1.00}},
+                {"path_id": 5, "costs": {"time": 41.19, "money": 2.00}},
+                {"path_id": 6, "costs": {"time": 63.91, "money": 0.00}}
+              ]
+            }
+          ]
+        },
+        "region2": {
+          "name": "满足全部约束但违反T_{max} (BS_0^{zeta} \\ T_{max})",
+          "plans": [
+            {
+              "plan_id": 1,
+              "flow_distribution": [4758.09, 3882.45, 0.00, 0.00, 1359.45, 0.00],
+              "paths": [
+                {"path_id": 1, "costs": {"time": 32.36, "money": 20.00}},
+                {"path_id": 2, "costs": {"time": 33.34, "money": 15.00}},
+                {"path_id": 3, "costs": {"time": 44.37, "money": 1.00}},
+                {"path_id": 4, "costs": {"time": 44.37, "money": 1.00}},
+                {"path_id": 5, "costs": {"time": 34.07, "money": 2.00}},
+                {"path_id": 6, "costs": {"time": 63.91, "money": 0.00}}
+              ]
+            },
+            {
+              "plan_id": 2,
+              "flow_distribution": [4493.79, 3621.15, 0.00, 0.00, 1885.06, 0.00],
+              "paths": [
+                {"path_id": 1, "costs": {"time": 30.38, "money": 20.00}},
+                {"path_id": 2, "costs": {"time": 32.03, "money": 15.00}},
+                {"path_id": 3, "costs": {"time": 46.17, "money": 1.00}},
+                {"path_id": 4, "costs": {"time": 46.17, "money": 1.00}},
+                {"path_id": 5, "costs": {"time": 38.12, "money": 2.00}},
+                {"path_id": 6, "costs": {"time": 63.91, "money": 0.00}}
+              ]
+            }
+          ]
+        },
+        "region3": {
+          "name": "满足全部约束且满足T_{max} (BS_0^{zeta} ∩ T_{max})",
+          "plans": [
+            {
+              "plan_id": 1,
+              "flow_distribution": [4289.23, 3855.09, 0.00, 0.00, 1855.68, 0.00],
+              "paths": [
+                {"path_id": 1, "costs": {"time": 29.05, "money": 20.00}},
+                {"path_id": 2, "costs": {"time": 33.19, "money": 15.00}},
+                {"path_id": 3, "costs": {"time": 46.02, "money": 1.00}},
+                {"path_id": 4, "costs": {"time": 46.02, "money": 1.00}},
+                {"path_id": 5, "costs": {"time": 37.78, "money": 2.00}},
+                {"path_id": 6, "costs": {"time": 63.91, "money": 0.00}}
+              ]
+            },
+            {
+              "plan_id": 2,
+              "flow_distribution": [4181.32, 4064.58, 0.00, 0.00, 1754.10, 0.00],
+              "paths": [
+                {"path_id": 1, "costs": {"time": 28.43, "money": 20.00}},
+                {"path_id": 2, "costs": {"time": 34.41, "money": 15.00}},
+                {"path_id": 3, "costs": {"time": 45.56, "money": 1.00}},
+                {"path_id": 4, "costs": {"time": 45.56, "money": 1.00}},
+                {"path_id": 5, "costs": {"time": 36.73, "money": 2.00}},
+                {"path_id": 6, "costs": {"time": 63.91, "money": 0.00}}
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }

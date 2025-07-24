@@ -228,6 +228,7 @@ function plotPathCostsWithUpperLimit(allPathCosts, boundary, colorVariations, pa
     
     % Calculate equilibrium line (T_eqm) - position varies based on money cost
     eqmLimitX = calculateEquilibriumLine(boundary.leftX, upperLimitX, upperLimitY);
+    [T, M] = calculateTandM(eqmLimitX, upperLimitY);
     
     % Create figure
     fig = figure('Name', 'Path Costs with Upper Limit', 'NumberTitle', 'off', ...
@@ -249,7 +250,7 @@ function plotPathCostsWithUpperLimit(allPathCosts, boundary, colorVariations, pa
     h_legend(3) = plot(eqmLimitX, upperLimitY, '-.', 'Color', [0.5 0.0 0.8], 'LineWidth', 2.5);
     
     % Draw upper limit line (T_max)
-    h_legend(7) = plot(upperLimitX, upperLimitY, '-.', 'Color', [0.8 0.2 0.2], 'LineWidth', 2);
+    h_legend(7) = plot(T, M, '-.', 'Color', [0.8 0.2 0.2], 'LineWidth', 2);
     
     % Configure axes
     configureAxes(params);
@@ -287,7 +288,27 @@ function eqmLimitX = calculateEquilibriumLine(leftBoundaryX, upperLimitX, upperL
     % Calculate equilibrium line position
     % With low money cost (small weight), eqmLimitX will be closer to leftBoundaryX
     % With high money cost (large weight), eqmLimitX will be closer to upperLimitX
-    eqmLimitX = leftBoundaryX + (upperLimitX - leftBoundaryX) .* weights;
+    eqmLimitX = upperLimitX - 50/(10+upperLimitY);
+end
+
+
+function [T, M] = calculateTandM(eqmLimitX, upperLimitY)
+    % 计算分段线性函数 T = k*M + b + 50/(10+M)
+    % eqmLimitX, upperLimitY: 分段端点
+    T = [];
+    M = [];
+    for i = 1:length(eqmLimitX)-1
+        % 当前区间的M
+        M_segment = linspace(upperLimitY(i), upperLimitY(i+1), 50);
+        % 计算斜率和截距
+        k = (eqmLimitX(i+1) - eqmLimitX(i)) / (upperLimitY(i+1) - upperLimitY(i));
+        b = eqmLimitX(i) - k * upperLimitY(i);
+        % 计算T
+        T_segment = k * M_segment + b + 50 ./ (10 + M_segment);
+        % 拼接
+        T = [T, T_segment];
+        M = [M, M_segment];
+    end
 end
 
 function [h_legend, boundaryX, boundaryY] = drawFeasibleRegion(boundary)
