@@ -289,7 +289,8 @@ function eqmLimitX = calculateEquilibriumLine(leftBoundaryX, upperLimitX, upperL
     % Calculate equilibrium line position
     % With low money cost (small weight), eqmLimitX will be closer to leftBoundaryX
     % With high money cost (large weight), eqmLimitX will be closer to upperLimitX
-    eqmLimitX = upperLimitX - 50./(10+upperLimitY);
+    % eqmLimitX = upperLimitX - 50./(10+upperLimitY);
+    eqmLimitX = leftBoundaryX + (upperLimitX - leftBoundaryX) .* weights;
 end
 
 

@@ -55,3 +55,5 @@ reference/ref.out
 .gitignore
 matlab/results/pdf_outputs/
 *.fig
+/results/
+*.pdf

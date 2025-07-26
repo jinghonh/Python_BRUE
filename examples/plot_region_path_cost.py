@@ -24,7 +24,7 @@ import numpy as np
 # ============================== 基本常量 ==============================
 RHO: float = 15
 SIGMA: float = 0.02
-E: float = 31.0  # 误差上限 (与 Mathematica 变量 e 对应)
+E: float = 15.0  # 误差上限 (与 Mathematica 变量 e 对应)
 EPS: float = 1e-8  # 严格不等式缓冲 (与 Mathematica 变量 eps 对应)
 
 # 边界条件 (与 box 变量对应)
@@ -113,6 +113,37 @@ def feasible_mask(f1: np.ndarray, f2: np.ndarray) -> np.ndarray:
         f1, f2
     )
 
+# ============================ 平衡线计算函数 ===========================
+
+def calculate_equilibrium_line(left_boundary_x, upper_limit_x, upper_limit_y):
+    """计算平衡线位置
+    
+    参数:
+        left_boundary_x: 左边界X值
+        upper_limit_x: 上限X值 (mid_path1, mid_path2, mid_path5)
+        upper_limit_y: 上限Y值 (货币成本值)
+        
+    返回:
+        eqm_limit_x: 平衡线X值
+    """
+    # 获取归一化的货币成本
+    money_max = max(upper_limit_y)
+    money_min = min(upper_limit_y)
+    money_range = money_max - money_min
+    
+    if money_range > 0:
+        # 计算权重: 较低的货币成本获得较高权重
+        weights = 0.7 + 0.1 * ((upper_limit_y - money_min) / money_range)
+    else:
+        weights = 0.5 * np.ones_like(upper_limit_y)
+    
+    # 计算平衡线位置
+    # 较低的货币成本（较大的权重）时，eqm_limit_x更接近左边界
+    # 较高的货币成本（较小的权重）时，eqm_limit_x更接近上限
+    eqm_limit_x = left_boundary_x + (upper_limit_x - left_boundary_x) * weights
+    
+    return eqm_limit_x
+
 # --------------------------- 网格采样 ---------------------------
 
 STEP = 10  # 调节步长可提升/降低精度
@@ -144,6 +175,24 @@ mid_path1, mid_path2, mid_path5 = (r1_max + r1_min) / 2, (r2_max + r2_min) / 2, 
     r5_max + r5_min
 ) / 2
 
+# ---------------------- 计算平衡线 ----------------------
+
+# 设置upperLimitX和upperLimitY
+upper_limit_x = np.array([mid_path1, mid_path2, mid_path5])
+upper_limit_y = np.array([20.0, 15.0, 2.0])
+
+# 计算左边界 - 使用最小值作为近似
+left_boundary_x = np.array([r1_min, r2_min, r5_min])
+
+# 计算平衡线
+eqm_limit_x = calculate_equilibrium_line(left_boundary_x, upper_limit_x, upper_limit_y)
+
+# 输出计算结果
+print(f"左边界X: {left_boundary_x}")
+print(f"上限X: {upper_limit_x}")
+print(f"上限Y (货币成本): {upper_limit_y}")
+print(f"平衡线X: {eqm_limit_x}")
+
 # --------------------------- 其他区域 ---------------------------
 
 mask_reg3 = mask_reg & (
@@ -151,6 +200,13 @@ mask_reg3 = mask_reg & (
 )
 mask_reg2 = _box_constraints(F1_GRID, F2_GRID) & (
     (max_path(F1_GRID, F2_GRID) - min_path(F1_GRID, F2_GRID)) <= E
+)
+
+# 平衡线区域 - Pi_VALS < eqmLimitX
+mask_eqm = mask_reg & (
+    (P1_VALS <= eqm_limit_x[0]) & 
+    (P2_VALS <= eqm_limit_x[1]) & 
+    (P5_VALS <= eqm_limit_x[2])
 )
 
 # --------------------------- 绘图 ---------------------------
@@ -192,36 +248,44 @@ plt.scatter(
     alpha=0.3,
     label=r"Region of $RS_0^\zeta$",
 )
+plt.scatter(
+    F1_GRID[mask_eqm],
+    F2_GRID[mask_eqm],
+    s=4,
+    color="purple",
+    alpha=0.5,
+    label=r"Region of $T_{eqm}$",
+)
 
 # 方案点
-path_constraint_points = np.array([[5373.80, 4413.76], [4582.07, 3312.18]])
-all_constraint_points = np.array([[4758.09, 3882.45], [4493.79, 3621.15]])
-tmax_constraint_points = np.array([[4250.23, 3855.09], [4181.32, 4064.58]])
+# path_constraint_points = np.array([[5373.80, 4413.76], [4582.07, 3312.18]])
+# all_constraint_points = np.array([[4758.09, 3882.45], [4493.79, 3621.15]])
+# tmax_constraint_points = np.array([[4250.23, 3855.09], [4181.32, 4064.58]])
 
-plt.scatter(
-    path_constraint_points[:, 0],
-    path_constraint_points[:, 1],
-    color="green",
-    marker="o",
-    s=100,
-    label=r"Flows of $S_0^\zeta$",
-)
-plt.scatter(
-    all_constraint_points[:, 0],
-    all_constraint_points[:, 1],
-    color="orange",
-    marker="s",
-    s=100,
-    label=r"Flows of $BS_0^\zeta$",
-)
-plt.scatter(
-    tmax_constraint_points[:, 0],
-    tmax_constraint_points[:, 1],
-    color="blue",
-    marker="D",
-    s=100,
-    label=r"Flows of $RS_0^\zeta$",
-)
+# plt.scatter(
+#     path_constraint_points[:, 0],
+#     path_constraint_points[:, 1],
+#     color="green",
+#     marker="o",
+#     s=100,
+#     label=r"Flows of $S_0^\zeta$",
+# )
+# plt.scatter(
+#     all_constraint_points[:, 0],
+#     all_constraint_points[:, 1],
+#     color="orange",
+#     marker="s",
+#     s=100,
+#     label=r"Flows of $BS_0^\zeta$",
+# )
+# plt.scatter(
+#     tmax_constraint_points[:, 0],
+#     tmax_constraint_points[:, 1],
+#     color="blue",
+#     marker="D",
+#     s=100,
+#     label=r"Flows of $RS_0^\zeta$",
+# )
 
 plt.xlabel(r"$f_1$", fontsize=14)
 plt.ylabel(r"$f_2$", fontsize=14)
@@ -232,7 +296,7 @@ plt.legend(loc="upper right", fontsize=10)
 plt.tight_layout()
 
 # 输出 pdf
-out_path = Path(__file__).with_name(f"ee_time_point{int(E)}.pdf")
+out_path = Path(__file__).with_name(f"ee_time_point{int(E)}_with_eqm.pdf")
 plt.savefig(out_path)
 print(f"✅ 绘图完成，已保存至 {out_path.resolve()}")
 plt.show()
