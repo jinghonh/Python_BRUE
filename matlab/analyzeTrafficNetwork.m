@@ -15,6 +15,8 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index, varargin)
     %                   'ShowGrid': 是否显示网格 (默认: true)
     %                   'ZetaValue': 用于文件名的zeta值 (默认: zeta参数值)
     %                   'SubsetIndex': 用于文件名的subset_index值 (默认: subset_index参数值)
+    %                   'ForceRecalculate': 强制重新计算，不加载缓存 (默认: false)
+    %                   'UseConfigFile': 是否使用配置文件管理搜索范围 (默认: false)
     
     % 解析可选参数
     p = inputParser;
@@ -23,6 +25,8 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index, varargin)
     defaultFontName = 'Arial';
     defaultFontSize = 10;
     defaultShowGrid = true;
+    defaultForceRecalculate = false;
+    defaultUseConfigFile = false;
     
     addParameter(p, 'SavePath', defaultSavePath);
     addParameter(p, 'FigurePosition', defaultFigPosition);
@@ -31,6 +35,8 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index, varargin)
     addParameter(p, 'ShowGrid', defaultShowGrid);
     addParameter(p, 'ZetaValue', zeta);
     addParameter(p, 'SubsetIndex', subset_index);
+    addParameter(p, 'ForceRecalculate', defaultForceRecalculate);
+    addParameter(p, 'UseConfigFile', defaultUseConfigFile);
     
     parse(p, varargin{:});
     plotParams = p.Results;
@@ -53,7 +59,8 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index, varargin)
     cacheFileName = sprintf('cache/cache_zeta%d_subset%d.mat', zeta, subset_index); % 双目标可行解缓存文件
     pathConstraintCacheFileName = sprintf('cache/cache_path_only_zeta%d_subset%d.mat', zeta, subset_index); % 只满足路径约束的可行解缓存文件
     
-    if exist(cacheFileName, 'file') && exist(pathConstraintCacheFileName, 'file')
+    % 仅当不强制重新计算且缓存文件存在时加载缓存
+    if ~plotParams.ForceRecalculate && exist(cacheFileName, 'file') && exist(pathConstraintCacheFileName, 'file')
         fprintf('加载缓存数据...\n');
         load(cacheFileName, 'totalValidFlow', 'relationMatrix');
         load(pathConstraintCacheFileName, 'totalPathValidFlow');
@@ -70,29 +77,15 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index, varargin)
                 'FontName', plotParams.FontName, ...
                 'FontSize', plotParams.FontSize, ...
                 'ShowGrid', plotParams.ShowGrid);
-            % 
-            % 绘制对比图
-            % if ~isempty(totalPathValidFlow)
-            %     % 调用三区域对比绘图函数
-            %     plotThreeRegionsPathCosts(totalValidFlow, totalPathValidFlow, relationMatrix, ...
-            %         'SavePath', "results/pdf_outputs/", ...
-            %         'FigurePosition', plotParams.FigurePosition, ...
-            %         'FontName', plotParams.FontName, ...
-            %         'FontSize', plotParams.FontSize, ...
-            %         'ShowGrid', plotParams.ShowGrid, ...
-            %         'NumFlows', 2);  % 默认从每类选择2个流量
-            % 
-            %     % 调用两区域对比绘图函数
-            %     plotComparisonPathCosts(totalValidFlow, totalPathValidFlow, relationMatrix, ...
-            %         'SavePath', "results/pdf_outputs/", ...
-            %         'FigurePosition', plotParams.FigurePosition, ...
-            %         'FontName', plotParams.FontName, ...
-            %         'FontSize', plotParams.FontSize, ...
-            %         'ShowGrid', plotParams.ShowGrid, ...
-            %         'NumFlows', 2);  % 与plotThreeRegionsPathCosts保持一致
-            % end
+            
+            % 如果使用配置文件，更新配置
+            if plotParams.UseConfigFile
+                fprintf('更新配置文件中的搜索范围...\n');
+                loadSaveConfig('save', zeta, subset_index, rangeMin, rangeMax, totalValidFlow);
+            end
+            
+            return;
         end
-        return;
     end
     
     % 参数验证
@@ -106,7 +99,8 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index, varargin)
     n = size(relationMatrix, 1);
     totalValidFlow = [];
     totalPathValidFlow = []; % 只满足路径约束的流量
-    bound = 0;
+    bound = zeros(1, n); % 初始化每个维度的边界扩展量
+    noImprovementCount = 0; % 连续未找到新有效样本的计数
     
     %% 确保rangeMin和rangeMax的长度与n一致
     if length(rangeMin) < n
@@ -121,6 +115,10 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index, varargin)
         rangeMax = rangeMax(1:n);
     end
     
+    % 保存初始搜索范围，用于重置
+    initialRangeMin = rangeMin;
+    initialRangeMax = rangeMax;
+    
     %% 主循环
     tic
     % 添加进度显示
@@ -130,6 +128,9 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index, varargin)
     
     % 设置数据压缩参数
     maxPointsPerIteration = 1e6; % 每次迭代最大保留点数
+    
+    % 用于记录每次迭代找到的有效样本数量
+    validSampleCounts = zeros(maxIt - minIt + 1, 1);
 
     % 传统网格采样策略
     for ii = minIt:maxIt
@@ -152,10 +153,47 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index, varargin)
         [path_err, ~] = evaluateObjective(samplesMat, relationMatrix, zeta);
         valid = find(path_err == 0);
         
+        % 记录当前迭代找到的有效样本数
+        validSampleCounts(ii - minIt + 1) = length(valid);
+        
         if ~isempty(valid)
-            [rangeMin, rangeMax, bound] = updateSearchRange(samplesMat(valid,:), ii);
+            % 有有效样本，更新搜索范围
+            [rangeMin, rangeMax, bound, adaptiveFactors] = updateSearchRange(samplesMat(valid,:), ii, maxIt, noImprovementCount, validSampleCounts);
+            noImprovementCount = 0; % 重置计数器
         else
-            bound = 0;
+            % 没有找到有效样本，增加连续未改进计数
+            noImprovementCount = noImprovementCount + 1;
+            
+            % 如果连续多次没有找到有效样本，实施探索策略
+            if noImprovementCount >= 3
+                fprintf('连续%d次迭代未找到有效样本，调整搜索策略...\n', noImprovementCount);
+                
+                % 策略1：扩大搜索范围
+                explorationFactor = min(0.2 * noImprovementCount, 0.5); % 根据未改进次数增加探索因子，最大0.5
+                rangeSpan = initialRangeMax - initialRangeMin;
+                
+                % 更新搜索范围，向各方向扩展
+                rangeMin = max(0, initialRangeMin - explorationFactor * rangeSpan);
+                rangeMax = initialRangeMax + explorationFactor * rangeSpan;
+                
+                % 重置边界扩展量，增加探索性
+                bound = rangeSpan * 0.1;
+                
+                fprintf('搜索范围已重置并扩大%.1f%%\n', explorationFactor * 100);
+                
+                if noImprovementCount >= 5
+                    % 策略2：完全重置搜索空间到初始值
+                    fprintf('多次未找到有效解，完全重置搜索空间\n');
+                    rangeMin = initialRangeMin;
+                    rangeMax = initialRangeMax;
+                    bound = rangeSpan * 0.05;
+                    noImprovementCount = 0; % 重置计数器
+                end
+            else
+                % 小幅增加边界扩展量
+                bound = bound * (1 + 0.2 * noImprovementCount);
+                bound(bound < 20) = 20; % 保持最小边界扩展量
+            end
         end
         
         fprintf('完成迭代 %d\n', ii);
@@ -189,6 +227,12 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index, varargin)
     % 保存只满足路径约束的数据到缓存文件
     save(pathConstraintCacheFileName, 'totalPathValidFlow', 'relationMatrix');
     fprintf('只满足路径约束的结果已保存到缓存文件%s\n', pathConstraintCacheFileName);
+    
+    % 如果使用配置文件，更新配置
+    if plotParams.UseConfigFile && ~isempty(totalValidFlow)
+        fprintf('更新配置文件中的搜索范围...\n');
+        loadSaveConfig('save', zeta, subset_index, rangeMin, rangeMax, totalValidFlow);
+    end
     
     % 设置随机选择的流量向量数量
     q = 30;  % 可以根据需要修改
@@ -444,12 +488,106 @@ function err = checkMoneyConstraints(RT, money, n, err)
     err = err + sum(max(RTDiffs .* moneyDiffs, 0), 2);
 end
 
-function [rangeMin, rangeMax, bound] = updateSearchRange(validSamples, ii)
-    % 更新搜索范围
+function [rangeMin, rangeMax, bound, adaptiveFactors] = updateSearchRange(validSamples, currentIter, maxIter, noImprovementCount, validSampleHistory)
+    % 更新搜索范围 - 增强版
+    % 
+    % 输入:
+    %   validSamples - 有效样本矩阵
+    %   currentIter - 当前迭代次数
+    %   maxIter - 最大迭代次数
+    %   noImprovementCount - 连续未找到新有效样本的次数
+    %   validSampleHistory - 历史迭代中有效样本数量的记录
+    %
+    % 输出:
+    %   rangeMin - 更新后的最小范围
+    %   rangeMax - 更新后的最大范围
+    %   bound - 边界扩展量
+    %   adaptiveFactors - 各维度的自适应因子
+    
+    % 确保有有效样本
+    if isempty(validSamples)
+        error('updateSearchRange函数需要非空的有效样本集');
+    end
+    
+    % 计算统计信息
     rangeMin = min(validSamples);
     rangeMax = max(validSamples);
-    bound = (rangeMax-rangeMin)/ii;
-    bound(bound<20) = 20;
+    meanVals = mean(validSamples);
+    stdVals = std(validSamples);
+    rangeWidth = rangeMax - rangeMin;
+    
+    % 根据迭代阶段调整全局收缩因子
+    % 早期阶段宽松，后期阶段收紧
+    progressRatio = currentIter / maxIter;
+    globalFactor = max(0.1, 1 - 0.7 * progressRatio); % 从1.0到0.3线性递减
+    
+    % 根据未改进次数增加探索因子
+    explorationBoost = 1 + 0.2 * noImprovementCount;
+    globalFactor = globalFactor * explorationBoost;
+    
+    % 分析历史趋势
+    trendFactor = 1.0;
+    if length(validSampleHistory) >= 3
+        % 计算最近几次迭代有效样本数量的变化趋势
+        recentTrend = diff(validSampleHistory(max(1, end-2):end));
+        
+        % 如果趋势下降，增加探索
+        if mean(recentTrend) < 0
+            trendFactor = 1.2; % 增加20%的探索度
+        elseif mean(recentTrend) > 0
+            trendFactor = 0.9; % 减少10%的探索度
+        end
+    end
+    
+    % 每个维度的自适应因子
+    adaptiveFactors = ones(1, length(rangeMin));
+    
+    % 针对每个维度计算自适应因子
+    for i = 1:length(rangeMin)
+        % 计算当前维度中有效样本的分布情况
+        dimValues = validSamples(:, i);
+        
+        % 检查是否样本集中在边界附近
+        lowerRatio = sum(dimValues <= rangeMin(i) + 0.1 * rangeWidth(i)) / length(dimValues);
+        upperRatio = sum(dimValues >= rangeMax(i) - 0.1 * rangeWidth(i)) / length(dimValues);
+        
+        % 如果样本集中在边界，增加相应方向的搜索范围
+        if lowerRatio > 0.3
+            adaptiveFactors(i) = adaptiveFactors(i) * 1.5; % 向下扩展更多
+        end
+        if upperRatio > 0.3
+            adaptiveFactors(i) = adaptiveFactors(i) * 1.5; % 向上扩展更多
+        end
+        
+        % 根据分布情况调整
+        if stdVals(i) < 0.1 * rangeWidth(i) % 样本过于集中
+            adaptiveFactors(i) = adaptiveFactors(i) * 1.3; % 增加探索
+        elseif stdVals(i) > 0.4 * rangeWidth(i) % 样本分布较广
+            adaptiveFactors(i) = adaptiveFactors(i) * 0.9; % 减少探索
+        end
+    end
+    
+    % 应用全局因子和趋势因子
+    adaptiveFactors = adaptiveFactors * globalFactor * trendFactor;
+    
+    % 计算新的边界扩展量
+    bound = rangeWidth .* adaptiveFactors;
+    
+    % 确保最小边界扩展量
+    minBoundValue = 20;
+    bound(bound < minBoundValue) = minBoundValue;
+    
+    % 防止极端扩展
+    maxBoundFactor = 0.3; % 最大不超过范围宽度的30%
+    bound = min(bound, rangeWidth * maxBoundFactor);
+    
+    % 打印诊断信息
+    fprintf('搜索范围更新: 全局因子=%.2f, 趋势因子=%.2f\n', globalFactor, trendFactor);
+    fprintf('维度自适应因子: [%s]\n', num2str(adaptiveFactors, '%.2f '));
+    
+    % 根据计算的边界扩展量更新搜索范围
+    rangeMin = max(0, rangeMin - bound);
+    rangeMax = rangeMax + bound;
 end
 
 function M = pairsToMatrix(pairs)

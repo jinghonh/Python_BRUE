@@ -20,6 +20,7 @@ from typing import Callable, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.colors import LinearSegmentedColormap
 
 # ============================== 基本常量 ==============================
 RHO: float = 15
@@ -211,92 +212,176 @@ mask_eqm = mask_reg & (
 
 # --------------------------- 绘图 ---------------------------
 
-# 使用 rcParams 全局设置 LaTeX 渲染
-plt.rcParams.update(
-    {
-        "text.usetex": True,
-        "font.family": "serif",
-        "font.serif": ["Computer Modern Roman"],
-        "text.latex.preamble": r"\usepackage{amsmath}",
-    }
-)
+# 设置学术期刊风格
+plt.rcParams.update({
+    # 基础字体设置
+    "font.family": "serif",
+    "font.serif": ["Times New Roman"],
+    "font.size": 11,
+    
+    # LaTeX设置
+    "text.usetex": True,
+    "text.latex.preamble": r"\usepackage{amsmath}\usepackage{amssymb}",
+    
+    # 图形风格
+    "axes.linewidth": 0.8,
+    "axes.labelsize": 11,
+    "axes.titlesize": 12,
+    "axes.grid": True,
+    "grid.linestyle": ":",
+    "grid.linewidth": 0.5,
+    "grid.alpha": 0.3,
+    
+    # 刻度设置
+    "xtick.direction": "in",
+    "ytick.direction": "in",
+    "xtick.major.size": 3.0,
+    "ytick.major.size": 3.0,
+    "xtick.minor.size": 1.5,
+    "ytick.minor.size": 1.5,
+    "xtick.major.width": 0.8,
+    "ytick.major.width": 0.8,
+    "xtick.minor.width": 0.6,
+    "ytick.minor.width": 0.6,
+    
+    # 图例设置
+    "legend.frameon": True,
+    "legend.framealpha": 0.8,
+    "legend.edgecolor": "k",
+    "legend.fancybox": False,
+    "legend.fontsize": 9,
+    
+    # 保存设置
+    "savefig.dpi": 600,
+    "savefig.format": "pdf",
+    "savefig.bbox": "tight",
+    "savefig.pad_inches": 0.05,
+})
 
-plt.figure(figsize=(8, 6))
+# 定义学术期刊适合的颜色方案
+color_S0 = "#0072B2"       # 深蓝色
+color_BS0 = "#D55E00"      # 砖红色
+color_RS0 = "#009E73"      # 深绿色
+color_Teqm = "#CC79A7"     # 紫红色
+
+# 创建图形和轴
+fig, ax = plt.subplots(figsize=(4.5, 3.5), constrained_layout=True)
 
 # 使用掩码散点可视化近似区域
-plt.scatter(
+ax.scatter(
     F1_GRID[mask_reg2],
     F2_GRID[mask_reg2],
-    s=4,
-    color="blue",
+    s=2.5,  # 减小标记大小
+    color=color_S0,
     alpha=0.3,
-    label=r"Region of $S_0^\zeta$",
+    edgecolors="none",
+    rasterized=True,  # 栅格化以减少PDF文件大小
+    label=r"$S_0^\zeta$",
 )
-plt.scatter(
+ax.scatter(
     F1_GRID[mask_reg],
     F2_GRID[mask_reg],
-    s=4,
-    color="red",
+    s=2.5,
+    color=color_BS0,
     alpha=0.3,
-    label=r"Region of $BS_0^\zeta$",
+    edgecolors="none",
+    rasterized=True,
+    label=r"$BS_0^\zeta$",
 )
-plt.scatter(
+ax.scatter(
     F1_GRID[mask_reg3],
     F2_GRID[mask_reg3],
-    s=4,
-    color="green",
+    s=2.5,
+    color=color_RS0,
     alpha=0.3,
-    label=r"Region of $RS_0^\zeta$",
+    edgecolors="none",
+    rasterized=True,
+    label=r"$RS_0^\zeta$",
 )
-plt.scatter(
+ax.scatter(
     F1_GRID[mask_eqm],
     F2_GRID[mask_eqm],
-    s=4,
-    color="purple",
-    alpha=0.5,
-    label=r"Region of $T_{eqm}$",
+    s=2.5,
+    color=color_Teqm,
+    alpha=0.3,
+    edgecolors="none",
+    rasterized=True,
+    label=r"$T_{eqm}$",
 )
 
-# 方案点
+# 方案点 - 如果需要的话取消注释这段代码
 # path_constraint_points = np.array([[5373.80, 4413.76], [4582.07, 3312.18]])
 # all_constraint_points = np.array([[4758.09, 3882.45], [4493.79, 3621.15]])
 # tmax_constraint_points = np.array([[4250.23, 3855.09], [4181.32, 4064.58]])
 
-# plt.scatter(
+# ax.scatter(
 #     path_constraint_points[:, 0],
 #     path_constraint_points[:, 1],
-#     color="green",
+#     color=color_RS0,
 #     marker="o",
-#     s=100,
+#     s=40,
+#     linewidth=0.8,
+#     edgecolor='k',
 #     label=r"Flows of $S_0^\zeta$",
+#     zorder=5,  # 确保点在散点之上
 # )
-# plt.scatter(
+# ax.scatter(
 #     all_constraint_points[:, 0],
 #     all_constraint_points[:, 1],
-#     color="orange",
+#     color=color_BS0,
 #     marker="s",
-#     s=100,
+#     s=40,
+#     linewidth=0.8,
+#     edgecolor='k',
 #     label=r"Flows of $BS_0^\zeta$",
+#     zorder=5,
 # )
-# plt.scatter(
+# ax.scatter(
 #     tmax_constraint_points[:, 0],
 #     tmax_constraint_points[:, 1],
-#     color="blue",
+#     color=color_Teqm,
 #     marker="D",
-#     s=100,
+#     s=40,
+#     linewidth=0.8,
+#     edgecolor='k',
 #     label=r"Flows of $RS_0^\zeta$",
+#     zorder=5,
 # )
 
-plt.xlabel(r"$f_1$", fontsize=14)
-plt.ylabel(r"$f_2$", fontsize=14)
-plt.xlim(F1_MIN, F1_MAX)
-plt.ylim(F2_MIN, F2_MAX)
-plt.grid(True, linestyle="--", alpha=0.4)
-plt.legend(loc="upper right", fontsize=10)
-plt.tight_layout()
+# 设置轴标签和范围
+ax.set_xlabel(r"$f_1$")
+ax.set_ylabel(r"$f_2$")
+ax.set_xlim(F1_MIN, F1_MAX)
+ax.set_ylim(F2_MIN, F2_MAX)
 
-# 输出 pdf
-out_path = Path(__file__).with_name(f"ee_time_point{int(E)}_with_eqm.pdf")
-plt.savefig(out_path)
+# 添加科学计数法格式的刻度标签
+ax.ticklabel_format(axis='both', style='sci', scilimits=(0,0), useMathText=True)
+
+# 优化图例位置和样式
+ax.legend(
+    loc="upper right", 
+    fontsize=8,
+    markerscale=2,  # 增大图例中的标记尺寸
+    borderpad=0.4,
+    labelspacing=0.3,
+    handletextpad=0.5,
+)
+
+# 添加网格线
+ax.grid(True, linestyle=':', alpha=0.3, color='gray', linewidth=0.5)
+
+# 添加子图标签 (a), (b)等，如果是多子图的一部分
+# ax.text(-0.15, 1.05, '(a)', transform=ax.transAxes, fontsize=11, fontweight='bold')
+
+# 输出 pdf，使用严格的学术期刊标准
+out_path = Path(__file__).with_name(f"ee_time_point{int(E)}_academic.pdf")
+plt.savefig(out_path, dpi=600, bbox_inches='tight')
 print(f"✅ 绘图完成，已保存至 {out_path.resolve()}")
+
+# 如果需要PNG格式的输出
+png_path = Path(__file__).with_name(f"ee_time_point{int(E)}_academic.png")
+plt.savefig(png_path, dpi=300, format='png', bbox_inches='tight')
+print(f"✅ 额外输出PNG格式图片，已保存至 {png_path.resolve()}")
+
+# 显示图形
 plt.show()
