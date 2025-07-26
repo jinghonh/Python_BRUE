@@ -234,6 +234,8 @@ def get_or_generate_scatter_points(mask_reg2, mask_reg, mask_reg3, mask_eqm, F1_
     获取或生成符合各区域约束的散点数据，并保存到JSON文件
     如果JSON文件中某个区域没有散点数据，会尝试重新生成该区域的散点
     
+    注意：由于区域存在包含关系(S⊃BS⊃RS⊃T_eqm)，将使用区域差集确保各区域散点不重叠
+    
     参数:
         mask_reg2: S_0^ζ区域掩码
         mask_reg: BS_0^ζ区域掩码
@@ -252,11 +254,20 @@ def get_or_generate_scatter_points(mask_reg2, mask_reg, mask_reg3, mask_eqm, F1_
     os.makedirs(results_dir, exist_ok=True)
     cache_file = os.path.join(results_dir, f"scatter_points_e{int(e_value)}.json")
     
+    # 计算区域差集，确保各区域不重叠
+    # T_eqm: 使用原始mask_eqm (紫色区域)
+    # RS_0^ζ: 使用mask_reg3 - mask_eqm (绿色区域减去紫色区域)
+    # BS_0^ζ: 使用mask_reg - mask_reg3 (蓝色区域减去绿色区域)
+    # S_0^ζ: 使用mask_reg2 - mask_reg (红/黄色区域减去蓝色区域)
+    mask_rs_only = np.logical_and(mask_reg3, np.logical_not(mask_eqm))
+    mask_bs_only = np.logical_and(mask_reg, np.logical_not(mask_reg3))
+    mask_s_only = np.logical_and(mask_reg2, np.logical_not(mask_reg))
+    
     # 准备各区域的索引，供后续可能需要的重新生成使用
-    reg2_indices = np.where(mask_reg2)
-    reg_indices = np.where(mask_reg)
-    reg3_indices = np.where(mask_reg3)
     eqm_indices = np.where(mask_eqm)
+    rs_only_indices = np.where(mask_rs_only)
+    bs_only_indices = np.where(mask_bs_only)
+    s_only_indices = np.where(mask_s_only)
     
     # 定义空的散点数组
     s_constraint_points = np.array([])
@@ -284,15 +295,15 @@ def get_or_generate_scatter_points(mask_reg2, mask_reg, mask_reg3, mask_eqm, F1_
             
             # 检查各区域是否有数据，如果没有则尝试重新生成
             
-            # 1. 检查S_0^ζ区域
-            if s_constraint_points.size == 0 and len(reg2_indices[0]) > 0:
+            # 1. 检查S_0^ζ区域 (仅S区域，不包括其子区域)
+            if s_constraint_points.size == 0 and len(s_only_indices[0]) > 0:
                 print("S_0^ζ区域没有散点数据，尝试重新生成...")
-                points_count = min(num_points, len(reg2_indices[0]))
+                points_count = min(num_points, len(s_only_indices[0]))
                 if points_count > 0:
-                    s_constraint_indices = np.random.choice(len(reg2_indices[0]), points_count, replace=False)
+                    s_constraint_indices = np.random.choice(len(s_only_indices[0]), points_count, replace=False)
                     s_constraint_points = np.array([
-                        [F1_GRID[reg2_indices[0][i], reg2_indices[1][i]], 
-                        F2_GRID[reg2_indices[0][i], reg2_indices[1][i]]]
+                        [F1_GRID[s_only_indices[0][i], s_only_indices[1][i]], 
+                        F2_GRID[s_only_indices[0][i], s_only_indices[1][i]]]
                         for i in s_constraint_indices
                     ])
                     print(f"已为S_0^ζ区域生成 {len(s_constraint_points)} 个散点")
@@ -300,37 +311,37 @@ def get_or_generate_scatter_points(mask_reg2, mask_reg, mask_reg3, mask_eqm, F1_
                 else:
                     print("S_0^ζ区域没有足够的点用于生成散点")
             
-            # 2. 检查RS_0^ζ区域
-            if path_constraint_points.size == 0 and len(reg3_indices[0]) > 0:
-                print("RS_0^ζ区域没有散点数据，尝试重新生成...")
-                points_count = min(num_points, len(reg3_indices[0]))
-                if points_count > 0:
-                    path_constraint_indices = np.random.choice(len(reg3_indices[0]), points_count, replace=False)
-                    path_constraint_points = np.array([
-                        [F1_GRID[reg3_indices[0][i], reg3_indices[1][i]], 
-                        F2_GRID[reg3_indices[0][i], reg3_indices[1][i]]]
-                        for i in path_constraint_indices
-                    ])
-                    print(f"已为RS_0^ζ区域生成 {len(path_constraint_points)} 个散点")
-                    need_update = True
-                else:
-                    print("RS_0^ζ区域没有足够的点用于生成散点")
-            
-            # 3. 检查BS_0^ζ区域
-            if all_constraint_points.size == 0 and len(reg_indices[0]) > 0:
+            # 2. 检查BS_0^ζ区域 (仅BS区域，不包括其子区域)
+            if all_constraint_points.size == 0 and len(bs_only_indices[0]) > 0:
                 print("BS_0^ζ区域没有散点数据，尝试重新生成...")
-                points_count = min(num_points, len(reg_indices[0]))
+                points_count = min(num_points, len(bs_only_indices[0]))
                 if points_count > 0:
-                    all_constraint_indices = np.random.choice(len(reg_indices[0]), points_count, replace=False)
+                    all_constraint_indices = np.random.choice(len(bs_only_indices[0]), points_count, replace=False)
                     all_constraint_points = np.array([
-                        [F1_GRID[reg_indices[0][i], reg_indices[1][i]], 
-                        F2_GRID[reg_indices[0][i], reg_indices[1][i]]]
+                        [F1_GRID[bs_only_indices[0][i], bs_only_indices[1][i]], 
+                        F2_GRID[bs_only_indices[0][i], bs_only_indices[1][i]]]
                         for i in all_constraint_indices
                     ])
                     print(f"已为BS_0^ζ区域生成 {len(all_constraint_points)} 个散点")
                     need_update = True
                 else:
                     print("BS_0^ζ区域没有足够的点用于生成散点")
+            
+            # 3. 检查RS_0^ζ区域 (仅RS区域，不包括其子区域)
+            if path_constraint_points.size == 0 and len(rs_only_indices[0]) > 0:
+                print("RS_0^ζ区域没有散点数据，尝试重新生成...")
+                points_count = min(num_points, len(rs_only_indices[0]))
+                if points_count > 0:
+                    path_constraint_indices = np.random.choice(len(rs_only_indices[0]), points_count, replace=False)
+                    path_constraint_points = np.array([
+                        [F1_GRID[rs_only_indices[0][i], rs_only_indices[1][i]], 
+                        F2_GRID[rs_only_indices[0][i], rs_only_indices[1][i]]]
+                        for i in path_constraint_indices
+                    ])
+                    print(f"已为RS_0^ζ区域生成 {len(path_constraint_points)} 个散点")
+                    need_update = True
+                else:
+                    print("RS_0^ζ区域没有足够的点用于生成散点")
             
             # 4. 检查T_eqm区域
             if tmax_constraint_points.size == 0 and len(eqm_indices[0]) > 0:
@@ -371,59 +382,8 @@ def get_or_generate_scatter_points(mask_reg2, mask_reg, mask_reg3, mask_eqm, F1_
     # 如果没有缓存文件或加载失败，生成所有新的散点数据
     print(f"为 e={e_value} 生成新的散点数据")
     
-    # 各区域独立生成散点，互不影响
-    # 0. S_0^ζ 区域 (黄/红色区域，s_constraint_points)
-    s_constraint_points = np.array([])
-    if len(reg2_indices[0]) > 0:
-        points_count = min(num_points, len(reg2_indices[0]))
-        if points_count > 0:
-            s_constraint_indices = np.random.choice(len(reg2_indices[0]), points_count, replace=False)
-            s_constraint_points = np.array([
-                [F1_GRID[reg2_indices[0][i], reg2_indices[1][i]], 
-                F2_GRID[reg2_indices[0][i], reg2_indices[1][i]]]
-                for i in s_constraint_indices
-            ])
-            print(f"已为S_0^ζ区域生成 {len(s_constraint_points)} 个散点")
-        else:
-            print("S_0^ζ区域没有足够的点用于生成散点")
-    else:
-        print("S_0^ζ区域为空，无法生成散点")
-        
-    # 1. RS_0^ζ 区域 (绿色区域，path_constraint_points)
-    path_constraint_points = np.array([])
-    if len(reg3_indices[0]) > 0:
-        points_count = min(num_points, len(reg3_indices[0]))
-        if points_count > 0:
-            path_constraint_indices = np.random.choice(len(reg3_indices[0]), points_count, replace=False)
-            path_constraint_points = np.array([
-                [F1_GRID[reg3_indices[0][i], reg3_indices[1][i]], 
-                F2_GRID[reg3_indices[0][i], reg3_indices[1][i]]]
-                for i in path_constraint_indices
-            ])
-            print(f"已为RS_0^ζ区域生成 {len(path_constraint_points)} 个散点")
-        else:
-            print("RS_0^ζ区域没有足够的点用于生成散点")
-    else:
-        print("RS_0^ζ区域为空，无法生成散点")
-    
-    # 2. BS_0^ζ 区域 (蓝色区域，all_constraint_points)
-    all_constraint_points = np.array([])
-    if len(reg_indices[0]) > 0:
-        points_count = min(num_points, len(reg_indices[0]))
-        if points_count > 0:
-            all_constraint_indices = np.random.choice(len(reg_indices[0]), points_count, replace=False)
-            all_constraint_points = np.array([
-                [F1_GRID[reg_indices[0][i], reg_indices[1][i]], 
-                F2_GRID[reg_indices[0][i], reg_indices[1][i]]]
-                for i in all_constraint_indices
-            ])
-            print(f"已为BS_0^ζ区域生成 {len(all_constraint_points)} 个散点")
-        else:
-            print("BS_0^ζ区域没有足够的点用于生成散点")
-    else:
-        print("BS_0^ζ区域为空，无法生成散点")
-    
-    # 3. T_eqm 区域 (紫色区域，tmax_constraint_points)
+    # 各区域独立生成散点，互不影响，按从小到大顺序处理
+    # 3. T_eqm 区域 (紫色区域)
     tmax_constraint_points = np.array([])
     if len(eqm_indices[0]) > 0:
         points_count = min(num_points, len(eqm_indices[0]))
@@ -439,6 +399,57 @@ def get_or_generate_scatter_points(mask_reg2, mask_reg, mask_reg3, mask_eqm, F1_
             print("T_eqm区域没有足够的点用于生成散点")
     else:
         print("T_eqm区域为空，无法生成散点")
+        
+    # 2. RS_0^ζ 区域 (绿色区域，不含紫色部分)
+    path_constraint_points = np.array([])
+    if len(rs_only_indices[0]) > 0:
+        points_count = min(num_points, len(rs_only_indices[0]))
+        if points_count > 0:
+            path_constraint_indices = np.random.choice(len(rs_only_indices[0]), points_count, replace=False)
+            path_constraint_points = np.array([
+                [F1_GRID[rs_only_indices[0][i], rs_only_indices[1][i]], 
+                F2_GRID[rs_only_indices[0][i], rs_only_indices[1][i]]]
+                for i in path_constraint_indices
+            ])
+            print(f"已为RS_0^ζ区域(不含T_eqm)生成 {len(path_constraint_points)} 个散点")
+        else:
+            print("RS_0^ζ区域(不含T_eqm)没有足够的点用于生成散点")
+    else:
+        print("RS_0^ζ区域(不含T_eqm)为空，无法生成散点")
+    
+    # 1. BS_0^ζ 区域 (蓝色区域，不含绿色部分)
+    all_constraint_points = np.array([])
+    if len(bs_only_indices[0]) > 0:
+        points_count = min(num_points, len(bs_only_indices[0]))
+        if points_count > 0:
+            all_constraint_indices = np.random.choice(len(bs_only_indices[0]), points_count, replace=False)
+            all_constraint_points = np.array([
+                [F1_GRID[bs_only_indices[0][i], bs_only_indices[1][i]], 
+                F2_GRID[bs_only_indices[0][i], bs_only_indices[1][i]]]
+                for i in all_constraint_indices
+            ])
+            print(f"已为BS_0^ζ区域(不含RS_0^ζ)生成 {len(all_constraint_points)} 个散点")
+        else:
+            print("BS_0^ζ区域(不含RS_0^ζ)没有足够的点用于生成散点")
+    else:
+        print("BS_0^ζ区域(不含RS_0^ζ)为空，无法生成散点")
+    
+    # 0. S_0^ζ 区域 (红/黄色区域，不含蓝色部分)
+    s_constraint_points = np.array([])
+    if len(s_only_indices[0]) > 0:
+        points_count = min(num_points, len(s_only_indices[0]))
+        if points_count > 0:
+            s_constraint_indices = np.random.choice(len(s_only_indices[0]), points_count, replace=False)
+            s_constraint_points = np.array([
+                [F1_GRID[s_only_indices[0][i], s_only_indices[1][i]], 
+                F2_GRID[s_only_indices[0][i], s_only_indices[1][i]]]
+                for i in s_constraint_indices
+            ])
+            print(f"已为S_0^ζ区域(不含BS_0^ζ)生成 {len(s_constraint_points)} 个散点")
+        else:
+            print("S_0^ζ区域(不含BS_0^ζ)没有足够的点用于生成散点")
+    else:
+        print("S_0^ζ区域(不含BS_0^ζ)为空，无法生成散点")
     
     # 将数据保存为JSON格式
     import time  # 添加时间模块，记录更新时间
