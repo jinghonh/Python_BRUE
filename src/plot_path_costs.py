@@ -1,5 +1,6 @@
 import argparse
 import os
+import json
 from dataclasses import dataclass
 from typing import List, Tuple
 
@@ -152,6 +153,80 @@ def calculate_equilibrium_line(left_boundary_x: np.ndarray, upper_limit_x: np.nd
     return eqm_limit_x
 
 
+def get_or_compute_t_max_t_eqm(boundary: Boundary, zeta: int, results_dir: str = 'results') -> Tuple[np.ndarray, np.ndarray]:
+    """
+    获取或计算特定zeta值的t_max和t_eqm，使用JSON格式存储以便手动编辑
+    
+    Args:
+        boundary: 边界数据
+        zeta: zeta值
+        results_dir: 结果存储目录
+        
+    Returns:
+        Tuple[np.ndarray, np.ndarray]: t_max和t_eqm数组
+    """
+    # 创建存储目录
+    os.makedirs(results_dir, exist_ok=True)
+    cache_file = os.path.join(results_dir, f"tmax_teqm_zeta{zeta}.json")
+    
+    # 检查是否存在缓存文件
+    if os.path.exists(cache_file):
+        print(f"Loading t_max and t_eqm from {cache_file}")
+        try:
+            with open(cache_file, 'r') as f:
+                data = json.load(f)
+            
+            # 从JSON加载数据
+            money_values = np.array(data['money_values'])
+            t_max_values = np.array(data['t_max'])
+            t_eqm_values = np.array(data['t_eqm'])
+            
+            # 如果边界货币值与缓存不同，需要进行插值
+            if len(money_values) != len(boundary.left_y) or not np.allclose(money_values, boundary.left_y):
+                # 为t_max创建插值函数
+                f_tmax = interp1d(
+                    money_values, t_max_values,
+                    kind='linear', bounds_error=False, fill_value="extrapolate"
+                )
+                t_max = f_tmax(boundary.left_y)
+                
+                # 为t_eqm创建插值函数
+                f_teqm = interp1d(
+                    money_values, t_eqm_values,
+                    kind='linear', bounds_error=False, fill_value="extrapolate"
+                )
+                t_eqm = f_teqm(boundary.left_y)
+            else:
+                # 直接使用缓存值
+                t_max = t_max_values
+                t_eqm = t_eqm_values
+                
+            print(f"Successfully loaded t_max and t_eqm for zeta={zeta}")
+            return t_max, t_eqm
+        except Exception as e:
+            print(f"Error loading t_max and t_eqm from cache: {e}")
+            print("Computing new values...")
+    
+    # 计算t_max和t_eqm
+    print(f"Computing new t_max and t_eqm for zeta={zeta}")
+    t_max = (boundary.left_x + boundary.right_x) / 2
+    t_eqm = calculate_equilibrium_line(boundary.left_x, t_max, boundary.left_y)
+    
+    # 将数据保存为JSON格式（易于编辑）
+    data = {
+        'money_values': boundary.left_y.tolist(),
+        't_max': t_max.tolist(),
+        't_eqm': t_eqm.tolist(),
+        'description': f"T_max和T_eqm数据，用于zeta={zeta}的所有子集。可以手动编辑这些值以确保一致性。"
+    }
+    
+    with open(cache_file, 'w') as f:
+        json.dump(data, f, indent=2)
+    
+    print(f"Saved t_max and t_eqm to {cache_file}")
+    return t_max, t_eqm
+
+
 def configure_plot(ax: plt.Axes, params: PlotParams, title: str, xlabel: str, ylabel: str):
     """Apply common plot configurations."""
     ax.set_title(title, fontsize=params.font_size + 4, fontweight='bold')
@@ -211,11 +286,8 @@ def plot_path_costs_with_upper_limit(all_path_costs: List[np.ndarray], boundary:
         plt.close(fig)
         return
 
-    # 计算T_max (中点)
-    t_max = (boundary.left_x + boundary.right_x) / 2
-    
-    # 使用正确的函数计算T_eqm
-    t_eqm = calculate_equilibrium_line(boundary.left_x, t_max, boundary.left_y)
+    # 使用共享函数获取t_max和t_eqm
+    t_max, t_eqm = get_or_compute_t_max_t_eqm(boundary, zeta, params.save_path)
     
     f_tmax = interp1d(boundary.left_y, t_max, kind='nearest', bounds_error=False, fill_value="extrapolate")
 
@@ -334,11 +406,8 @@ def plot_path_costs_below_equilibrium(all_path_costs: List[np.ndarray], boundary
         plt.close(fig)
         return
 
-    # 计算T_max和T_eqm
-    t_max = (boundary.left_x + boundary.right_x) / 2
-    
-    # 使用正确的函数计算T_eqm
-    t_eqm = calculate_equilibrium_line(boundary.left_x, t_max, boundary.left_y)
+    # 使用共享函数获取t_max和t_eqm
+    t_max, t_eqm = get_or_compute_t_max_t_eqm(boundary, zeta, params.save_path)
     
     # 创建T_eqm的插值函数用于判断
     f_teqm = interp1d(boundary.left_y, t_eqm, kind='nearest', bounds_error=False, fill_value="extrapolate")
@@ -523,7 +592,7 @@ def main():
         # 使用默认配置运行
         result = run_with_params(
             zeta=16,
-            subset_index=1,
+            subset_index=0,
             num_flows=100,
             cache_dir='matlab/cache',
             results_dir='results',

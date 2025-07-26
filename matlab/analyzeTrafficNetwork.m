@@ -70,13 +70,13 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index, varargin)
         % 直接绘图
         q = 10000;
         if ~isempty(totalValidFlow)
-            selectedIndices = randperm(size(totalValidFlow, 1), min(q, size(totalValidFlow, 1)));
-            plotPathCosts(totalValidFlow, relationMatrix, selectedIndices, ...
-                'SavePath', plotParams.SavePath, ...
-                'FigurePosition', plotParams.FigurePosition, ...
-                'FontName', plotParams.FontName, ...
-                'FontSize', plotParams.FontSize, ...
-                'ShowGrid', plotParams.ShowGrid);
+            % selectedIndices = randperm(size(totalValidFlow, 1), min(q, size(totalValidFlow, 1)));
+            % plotPathCosts(totalValidFlow, relationMatrix, selectedIndices, ...
+            %     'SavePath', plotParams.SavePath, ...
+            %     'FigurePosition', plotParams.FigurePosition, ...
+            %     'FontName', plotParams.FontName, ...
+            %     'FontSize', plotParams.FontSize, ...
+            %     'ShowGrid', plotParams.ShowGrid);
             
             % 如果使用配置文件，更新配置
             if plotParams.UseConfigFile
@@ -123,8 +123,8 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index, varargin)
     tic
     % 添加进度显示
     h = waitbar(0, '开始计算...');
-    minIt = 30;
-    maxIt = 40;
+    minIt = 20;
+    maxIt = 50;
     
     % 设置数据压缩参数
     maxPointsPerIteration = 1e6; % 每次迭代最大保留点数
@@ -234,62 +234,76 @@ function analyzeTrafficNetwork(zeta, rangeMin, rangeMax, subset_index, varargin)
         loadSaveConfig('save', zeta, subset_index, rangeMin, rangeMax, totalValidFlow);
     end
     
-    % 设置随机选择的流量向量数量
-    q = 30;  % 可以根据需要修改
+    % % 设置随机选择的流量向量数量
+    % q = 30;  % 可以根据需要修改
     
-    % 随机选择q个流量向量的索引
-    if ~isempty(totalValidFlow)
-        selectedIndices = randperm(size(totalValidFlow, 1), min(q, size(totalValidFlow, 1)));
-        % 调用路径成本绘图函数
-        plotPathCosts(totalValidFlow, relationMatrix, selectedIndices, ...
-            'SavePath', plotParams.SavePath, ...
-            'FigurePosition', plotParams.FigurePosition, ...
-            'FontName', plotParams.FontName, ...
-            'FontSize', plotParams.FontSize, ...
-            'ShowGrid', plotParams.ShowGrid);
+    % % 随机选择q个流量向量的索引
+    % if ~isempty(totalValidFlow)
+    %     selectedIndices = randperm(size(totalValidFlow, 1), min(q, size(totalValidFlow, 1)));
+    %     % 调用路径成本绘图函数
+    %     plotPathCosts(totalValidFlow, relationMatrix, selectedIndices, ...
+    %         'SavePath', plotParams.SavePath, ...
+    %         'FigurePosition', plotParams.FigurePosition, ...
+    %         'FontName', plotParams.FontName, ...
+    %         'FontSize', plotParams.FontSize, ...
+    %         'ShowGrid', plotParams.ShowGrid);
         
-        % 绘制对比图
-        if ~isempty(totalPathValidFlow)
-            % 调用三区域对比绘图函数
-            plotThreeRegionsPathCosts(totalValidFlow, totalPathValidFlow, relationMatrix, ...
-                'SavePath', plotParams.SavePath, ...
-                'FigurePosition', plotParams.FigurePosition, ...
-                'FontName', plotParams.FontName, ...
-                'FontSize', plotParams.FontSize, ...
-                'ShowGrid', plotParams.ShowGrid, ...
-                'NumFlows', 2);  % 默认从每类选择2个流量
+    %     % 绘制对比图
+    %     if ~isempty(totalPathValidFlow)
+    %         % 调用三区域对比绘图函数
+    %         plotThreeRegionsPathCosts(totalValidFlow, totalPathValidFlow, relationMatrix, ...
+    %             'SavePath', plotParams.SavePath, ...
+    %             'FigurePosition', plotParams.FigurePosition, ...
+    %             'FontName', plotParams.FontName, ...
+    %             'FontSize', plotParams.FontSize, ...
+    %             'ShowGrid', plotParams.ShowGrid, ...
+    %             'NumFlows', 2);  % 默认从每类选择2个流量
             
-            % 调用两区域对比绘图函数
-            plotComparisonPathCosts(totalValidFlow, totalPathValidFlow, relationMatrix, ...
-                'SavePath', plotParams.SavePath, ...
-                'FigurePosition', plotParams.FigurePosition, ...
-                'FontName', plotParams.FontName, ...
-                'FontSize', plotParams.FontSize, ...
-                'ShowGrid', plotParams.ShowGrid, ...
-                'NumFlows', 2);  % 与plotThreeRegionsPathCosts保持一致
-        end
-    else
-        warning('没有找到可行解');
-    end
+    %         % 调用两区域对比绘图函数
+    %         plotComparisonPathCosts(totalValidFlow, totalPathValidFlow, relationMatrix, ...
+    %             'SavePath', plotParams.SavePath, ...
+    %             'FigurePosition', plotParams.FigurePosition, ...
+    %             'FontName', plotParams.FontName, ...
+    %             'FontSize', plotParams.FontSize, ...
+    %             'ShowGrid', plotParams.ShowGrid, ...
+    %             'NumFlows', 2);  % 与plotThreeRegionsPathCosts保持一致
+    %     end
+    % else
+    %     warning('没有找到可行解');
+    % end
 end
 
 function orderedPair = selectOrderedPair(zeta, subset_index)
     % 根据zeta和subset_index选择orderedPair
-    if zeta == 15
+    if zeta <= 9
+        % zeta <= 9 范围
         switch subset_index
-            case 0  % zeta 15 0
-                orderedPair = [1,1;2,2;3,3;3,5;3,8];
-            case 1  % zeta 15 1
-                orderedPair=[1,1;2,2;3,3;3,7;4,4;4,8;5,3;5,5;5,8];
+            case 0
+                orderedPair = [1,1;2,2;3,3];
+            otherwise
+                error('当zeta <= 9时，subset_index必须为0');
         end
-    else  % zeta == 31
+    elseif zeta >= 10 && zeta <= 26
+        % 10 <= zeta <= 26 范围
         switch subset_index
-            case 0  % zeta 31 0
+            case 0
                 orderedPair = [1,1;2,2;3,3;3,5;3,8];
-            case 1  % zeta 31 1
+            case 1
                 orderedPair=[1,1;2,2;3,3;3,7;4,4;4,8;5,3;5,5;5,8];
-            case 2  % zeta 31 2
+            otherwise
+                error('当10 <= zeta <= 26时，subset_index必须为0或1');
+        end
+    else  % zeta > 26
+        % zeta > 26 范围
+        switch subset_index
+            case 0
+                orderedPair = [1,1;2,2;3,3;3,5;3,8];
+            case 1
+                orderedPair=[1,1;2,2;3,3;3,7;4,4;4,8;5,3;5,5;5,8];
+            case 2
                 orderedPair = [1,1;2,2;3,3;5,3;4,4;6,4;5,5;6,6;3,7;6,7;4,8;5,8];
+            otherwise
+                error('当zeta > 26时，subset_index必须为0、1或2');
         end
     end
 end
