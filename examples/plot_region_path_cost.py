@@ -151,79 +151,70 @@ def calculate_equilibrium_line(left_boundary_x, upper_limit_x, upper_limit_y):
 
 # ========================= JSON加载/保存功能 =========================
 
-def get_or_compute_path_limits(left_boundary_x, upper_limit_x, upper_limit_y, e_value, results_dir='results'):
+def get_or_compute_path_limits(left_boundary_x, upper_limit_x, upper_limit_y, e_value, results_dir='results', zeta=16):
     """
-    获取或计算mid_path和eqm_limit_x值，使用JSON格式存储以便手动编辑
+    获取t_max和t_eqm值，从plot_path_costs.py生成的JSON文件中读取
     
     参数:
         left_boundary_x: 左边界X值
-        upper_limit_x: 上限X值 (mid_path1, mid_path2, mid_path5)
+        upper_limit_x: 上限X值 (用于默认值，如果文件不存在)
         upper_limit_y: 上限Y值 (货币成本值)
-        e_value: 误差上限值
+        e_value: 误差上限值(用于日志显示)
         results_dir: 结果存储目录
+        zeta: zeta值，对应plot_path_costs.py生成的文件名
         
     返回:
-        Tuple[np.ndarray, np.ndarray]: mid_path和eqm_limit_x数组
+        Tuple[np.ndarray, np.ndarray]: mid_path(t_max)和eqm_limit_x(t_eqm)数组
     """
     # 创建存储目录
     os.makedirs(results_dir, exist_ok=True)
-    cache_file = os.path.join(results_dir, f"path_limits_e{int(e_value)}.json")
+    # 使用与plot_path_costs.py相同的文件名格式
+    cache_file = os.path.join(results_dir, f"tmax_teqm_zeta{zeta}.json")
     
     # 检查是否存在缓存文件
     if os.path.exists(cache_file):
-        print(f"正在从 {cache_file} 加载 mid_path 和 eqm_limit_x 数据")
+        print(f"正在从 {cache_file} 加载 t_max(mid_path) 和 t_eqm(eqm_limit_x) 数据")
         try:
             with open(cache_file, 'r') as f:
                 data = json.load(f)
             
-            # 从JSON加载数据
+            # 从JSON加载数据 - plot_path_costs.py中的t_max对应mid_path，t_eqm对应eqm_limit_x
             money_values = np.array(data['money_values'])
-            mid_path_values = np.array(data['mid_path'])
-            eqm_limit_values = np.array(data['eqm_limit_x'])
+            t_max_values = np.array(data['t_max'])  # 对应mid_path
+            t_eqm_values = np.array(data['t_eqm'])  # 对应eqm_limit_x
             
             # 如果货币值与缓存不同，需要进行插值
             if len(money_values) != len(upper_limit_y) or not np.allclose(money_values, upper_limit_y):
-                # 为mid_path创建插值函数
-                f_midpath = interp1d(
-                    money_values, mid_path_values,
+                # 为t_max(mid_path)创建插值函数
+                f_tmax = interp1d(
+                    money_values, t_max_values,
                     kind='linear', bounds_error=False, fill_value="extrapolate"
                 )
-                mid_path = f_midpath(upper_limit_y)
+                mid_path = f_tmax(upper_limit_y)
                 
-                # 为eqm_limit_x创建插值函数
-                f_eqmlimit = interp1d(
-                    money_values, eqm_limit_values,
+                # 为t_eqm(eqm_limit_x)创建插值函数
+                f_teqm = interp1d(
+                    money_values, t_eqm_values,
                     kind='linear', bounds_error=False, fill_value="extrapolate"
                 )
-                eqm_limit_x = f_eqmlimit(upper_limit_y)
+                eqm_limit_x = f_teqm(upper_limit_y)
             else:
                 # 直接使用缓存值
-                mid_path = mid_path_values
-                eqm_limit_x = eqm_limit_values
+                mid_path = t_max_values
+                eqm_limit_x = t_eqm_values
                 
-            print(f"成功加载 e={e_value} 的 mid_path 和 eqm_limit_x 数据")
+            print(f"成功加载 zeta={zeta} 的 t_max(mid_path) 和 t_eqm(eqm_limit_x) 数据")
             return mid_path, eqm_limit_x
         except Exception as e:
-            print(f"从缓存加载 mid_path 和 eqm_limit_x 时出错: {e}")
-            print("计算新值...")
+            print(f"从缓存加载数据时出错: {e}")
+            print("计算默认值...")
     
-    # 计算mid_path和eqm_limit_x
-    print(f"为 e={e_value} 计算新的 mid_path 和 eqm_limit_x 值")
-    mid_path = upper_limit_x
+    # 文件不存在或加载失败，使用默认值
+    print(f"找不到zeta={zeta}的数据文件，使用默认计算值")
+    mid_path = upper_limit_x  # 默认使用传入的upper_limit_x作为mid_path(t_max)
     eqm_limit_x = calculate_equilibrium_line(left_boundary_x, upper_limit_x, upper_limit_y)
     
-    # 将数据保存为JSON格式（易于编辑）
-    data = {
-        'money_values': upper_limit_y.tolist(),
-        'mid_path': mid_path.tolist(),
-        'eqm_limit_x': eqm_limit_x.tolist(),
-        'description': f"mid_path和eqm_limit_x数据，用于e={e_value}的区域绘制。可以手动编辑这些值以确保一致性。"
-    }
-    
-    with open(cache_file, 'w') as f:
-        json.dump(data, f, indent=2)
-    
-    print(f"已保存 mid_path 和 eqm_limit_x 到 {cache_file}")
+    print(f"注意：未找到由plot_path_costs.py生成的数据文件，请先运行该脚本生成tmax_teqm_zeta{zeta}.json")
     return mid_path, eqm_limit_x
 
 # ========================= 散点数据生成/加载功能 =========================
@@ -503,21 +494,25 @@ left_boundary_x = np.array([r1_min, r2_min, r5_min])
 default_upper_limit_x = np.array([(r1_max + r1_min) / 2, (r2_max + r2_min) / 2, (r5_max + r5_min) / 2])
 upper_limit_y = np.array([20.0, 15.0, 2.0])
 
-# 使用JSON文件加载或计算mid_path和eqm_limit_x
+# 使用JSON文件加载或计算mid_path(t_max)和eqm_limit_x(t_eqm)
 results_dir = 'results'
+# 定义zeta值，与plot_path_costs.py保持一致
+ZETA_VALUE = E  # 默认值为16，可以根据需要修改
 mid_path, eqm_limit_x = get_or_compute_path_limits(
     left_boundary_x=left_boundary_x,
     upper_limit_x=default_upper_limit_x,
     upper_limit_y=upper_limit_y,
     e_value=E,
-    results_dir=results_dir
+    results_dir=results_dir,
+    zeta=ZETA_VALUE  # 传递zeta参数
 )
 
 # 输出计算结果
 print(f"左边界X: {left_boundary_x}")
-print(f"中点路径X: {mid_path}")
+print(f"中点路径X (t_max): {mid_path}")
 print(f"上限Y (货币成本): {upper_limit_y}")
-print(f"平衡线X: {eqm_limit_x}")
+print(f"平衡线X (t_eqm): {eqm_limit_x}")
+print(f"使用的zeta值: {ZETA_VALUE}")
 
 # --------------------------- 其他区域 ---------------------------
 

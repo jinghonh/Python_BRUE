@@ -250,7 +250,7 @@ def plot_time_money_cost_relationship(all_path_costs: List[np.ndarray], boundary
                                       color_variations: np.ndarray, params: PlotParams, zeta: int, subset_index: int):
     """Plot the time-money cost relationship."""
     fig, ax = plt.subplots(figsize=params.figure_size)
-    configure_plot(ax, params, 'Path Time-Money Cost Relationship', r'Time Cost ($T$)', r'Money Cost ($M$)')
+    configure_plot(ax, params, 'Path Time-Money Cost Relationship', r'Time Cost', r'Money Cost')
 
     if boundary.left_x.size > 0:
         boundary_x = np.concatenate([boundary.left_x, boundary.right_x[::-1]])
@@ -263,7 +263,7 @@ def plot_time_money_cost_relationship(all_path_costs: List[np.ndarray], boundary
         if costs.size > 0:
             ax.plot(costs[:, 0], costs[:, 1], '-', color=(*color_variations[i], 0.7), linewidth=1.2)
             ax.scatter(costs[:, 0], costs[:, 1], s=30, c=[color_variations[i]], marker='o', alpha=0.8,
-                       edgecolors='none', label=f'Flow Vector {i+1}' if i < 5 else "")
+                       edgecolors='none')
 
     handles, labels = ax.get_legend_handles_labels()
     if handles:
@@ -278,7 +278,7 @@ def plot_path_costs_with_upper_limit(all_path_costs: List[np.ndarray], boundary:
                                      color_variations: np.ndarray, params: PlotParams, zeta: int, subset_index: int):
     """Plot path costs with an upper limit and equilibrium line, with correct layering."""
     fig, ax = plt.subplots(figsize=params.figure_size)
-    configure_plot(ax, params, 'Path Costs with Upper Limit', r'Time Cost ($T$)', r'Money Cost ($M$)')
+    configure_plot(ax, params, 'Path Costs with Upper Limit', r'Time Cost', r'Money Cost')
 
     # --- Data Processing ---
     if boundary.left_x.size == 0:
@@ -345,8 +345,8 @@ def plot_path_costs_with_upper_limit(all_path_costs: List[np.ndarray], boundary:
             feasible_handle = h
 
     # Layer 5: T_max and T_eqm lines (Topmost)
-    t_max_handle = ax.plot(t_max, boundary.left_y, '-.', color=[0.8, 0.2, 0.2], linewidth=2, label=r'$T_{max}$')[0]
-    t_eqm_handle = ax.plot(t_eqm, boundary.left_y, '-.', color=[0.5, 0.0, 0.8], linewidth=2, label=r'$T_{eqm}$')[0]
+    t_max_handle = ax.plot(t_max, boundary.left_y, '-', color=[0.8, 0.2, 0.2], linewidth=2.5, label=r'$T_{max}$', zorder=10)[0]
+    t_eqm_handle = ax.plot(t_eqm, boundary.left_y, '-.', color=[0.5, 0.0, 0.8], linewidth=2.5, label=r'$T_{eqm}$', zorder=10)[0]
 
     # 添加图例
     legend_handles = []
@@ -398,7 +398,7 @@ def plot_path_costs_below_equilibrium(all_path_costs: List[np.ndarray], boundary
                                       color_variations: np.ndarray, params: PlotParams, zeta: int, subset_index: int):
     """筛选并绘制T_eqm（紫色折线）下方的可行方案。"""
     fig, ax = plt.subplots(figsize=params.figure_size)
-    configure_plot(ax, params, 'Path Costs Below Equilibrium Line', r'Time Cost ($T$)', r'Money Cost ($M$)')
+    configure_plot(ax, params, 'Path Costs Below Equilibrium Line', r'Time Cost', r'Money Cost')
 
     # --- Data Processing ---
     if boundary.left_x.size == 0:
@@ -422,8 +422,8 @@ def plot_path_costs_below_equilibrium(all_path_costs: List[np.ndarray], boundary
             # 判断所有点是否都在T_eqm下方
             is_below_eqm = np.all(costs[:, 0] <= f_teqm(costs[:, 1]))
             if is_below_eqm:
-                # 使用紫色系颜色（接近原T_eqm的颜色但略有变化）
-                purple_color = np.array([0.5, 0.0, 0.8]) + np.array([0.1, 0.1, 0.0]) * (i % 3)
+                # 使用更浅的紫色系颜色
+                purple_color = np.array([0.7, 0.5, 0.9]) + np.array([0.05, 0.05, 0.0]) * (i % 3)
                 purple_color = np.minimum(purple_color, 1.0)  # 确保颜色值不超过1
                 below_eqm_paths_data.append({'costs': costs, 'color': purple_color})
                 below_eqm_costs_points.append(costs)
@@ -461,11 +461,11 @@ def plot_path_costs_below_equilibrium(all_path_costs: List[np.ndarray], boundary
     for path in below_eqm_paths_data:
         costs = path['costs']
         color = path['color']
-        ax.plot(costs[:, 0], costs[:, 1], '-', color=(*color[:3], 0.7), linewidth=1.5, zorder=4)
-        ax.scatter(costs[:, 0], costs[:, 1], s=35, c=[color], marker='o', alpha=0.8, edgecolors='none', zorder=4)
+        ax.plot(costs[:, 0], costs[:, 1], '-', color=(*color[:3], 0.5), linewidth=1.5, zorder=4)
+        ax.scatter(costs[:, 0], costs[:, 1], s=35, c=[color], marker='o', alpha=0.6, edgecolors='none', zorder=4)
 
     # Layer 5: T_eqm line (Topmost)
-    ax.plot(t_eqm, boundary.left_y, '-.', color=[0.5, 0.0, 0.8], linewidth=2.5, label=r'$T_{eqm}$', zorder=5)
+    ax.plot(t_eqm, boundary.left_y, '-.', color=[0.5, 0.0, 0.8], linewidth=2.5, label=r'$T_{eqm}$', zorder=10)
 
     # 添加图例
     handles, labels = ax.get_legend_handles_labels()
@@ -591,9 +591,9 @@ def main():
     else:
         # 使用默认配置运行
         result = run_with_params(
-            zeta=16,
+            zeta=24,
             subset_index=0,
-            num_flows=100,
+            num_flows=5000,
             cache_dir='matlab/cache',
             results_dir='results',
             plot_params=PlotParams(save_path='results/', figure_dpi=600)
