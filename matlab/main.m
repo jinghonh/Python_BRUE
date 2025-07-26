@@ -96,8 +96,8 @@ function args = parseInputArgs()
     %     .useConfig - 是否使用配置文件（默认=true）
     
     % 初始化默认参数
-    defaultZeta = 24;
-    defaultSubset = 0;
+    defaultZeta = 32;
+    defaultSubset = 2;
     defaultForce = true;
     defaultUseConfig = true;
     

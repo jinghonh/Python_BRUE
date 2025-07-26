@@ -87,7 +87,7 @@ def plot_tmax_teqm(zeta_values, params=None):
     # 定义颜色
     tmax_color = [0.8, 0.2, 0.2]  # 红色系
     teqm_color = [0.5, 0.0, 0.8]  # 紫色系
-    
+
     # 为自定义图例创建句柄列表
     legend_handles = []
     
@@ -118,7 +118,7 @@ def plot_tmax_teqm(zeta_values, params=None):
             
             # 为每个zeta值创建图例条目，使用黑色以便区分
             legend_handles.append(plt.Line2D([0], [0], marker=marker, color='black', 
-                                          label=r'$\zeta=' + str(zeta) + r'$',
+                                          label=r'$\varepsilon=' + str(zeta) + r'$',
                                           markerfacecolor='black', markersize=8))
     
     # 添加自定义图例

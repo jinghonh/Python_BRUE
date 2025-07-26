@@ -29,7 +29,7 @@ from scipy.interpolate import interp1d
 # ============================== 基本常量 ==============================
 RHO: float = 15
 SIGMA: float = 0.02
-E: float = 24  # 误差上限 (与 Mathematica 变量 e 对应)
+E: float = 32  # 误差上限 (与 Mathematica 变量 e 对应)
 EPS: float = 1e-8  # 严格不等式缓冲 (与 Mathematica 变量 eps 对应)
 
 # 边界条件 (与 box 变量对应)
@@ -558,8 +558,8 @@ plt.rcParams.update({
     
     # 图形风格
     "axes.linewidth": 0.8,
-    "axes.labelsize": 11,
-    "axes.titlesize": 12,
+    "axes.labelsize": 15,
+    "axes.titlesize": 15,
     "axes.grid": True,
     "grid.linestyle": ":",
     "grid.linewidth": 0.5,
@@ -582,7 +582,7 @@ plt.rcParams.update({
     "legend.framealpha": 0.8,
     "legend.edgecolor": "k",
     "legend.fancybox": False,
-    "legend.fontsize": 9,
+    "legend.fontsize": 15,
     
     # 保存设置
     "savefig.dpi": 600,
@@ -599,7 +599,7 @@ color_Teqm = "#984ea3" # 紫色 - T_eqm
 
 # --------------------------- 创建绘图函数 ---------------------------
 
-def create_plot(plot_num, show_reg2=True, show_reg=True, show_reg3=False, show_eqm=False, show_points=False):
+def create_plot(plot_num, show_reg2=True, show_reg=True, show_reg3=False, show_eqm=False, show_points=False, results_dir='results'):
     """创建不同的区域图
     
     参数:
@@ -622,21 +622,21 @@ def create_plot(plot_num, show_reg2=True, show_reg=True, show_reg3=False, show_e
             F1_GRID, F2_GRID, mask_reg2, levels=[0.5, 1.5], colors=[color_S0], alpha=0.7, zorder=1
         )
         ax.contour(F1_GRID, F2_GRID, mask_reg2.astype(int), levels=[0.5], colors="k", linewidths=0.6, zorder=10)
-        legend_elements.append(Patch(facecolor=color_S0, edgecolor=color_S0, alpha=0.7, label=r"$S_0^\zeta$"))
+        legend_elements.append(Patch(facecolor=color_S0, edgecolor=color_S0, alpha=0.7, label=r"$S_0^\varepsilon$"))
     
     if show_reg:
         ax.contourf(
             F1_GRID, F2_GRID, mask_reg, levels=[0.5, 1.5], colors=[color_BS0], alpha=0.7, zorder=2
         )
         ax.contour(F1_GRID, F2_GRID, mask_reg.astype(int),  levels=[0.5], colors="k", linewidths=0.6, zorder=10)
-        legend_elements.append(Patch(facecolor=color_BS0, edgecolor=color_BS0, alpha=0.7, label=r"$BS_0^\zeta$"))
+        legend_elements.append(Patch(facecolor=color_BS0, edgecolor=color_BS0, alpha=0.7, label=r"$BS_0^\varepsilon$"))
     
     if show_reg3:
         ax.contourf(
             F1_GRID, F2_GRID, mask_reg3, levels=[0.5, 1.5], colors=[color_RS0], alpha=0.7, zorder=3
         )
         ax.contour(F1_GRID, F2_GRID, mask_reg3.astype(int), levels=[0.5], colors="k", linewidths=0.6, zorder=10)
-        legend_elements.append(Patch(facecolor=color_RS0, edgecolor=color_RS0, alpha=0.7, label=r"$RS_0^\zeta$"))
+        legend_elements.append(Patch(facecolor=color_RS0, edgecolor=color_RS0, alpha=0.7, label=r"$RS_0^\varepsilon$"))
     
     if show_eqm:
         ax.contourf(
@@ -657,7 +657,7 @@ def create_plot(plot_num, show_reg2=True, show_reg=True, show_reg3=False, show_e
                 s=45,
                 linewidth=0.8,
                 edgecolor='k',
-                label=r"Flows of $S_0^\zeta$",
+                label=r"Flows of $S_0^\varepsilon$",
                 zorder=15,  # 确保点在区域之上
             )
             
@@ -670,7 +670,7 @@ def create_plot(plot_num, show_reg2=True, show_reg=True, show_reg3=False, show_e
                 s=40,
                 linewidth=0.8,
                 edgecolor='k',
-                label=r"Flows of $RS_0^\zeta$",
+                label=r"Flows of $RS_0^\varepsilon$",
                 zorder=15,  # 确保点在区域之上
             )
         if all_constraint_points.size > 0:
@@ -682,7 +682,7 @@ def create_plot(plot_num, show_reg2=True, show_reg=True, show_reg3=False, show_e
                 s=40,
                 linewidth=0.8,
                 edgecolor='k',
-                label=r"Flows of $BS_0^\zeta$",
+                label=r"Flows of $BS_0^\varepsilon$",
                 zorder=15,
             )
         if tmax_constraint_points.size > 0:
@@ -712,7 +712,7 @@ def create_plot(plot_num, show_reg2=True, show_reg=True, show_reg3=False, show_e
         ax.legend(
             handles=legend_elements,
             loc="upper right", 
-            fontsize=8,
+            fontsize=15,
             borderpad=0.4,
             labelspacing=0.3,
             handletextpad=0.5,
@@ -730,27 +730,30 @@ def create_plot(plot_num, show_reg2=True, show_reg=True, show_reg3=False, show_e
     ax.set_title(plot_titles.get(plot_num, f"图 {plot_num}"))
     
     # 输出PDF格式
-    out_path = Path(__file__).with_name(f"ee_time_point{int(E)}_plot{plot_num}.pdf")
+    filename = f"region_path_cost_e{int(E)}_plot{plot_num}.pdf"
+    out_path = os.path.join(results_dir, filename)
     plt.savefig(out_path, dpi=600, bbox_inches='tight')
-    print(f"✅ 图 {plot_num} 绘图完成，已保存至 {out_path.resolve()}")
+
+    print(f"✅ 图 {plot_num} 绘图完成，已保存至 {out_path}")
     
-    # 输出PNG格式
-    png_path = Path(__file__).with_name(f"ee_time_point{int(E)}_plot{plot_num}.png")
-    plt.savefig(png_path, dpi=300, format='png', bbox_inches='tight')
-    print(f"✅ 图 {plot_num} 额外输出PNG格式，已保存至 {png_path.resolve()}")
+    # # 输出PNG格式
+    # png_path = Path(__file__).with_name(f"ee_time_point{int(E)}_plot{plot_num}.png")
+    # plt.savefig(png_path, dpi=300, format='png', bbox_inches='tight')
+    # print(f"✅ 图 {plot_num} 额外输出PNG格式，已保存至 {png_path.resolve()}")
+
     
     return fig
 
 # --------------------------- 创建三个不同的图 ---------------------------
 
 # 图1: 只绘制前两个区域
-fig1 = create_plot(plot_num=1, show_reg2=True, show_reg=True, show_reg3=False, show_eqm=False, show_points=False)
+fig1 = create_plot(plot_num=1, show_reg2=True, show_reg=True, show_reg3=False, show_eqm=False, show_points=False, results_dir=results_dir)
 
 # 图2: 绘制全部区域
-fig2 = create_plot(plot_num=2, show_reg2=True, show_reg=True, show_reg3=True, show_eqm=True, show_points=False)
+fig2 = create_plot(plot_num=2, show_reg2=True, show_reg=True, show_reg3=True, show_eqm=True, show_points=False, results_dir=results_dir)
 
 # 图3: 绘制全部区域和散点
-fig3 = create_plot(plot_num=3, show_reg2=True, show_reg=True, show_reg3=True, show_eqm=True, show_points=True)
+fig3 = create_plot(plot_num=3, show_reg2=True, show_reg=True, show_reg3=True, show_eqm=True, show_points=True, results_dir=results_dir)
 
-# 显示所有图形
-plt.show()  
+# # 显示所有图形
+# plt.show()  

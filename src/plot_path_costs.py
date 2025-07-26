@@ -209,7 +209,7 @@ def get_or_compute_t_max_t_eqm(boundary: Boundary, zeta: int, results_dir: str =
     
     # 计算t_max和t_eqm
     print(f"Computing new t_max and t_eqm for zeta={zeta}")
-    t_max = (boundary.left_x + boundary.right_x) / 2
+    t_max = boundary.left_x * 0.3 + boundary.right_x * 0.7
     t_eqm = calculate_equilibrium_line(boundary.left_x, t_max, boundary.left_y)
     
     # 将数据保存为JSON格式（易于编辑）
@@ -591,8 +591,8 @@ def main():
     else:
         # 使用默认配置运行
         result = run_with_params(
-            zeta=24,
-            subset_index=0,
+            zeta=32,
+            subset_index=2,
             num_flows=5000,
             cache_dir='matlab/cache',
             results_dir='results',

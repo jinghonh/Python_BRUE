@@ -155,10 +155,10 @@ function plotComparisonPathCosts(totalValidFlow, totalPathValidFlow, relationMat
     % 图例标签
     legendLabels = cell(numSelected,1);
     for i=1:size(selectedTotalValid,1)
-        legendLabels{i} = sprintf('$BS_0^{\\zeta}$ %d', i);
+        legendLabels{i} = sprintf('$BS_0^{\\varepsilon}$ %d', i);
     end
     for i=1:size(selectedPathValid,1)
-        legendLabels{i+size(selectedTotalValid,1)} = sprintf('$S_0^{\\zeta}$ %d', i);
+        legendLabels{i+size(selectedTotalValid,1)} = sprintf('$S_0^{\\varepsilon}$ %d', i);
     end
 
     % ---- 调整绘图调用，传递满足全部约束方案数量以设置标记 ----

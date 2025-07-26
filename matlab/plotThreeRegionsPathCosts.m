@@ -188,13 +188,13 @@ function plotThreeRegionsPathCosts(totalValidFlow, totalPathValidFlow, relationM
 
         legendLabels = {};
         for i=1:size(selectedRegion1,1)
-            legendLabels{end+1} = sprintf('$S_0^{\\zeta}$ %d',i); %#ok<AGROW>
+            legendLabels{end+1} = sprintf('$S_0^{\\varepsilon}$ %d',i); %#ok<AGROW>
         end
         for i=1:size(selectedRegion2,1)
-            legendLabels{end+1} = sprintf('$BS_0^{\\zeta}$ %d',i); %#ok<AGROW>
+            legendLabels{end+1} = sprintf('$BS_0^{\\varepsilon}$ %d',i); %#ok<AGROW>
         end
         for i=1:size(selectedRegion3,1)
-            legendLabels{end+1} = sprintf('$RS_0^{\\zeta}$ %d',i); %#ok<AGROW>
+            legendLabels{end+1} = sprintf('$RS_0^{\\varepsilon}$ %d',i); %#ok<AGROW>
         end
 
         % 打印信息

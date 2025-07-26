@@ -260,11 +260,11 @@ def plot_three_regions_comparison(df, zeta_value, figsize=(10, 8), use_mat_file=
                 
                 # 为图例创建标签
                 if region == 1:
-                    label = f"$S_0^{{\\zeta}}$ {scheme}"
+                    label = f"$S_0^{{\\varepsilon}}$ {scheme}"
                 elif region == 2:
-                    label = f"$BS_0^{{\\zeta}}$ {scheme}"
+                    label = f"$BS_0^{{\\varepsilon}}$ {scheme}"
                 else:
-                    label = f"$RS_0^{{\\zeta}}$ {scheme}"
+                    label = f"$RS_0^{{\\varepsilon}}$ {scheme}"
                 
                 # 添加到图例句柄
                 legend_handles.append(mpatches.Patch(color=colors[region], label=label))
@@ -325,7 +325,7 @@ def plot_three_regions_comparison(df, zeta_value, figsize=(10, 8), use_mat_file=
     handles = legend_handles + [Line2D([0], [0], linestyle='-.', color=[0.8, 0.2, 0.2], label='$T_{max}$')]
     ax.legend(handles=handles, loc='best', fontsize=10, framealpha=1)
     
-    plt.title(f'Path Cost Comparison of Three Regions ($\\zeta = {zeta_value}$)', fontsize=14)
+    plt.title(f'Path Cost Comparison of Three Regions ($\\varepsilon = {zeta_value}$)', fontsize=14)
     plt.tight_layout()
     plt.savefig(f'three_regions_comparison_zeta{zeta_value}.pdf', format='pdf', dpi=300)
     plt.show()
@@ -417,9 +417,9 @@ def plot_comparison_path_costs(df, zeta_value, figsize=(10, 8)):
                 
                 # 为图例创建标签
                 if region == 1:
-                    label = f"$S_0^{{\\zeta}}$ {scheme}"
+                    label = f"$S_0^{{\\varepsilon}}$ {scheme}"
                 else:
-                    label = f"$BS_0^{{\\zeta}}$ {scheme}"
+                    label = f"$BS_0^{{\\varepsilon}}$ {scheme}"
                 
                 # 添加到图例句柄
                 legend_handles.append(mpatches.Patch(color=colors[region], label=label))
@@ -449,7 +449,7 @@ def plot_comparison_path_costs(df, zeta_value, figsize=(10, 8)):
     # 添加图例
     ax.legend(handles=legend_handles, loc='best', fontsize=10, framealpha=1)
     
-    plt.title(f'Path Cost Comparison ($\\zeta = {zeta_value}$)', fontsize=14)
+    plt.title(f'Path Cost Comparison ($\\varepsilon = {zeta_value}$)', fontsize=14)
     plt.tight_layout()
     plt.savefig(f'path_costs_comparison_zeta{zeta_value}.pdf', format='pdf', dpi=300)
     plt.show()
