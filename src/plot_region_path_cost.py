@@ -29,7 +29,7 @@ from scipy.interpolate import interp1d
 # ============================== 基本常量 ==============================
 RHO: float = 15
 SIGMA: float = 0.02
-E: float = 32  # 误差上限 (与 Mathematica 变量 e 对应)
+E: float = 8  # 误差上限 (与 Mathematica 变量 e 对应)
 EPS: float = 1e-8  # 严格不等式缓冲 (与 Mathematica 变量 eps 对应)
 
 # 边界条件 (与 box 变量对应)
@@ -225,12 +225,12 @@ def get_or_generate_scatter_points(mask_reg2, mask_reg, mask_reg3, mask_eqm, F1_
     获取或生成符合各区域约束的散点数据，并保存到JSON文件
     如果JSON文件中某个区域没有散点数据，会尝试重新生成该区域的散点
     
-    注意：由于区域存在包含关系(S⊃BS⊃RS⊃T_eqm)，将使用区域差集确保各区域散点不重叠
+    注意：由于区域存在包含关系(S⊃BS⊃RBS⊃T_eqm)，将使用区域差集确保各区域散点不重叠
     
     参数:
         mask_reg2: S_0^ζ区域掩码
         mask_reg: BS_0^ζ区域掩码
-        mask_reg3: RS_0^ζ区域掩码
+        mask_reg3: RBS_0^ζ区域掩码
         mask_eqm: T_eqm区域掩码
         F1_GRID: f1网格
         F2_GRID: f2网格
@@ -247,7 +247,7 @@ def get_or_generate_scatter_points(mask_reg2, mask_reg, mask_reg3, mask_eqm, F1_
     
     # 计算区域差集，确保各区域不重叠
     # T_eqm: 使用原始mask_eqm (紫色区域)
-    # RS_0^ζ: 使用mask_reg3 - mask_eqm (绿色区域减去紫色区域)
+    # RBS_0^ζ: 使用mask_reg3 - mask_eqm (绿色区域减去紫色区域)
     # BS_0^ζ: 使用mask_reg - mask_reg3 (蓝色区域减去绿色区域)
     # S_0^ζ: 使用mask_reg2 - mask_reg (红/黄色区域减去蓝色区域)
     mask_rs_only = np.logical_and(mask_reg3, np.logical_not(mask_eqm))
@@ -318,9 +318,9 @@ def get_or_generate_scatter_points(mask_reg2, mask_reg, mask_reg3, mask_eqm, F1_
                 else:
                     print("BS_0^ζ区域没有足够的点用于生成散点")
             
-            # 3. 检查RS_0^ζ区域 (仅RS区域，不包括其子区域)
+            # 3. 检查RBS_0^ζ区域 (仅RBS区域，不包括其子区域)
             if path_constraint_points.size == 0 and len(rs_only_indices[0]) > 0:
-                print("RS_0^ζ区域没有散点数据，尝试重新生成...")
+                print("RBS_0^ζ区域没有散点数据，尝试重新生成...")
                 points_count = min(num_points, len(rs_only_indices[0]))
                 if points_count > 0:
                     path_constraint_indices = np.random.choice(len(rs_only_indices[0]), points_count, replace=False)
@@ -329,10 +329,10 @@ def get_or_generate_scatter_points(mask_reg2, mask_reg, mask_reg3, mask_eqm, F1_
                         F2_GRID[rs_only_indices[0][i], rs_only_indices[1][i]]]
                         for i in path_constraint_indices
                     ])
-                    print(f"已为RS_0^ζ区域生成 {len(path_constraint_points)} 个散点")
+                    print(f"已为RBS_0^ζ区域生成 {len(path_constraint_points)} 个散点")
                     need_update = True
                 else:
-                    print("RS_0^ζ区域没有足够的点用于生成散点")
+                    print("RBS_0^ζ区域没有足够的点用于生成散点")
             
             # 4. 检查T_eqm区域
             if tmax_constraint_points.size == 0 and len(eqm_indices[0]) > 0:
@@ -391,7 +391,7 @@ def get_or_generate_scatter_points(mask_reg2, mask_reg, mask_reg3, mask_eqm, F1_
     else:
         print("T_eqm区域为空，无法生成散点")
         
-    # 2. RS_0^ζ 区域 (绿色区域，不含紫色部分)
+    # 2. RBS_0^ζ 区域 (绿色区域，不含紫色部分)
     path_constraint_points = np.array([])
     if len(rs_only_indices[0]) > 0:
         points_count = min(num_points, len(rs_only_indices[0]))
@@ -402,11 +402,11 @@ def get_or_generate_scatter_points(mask_reg2, mask_reg, mask_reg3, mask_eqm, F1_
                 F2_GRID[rs_only_indices[0][i], rs_only_indices[1][i]]]
                 for i in path_constraint_indices
             ])
-            print(f"已为RS_0^ζ区域(不含T_eqm)生成 {len(path_constraint_points)} 个散点")
+            print(f"已为RBS_0^ζ区域(不含T_eqm)生成 {len(path_constraint_points)} 个散点")
         else:
-            print("RS_0^ζ区域(不含T_eqm)没有足够的点用于生成散点")
+            print("RBS_0^ζ区域(不含T_eqm)没有足够的点用于生成散点")
     else:
-        print("RS_0^ζ区域(不含T_eqm)为空，无法生成散点")
+        print("RBS_0^ζ区域(不含T_eqm)为空，无法生成散点")
     
     # 1. BS_0^ζ 区域 (蓝色区域，不含绿色部分)
     all_constraint_points = np.array([])
@@ -419,11 +419,11 @@ def get_or_generate_scatter_points(mask_reg2, mask_reg, mask_reg3, mask_eqm, F1_
                 F2_GRID[bs_only_indices[0][i], bs_only_indices[1][i]]]
                 for i in all_constraint_indices
             ])
-            print(f"已为BS_0^ζ区域(不含RS_0^ζ)生成 {len(all_constraint_points)} 个散点")
+            print(f"已为BS_0^ζ区域(不含RBS_0^ζ)生成 {len(all_constraint_points)} 个散点")
         else:
-            print("BS_0^ζ区域(不含RS_0^ζ)没有足够的点用于生成散点")
+            print("BS_0^ζ区域(不含RBS_0^ζ)没有足够的点用于生成散点")
     else:
-        print("BS_0^ζ区域(不含RS_0^ζ)为空，无法生成散点")
+        print("BS_0^ζ区域(不含RBS_0^ζ)为空，无法生成散点")
     
     # 0. S_0^ζ 区域 (红/黄色区域，不含蓝色部分)
     s_constraint_points = np.array([])
@@ -594,7 +594,7 @@ plt.rcParams.update({
 # 定义一套柔和且清晰的学术颜色方案 (基于 ColorBrewer Set2) 别修改注释
 color_S0 = "#ea9999"   # 更红的柔和红色 - S_0^ζ（替换原灰色，更适合大面积底色）
 color_BS0 = "#1f77b4"  # 蓝色 - BS_0^ζ
-color_RS0 = "#4daf4a"  # 绿色 - RS_0^ζ
+color_RBS0 = "#4daf4a"  # 绿色 - RBS_0^ζ
 color_Teqm = "#984ea3" # 紫色 - T_eqm
 
 # --------------------------- 创建绘图函数 ---------------------------
@@ -606,7 +606,7 @@ def create_plot(plot_num, show_reg2=True, show_reg=True, show_reg3=False, show_e
         plot_num: 图的编号(1-3)
         show_reg2: 是否显示S_0^ζ区域
         show_reg: 是否显示BS_0^ζ区域
-        show_reg3: 是否显示RS_0^ζ区域
+        show_reg3: 是否显示RBS_0^ζ区域
         show_eqm: 是否显示T_eqm区域
         show_points: 是否显示散点
     """
@@ -633,10 +633,10 @@ def create_plot(plot_num, show_reg2=True, show_reg=True, show_reg3=False, show_e
     
     if show_reg3:
         ax.contourf(
-            F1_GRID, F2_GRID, mask_reg3, levels=[0.5, 1.5], colors=[color_RS0], alpha=0.7, zorder=3
+            F1_GRID, F2_GRID, mask_reg3, levels=[0.5, 1.5], colors=[color_RBS0], alpha=0.7, zorder=3
         )
         ax.contour(F1_GRID, F2_GRID, mask_reg3.astype(int), levels=[0.5], colors="k", linewidths=0.6, zorder=10)
-        legend_elements.append(Patch(facecolor=color_RS0, edgecolor=color_RS0, alpha=0.7, label=r"$RS_0^\varepsilon$"))
+        legend_elements.append(Patch(facecolor=color_RBS0, edgecolor=color_RBS0, alpha=0.7, label=r"$RBS_0^\varepsilon$"))
     
     if show_eqm:
         ax.contourf(
@@ -665,12 +665,12 @@ def create_plot(plot_num, show_reg2=True, show_reg=True, show_reg3=False, show_e
             ax.scatter(
                 path_constraint_points[:, 0],
                 path_constraint_points[:, 1],
-                color=color_RS0,
+                color=color_RBS0,
                 marker="o",
                 s=40,
                 linewidth=0.8,
                 edgecolor='k',
-                label=r"Flows of $RS_0^\varepsilon$",
+                label=r"Flows of $RBS_0^\varepsilon$",
                 zorder=15,  # 确保点在区域之上
             )
         if all_constraint_points.size > 0:
@@ -743,17 +743,14 @@ def create_plot(plot_num, show_reg2=True, show_reg=True, show_reg3=False, show_e
 
     
     return fig
+if __name__ == "__main__":
+    # --------------------------- 创建三个不同的图 ---------------------------
 
-# --------------------------- 创建三个不同的图 ---------------------------
+    # 图1: 只绘制前两个区域
+    fig1 = create_plot(plot_num=1, show_reg2=True, show_reg=True, show_reg3=False, show_eqm=False, show_points=False, results_dir=results_dir)
 
-# 图1: 只绘制前两个区域
-fig1 = create_plot(plot_num=1, show_reg2=True, show_reg=True, show_reg3=False, show_eqm=False, show_points=False, results_dir=results_dir)
+    # 图2: 绘制全部区域
+    fig2 = create_plot(plot_num=2, show_reg2=True, show_reg=True, show_reg3=True, show_eqm=True, show_points=False, results_dir=results_dir)
 
-# 图2: 绘制全部区域
-fig2 = create_plot(plot_num=2, show_reg2=True, show_reg=True, show_reg3=True, show_eqm=True, show_points=False, results_dir=results_dir)
-
-# 图3: 绘制全部区域和散点
-fig3 = create_plot(plot_num=3, show_reg2=True, show_reg=True, show_reg3=True, show_eqm=True, show_points=True, results_dir=results_dir)
-
-# # 显示所有图形
-# plt.show()  
+    # 图3: 绘制全部区域和散点
+    fig3 = create_plot(plot_num=3, show_reg2=True, show_reg=True, show_reg3=True, show_eqm=True, show_points=True, results_dir=results_dir)

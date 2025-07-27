@@ -3,6 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib.lines import Line2D
+import json
+import os
 from scipy.io import loadmat  # 添加导入.mat文件的库
 
 # 读取CSV数据
@@ -264,7 +266,7 @@ def plot_three_regions_comparison(df, zeta_value, figsize=(10, 8), use_mat_file=
                 elif region == 2:
                     label = f"$BS_0^{{\\varepsilon}}$ {scheme}"
                 else:
-                    label = f"$RS_0^{{\\varepsilon}}$ {scheme}"
+                    label = f"$RBS_0^{{\\varepsilon}}$ {scheme}"
                 
                 # 添加到图例句柄
                 legend_handles.append(mpatches.Patch(color=colors[region], label=label))
@@ -330,148 +332,144 @@ def plot_three_regions_comparison(df, zeta_value, figsize=(10, 8), use_mat_file=
     plt.savefig(f'three_regions_comparison_zeta{zeta_value}.pdf', format='pdf', dpi=300)
     plt.show()
 
-# 绘制路径成本对比图（区域1和区域3）
-def plot_comparison_path_costs(df, zeta_value, figsize=(10, 8)):
-    # 过滤指定zeta值的数据
-    df_zeta = df[df['zeta值'] == zeta_value]
-    
-    # 只保留区域1和区域3
-    df_filtered = df_zeta[(df_zeta['区域'] == 1) | (df_zeta['区域'] == 3)]
-    
-    # 创建图形
+# Plot path cost comparison using scatter JSON and compute all path costs.
+def plot_comparison_path_costs(zeta_value, figsize=(10, 8)):
+    """Plot path cost comparison using scatter JSON and compute all path costs."""
+    # Load scatter JSON
+    scatter_file = os.path.join('results', f'scatter_points_e{zeta_value}.json')
+    try:
+        with open(scatter_file, 'r') as f:
+            scatter_data = json.load(f)
+    except FileNotFoundError:
+        print(f"Warning: Scatter file not found: {scatter_file}")
+        return
+    # Load relation matrix from MATLAB cache for full path set
+    mat_file = os.path.join('matlab', 'cache', f'cache_zeta{32}_subset2.mat')
+    try:
+        mat_data = load_mat_data(mat_file)
+        relation_matrix = mat_data['relationMatrix']
+        
+    except Exception as e:
+        print(f"Warning: Failed to load relation matrix: {e}")
+        return
+
     fig, ax = plt.subplots(figsize=figsize)
-    
-    # 设置颜色和标记
-    colors = {
-        1: [0.0, 0.6, 0.3],  # 绿色 - 区域1：只满足路径约束
-        3: [0.0, 0.4, 0.8]   # 蓝色 - 区域3：满足全部约束且满足T_max
+    # Define regions: JSON key, color, legend label, and marker for scattering other paths
+    regions = [
+        ('s_constraint_points', '#ea9999', r'$S_0^\varepsilon$', '^'),
+        ('all_constraint_points', '#1f77b4', r'$BS_0^\varepsilon$', 's'),
+        ('path_constraint_points', '#4daf4a', r'$RBS_0^\varepsilon$', 'o')
+    ]
+    total_flow = 10000.0
+    # storage for csv rows
+    csv_rows = []
+    region_short = {
+        's_constraint_points': 'S',
+        'all_constraint_points': 'BS',
+        'path_constraint_points': 'RBS'
     }
-    markers = {
-        1: 'o',  # 区域1：圆形
-        3: 'd'   # 区域3：菱形
-    }
-    
-    legend_handles = []
-    
-    # 计算图表的x轴范围，用于后续添加标签
-    x_min, x_max = float('inf'), float('-inf')
-    
-    # 获取所有路径编号
-    unique_paths = df_filtered['路径编号'].unique()
-    
-    # 处理每个区域的数据
-    for region in [1, 3]:
-        for scheme in [1, 2]:
-            # 获取当前方案的数据
-            scheme_data = df_filtered[(df_filtered['区域'] == region) & (df_filtered['方案编号'] == scheme)]
-            
-            if not scheme_data.empty:
-                # 提取路径的时间成本和金钱成本
-                time_costs = scheme_data['时间成本'].values
-                money_costs = scheme_data['金钱成本'].values
-                flows = scheme_data['流量分配'].values
-                path_ids = scheme_data['路径编号'].values
-                
-                # 更新x轴范围
-                x_min = min(x_min, np.min(time_costs))
-                x_max = max(x_max, np.max(time_costs))
-                
-                # 绘制散点
-                scatter = ax.scatter(time_costs, money_costs, c=[colors[region]], 
-                                     marker=markers[region], s=60, alpha=0.8)
-                
-                # 对于同一方案中的每个唯一金钱成本（即同一路径），连接这些点
-                for path_id in unique_paths:
-                    # 获取当前路径编号的数据点
-                    path_points = scheme_data[scheme_data['路径编号'] == path_id]
-                    
-                    if not path_points.empty:
-                        path_time_costs = path_points['时间成本'].values
-                        path_money_cost = path_points['金钱成本'].values[0]  # 同一路径的金钱成本应该相同
-                        
-                        # 只绘制水平线，如果有多个点
-                        if len(path_time_costs) > 1:
-                            # 按时间成本排序
-                            sorted_indices = np.argsort(path_time_costs)
-                            sorted_time_costs = path_time_costs[sorted_indices]
-                            
-                            # 绘制水平连接线
-                            ax.plot([sorted_time_costs[0], sorted_time_costs[-1]], 
-                                    [path_money_cost, path_money_cost],
-                                    '-', color=colors[region], linewidth=1.0, alpha=0.6)
-                
-                # 连接流量大于0的路径点
-                pos_flow_indices = np.where(flows > 0)[0]
-                if len(pos_flow_indices) > 0:
-                    # 提取流量大于0的路径成本
-                    pos_time_costs = time_costs[pos_flow_indices]
-                    pos_money_costs = money_costs[pos_flow_indices]
-                    
-                    # 按金钱成本排序
-                    sorted_indices = np.argsort(pos_money_costs)
-                    sorted_time_costs = pos_time_costs[sorted_indices]
-                    sorted_money_costs = pos_money_costs[sorted_indices]
-                    
-                    # 绘制连接线
-                    ax.plot(sorted_time_costs, sorted_money_costs, '-', color=colors[region], linewidth=1.5)
-                
-                # 为图例创建标签
-                if region == 1:
-                    label = f"$S_0^{{\\varepsilon}}$ {scheme}"
-                else:
-                    label = f"$BS_0^{{\\varepsilon}}$ {scheme}"
-                
-                # 添加到图例句柄
-                legend_handles.append(mpatches.Patch(color=colors[region], label=label))
-    
-    # 在右侧添加路径标签
-    margin = (x_max - x_min) * 0.05  # 设置一个边距
-    # 获取唯一的金钱成本值并排序
-    unique_money_costs = sorted(df_filtered['金钱成本'].unique(), reverse=True)
-    
-    for money_cost in unique_money_costs:
-        # 对于每个金钱成本，找到对应的路径编号
-        path_data = df_filtered[df_filtered['金钱成本'] == money_cost]
-        if not path_data.empty:
-            path_id = path_data['路径编号'].values[0]
-            # 在右侧添加路径标签
-            ax.text(x_max + margin, money_cost, f'$P_{path_id}$', 
-                    fontsize=10, va='center', ha='left', color='#4D4D4D')
-    
-    # 设置轴标签和图例
+    # For each region: draw two sample polyline for P1,P2,P5 and scatter other paths
+    for key, color, label, marker in regions:
+        pts_list = scatter_data.get(key, [])
+        for idx_pt, pt in enumerate(pts_list):
+            f1, f2 = pt
+            # Determine flows on paths: f1, f2, f5, others zero
+            f5 = total_flow - f1 - f2
+            n_paths = relation_matrix.shape[0]
+            flow = np.zeros(n_paths)
+            flow[0] = f1  # path 1
+            flow[1] = f2  # path 2
+            # path5 index = 4 in full 6-path set
+            if n_paths >= 5:
+                flow[4] = f5  # path 5
+            # Compute costs for all paths
+            costs = calculate_all_path_costs(flow, relation_matrix)
+            times = costs[:, 0]
+            monies = costs[:, 1]
+            # Label only the first sample
+            lbl = label if idx_pt == 0 else None
+            # Connect only paths 1,2,5
+            line_idx = [0, 1, 4]
+            times_line = times[line_idx]
+            monies_line = monies[line_idx]
+            ax.plot(times_line, monies_line, '-', color=color, linewidth=1.5, marker=marker, markersize=8, label=lbl)
+            # Scatter other paths
+            other_idx = [i for i in range(len(times)) if i not in line_idx]
+            ax.scatter(times[other_idx], monies[other_idx], color=color, marker=marker, s=50)
+
+            # --- collect csv rows ---
+            region_code = region_short.get(key, key)
+            for p_idx in range(n_paths):
+                csv_rows.append({
+                    'region': region_code,
+                    'sample': idx_pt + 1,
+                    'path_id': p_idx + 1,
+                    'flow': flow[p_idx],
+                    'time_cost': times[p_idx],
+                    'money_cost': monies[p_idx]
+                })
+
+    # Plot T_max upper bound from JSON
+    tmax_file = os.path.join('results', f'tmax_teqm_zeta{zeta_value}.json')
+    try:
+        with open(tmax_file, 'r') as f:
+            tmax_data = json.load(f)
+        mvals = np.array(tmax_data['money_values'], dtype=float)
+        tmax_arr = np.array(tmax_data['t_max'], dtype=float)
+        idx_t = np.argsort(mvals)
+        ax.plot(tmax_arr[idx_t], mvals[idx_t], '-', color=[0.8, 0.2, 0.2], linewidth=3, label=r'$T_{max}$')
+    except FileNotFoundError:
+        pass
+    # --- annotate path labels at rightmost occurrence ---
+    label_pos = {}
+    for row in csv_rows:
+        pid = row['path_id']
+        t = row['time_cost']
+        m = row['money_cost']
+        if pid not in label_pos or t > label_pos[pid][0]:
+            label_pos[pid] = (t, m)
+    if label_pos:
+        xs = np.array([v[0] for v in label_pos.values()])
+        margin = (xs.max() - xs.min()) * 0.05 if len(xs) > 1 else 2
+        fixed_x = xs.max() - margin-5
+        for pid, (tx, my) in label_pos.items():
+            offset_x = fixed_x - 2 if pid == 3 else fixed_x
+            # horizontal line
+            ax.plot([tx, offset_x - 0.5], [my, my], color='gray', linestyle=':', linewidth=3)
+            # label
+            ax.text(offset_x, my, f'$P_{pid}$', fontsize=24, va='center', ha='left')
+
+    # Finalize and save
     ax.set_xlabel('Time Cost', fontsize=12)
     ax.set_ylabel('Money Cost', fontsize=12)
     ax.grid(True)
-    
-    # 扩展x轴范围以容纳路径标签
-    ax.set_xlim(x_min - margin, x_max + margin * 5)
-    
-    # 添加图例
-    ax.legend(handles=legend_handles, loc='best', fontsize=10, framealpha=1)
-    
-    plt.title(f'Path Cost Comparison ($\\varepsilon = {zeta_value}$)', fontsize=14)
+    ax.legend(loc='best', fontsize=10, framealpha=1)
+    # plt.title(f'Path Cost Comparison ($\\varepsilon = {zeta_value}$)', fontsize=14)
     plt.tight_layout()
-    plt.savefig(f'path_costs_comparison_zeta{zeta_value}.pdf', format='pdf', dpi=300)
+    plt.savefig(f'results/path_costs_comparison_zeta{zeta_value}.pdf', format='pdf', dpi=300)
     plt.show()
+
+    # Save CSV
+    if csv_rows:
+        import pandas as _pd
+        df_out = _pd.DataFrame(csv_rows)
+        os.makedirs('results', exist_ok=True)
+        csv_path = os.path.join('results', f'flow_costs_zeta{zeta_value}.csv')
+        df_out.to_csv(csv_path, index=False)
+        print(f"Flow and cost data saved to {csv_path}")
 
 # 主函数
 def main():
-    # 读取数据
-    df = load_data('matlab/results/result.csv')
-    
-    # 设置LaTeX渲染
+    # Set LaTeX rendering
     plt.rcParams.update({
         "text.usetex": True,
         "font.family": "serif",
         "font.serif": ["Computer Modern Roman"],
     })
-    
-    # 绘制四张图
-    plot_comparison_path_costs(df, 15)     # zeta=15的路径成本对比图
-    plot_comparison_path_costs(df, 31)     # zeta=31的路径成本对比图
-
-    plot_three_regions_comparison(df, 15, use_mat_file=True)  # 使用.mat文件的zeta=15三区域对比图
-    plot_three_regions_comparison(df, 31, use_mat_file=True)  # 使用.mat文件的zeta=31三区域对比图
+    # Plot comparison for JSON-based data
+    for zeta in [8, 16, 24, 32]:
+        plot_comparison_path_costs(zeta)
+    # Optionally, existing three regions comparison calls can remain or be removed.
 
 if __name__ == "__main__":
     main()
