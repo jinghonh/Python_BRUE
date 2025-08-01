@@ -255,9 +255,7 @@ def plot_time_money_cost_relationship(all_path_costs: List[np.ndarray], boundary
     if boundary.left_x.size > 0:
         boundary_x = np.concatenate([boundary.left_x, boundary.right_x[::-1]])
         boundary_y = np.concatenate([boundary.left_y, boundary.right_y[::-1]])
-        ax.fill(boundary_x, boundary_y, color=[0.9, 0.95, 1], alpha=1, edgecolor='none', label='Feasible Region')
-        ax.plot(boundary.left_x, boundary.left_y, '-', color=[0.4, 0.5, 0.8], linewidth=0.5)
-        ax.plot(boundary.right_x, boundary.right_y, '-', color=[0.4, 0.5, 0.8], linewidth=0.5)
+        ax.fill(boundary_x, boundary_y, color=[0.9, 0.95, 1], alpha=1, edgecolor='none', label='Feasible Region'); ax.plot(boundary.left_x, boundary.left_y, '-', color=[0.4, 0.5, 0.8], linewidth=0.5); ax.plot(boundary.right_x, boundary.right_y, '-', color=[0.4, 0.5, 0.8], linewidth=0.5)
 
     for i, costs in enumerate(all_path_costs):
         if costs.size > 0:
@@ -271,6 +269,79 @@ def plot_time_money_cost_relationship(all_path_costs: List[np.ndarray], boundary
         ax.legend(unique_labels.values(), unique_labels.keys(), loc='best', fontsize=params.font_size - 1)
     
     save_figure(fig, 'path_time_money', params, zeta, subset_index)
+    plt.close(fig)
+
+
+def plot_teqm_flow_path_cost(all_path_costs: List[np.ndarray], color_variations: np.ndarray, boundary: Boundary, params: PlotParams, zeta: int, subset_index: int, relation_matrix: np.ndarray,
+                               money_coeffs: np.ndarray, free_flow_time: np.ndarray, max_capacity: np.ndarray):
+    """
+    Plots the path cost line for the flow derived from the first T_eqm scatter point,
+    with other sample flows also plotted.
+    """
+    # 1. Load scatter data for T_eqm point
+    scatter_file = os.path.join('results', f'scatter_points_e{zeta}.json')
+    try:
+        with open(scatter_file, 'r') as f:
+            scatter_data = json.load(f)
+    except FileNotFoundError:
+        print(f"Warning: Scatter file for T_eqm point not found: {scatter_file}")
+        return
+
+    # 2. Get the first T_eqm point
+    teqm_points = scatter_data.get('tmax_constraint_points', [])
+    if not teqm_points:
+        print(f"Warning: No 'tmax_constraint_points' found in {scatter_file}")
+        return
+    
+    f1, f2 = teqm_points[0]
+    
+    # 3. Create the flow vector for T_eqm
+    f5 = 10000.0 - f1 - f2
+    n_paths = relation_matrix.shape[0]
+    teqm_flow = np.zeros(n_paths)
+    teqm_flow[0] = f1  # Path 1
+    teqm_flow[1] = f2  # Path 2
+
+    if subset_index == 0 and n_paths >= 3:
+        teqm_flow[2] = f5  # Path 5 is at index 2 for subset 0
+    elif subset_index in [1, 2] and n_paths >= 5:
+        teqm_flow[4] = f5  # Path 5 is at index 4 for subsets 1 and 2
+            
+    # 4. Calculate path costs for this single T_eqm flow
+    x = teqm_flow @ relation_matrix
+    rt = calculate_real_time(np.atleast_2d(x), relation_matrix, free_flow_time, max_capacity)
+    path_time_costs = rt.flatten()
+    money_costs_per_path = money_coeffs @ relation_matrix.T
+    teqm_costs = np.column_stack((path_time_costs, money_costs_per_path))
+    
+    # 5. Plotting
+    fig, ax = plt.subplots(figsize=params.figure_size)
+    configure_plot(ax, params, f'Path Costs with Highlighted T_eqm Flow (Zeta={zeta})', r'Time Cost', r'Money Cost')
+    
+    # Layer 1: Plot background feasible region
+    if boundary.left_x.size > 0:
+        boundary_x = np.concatenate([boundary.left_x, boundary.right_x[::-1]])
+        boundary_y = np.concatenate([boundary.left_y, boundary.right_y[::-1]])
+        ax.fill(boundary_x, boundary_y, color=[0.9, 0.95, 1], alpha=1, edgecolor='none', label='Feasible Region'); ax.plot(boundary.left_x, boundary.left_y, '-', color=[0.4, 0.5, 0.8], linewidth=0.5); ax.plot(boundary.right_x, boundary.right_y, '-', color=[0.4, 0.5, 0.8], linewidth=0.5)
+
+    # Layer 2: Plot all other flows
+    for i, costs in enumerate(all_path_costs):
+        if costs.size > 0:
+            ax.plot(costs[:, 0], costs[:, 1], '-', color=(*color_variations[i], 0.7), linewidth=1.2)
+            ax.scatter(costs[:, 0], costs[:, 1], s=30, c=[color_variations[i]], marker='o', alpha=0.8,
+                       edgecolors='none')
+
+    # Layer 3: Plot the prominent T_eqm cost line
+    sort_idx = np.argsort(teqm_costs[:, 1])
+    ax.plot(teqm_costs[sort_idx, 0], teqm_costs[sort_idx, 1], '-', color='#984ea3', linewidth=2.5, marker='D', markersize=8, label=r'Flow from $T_{eqm}$ point', zorder=10)
+    
+    # 6. Add legend and save
+    handles, labels = ax.get_legend_handles_labels()
+    if handles:
+        unique_labels = dict(zip(labels, handles))
+        ax.legend(unique_labels.values(), unique_labels.keys(), loc='best', fontsize=params.font_size - 1)
+
+    save_figure(fig, 'teqm_flow_path_cost_with_others', params, zeta, subset_index)
     plt.close(fig)
 
 
@@ -549,6 +620,13 @@ def run_with_params(zeta=None, subset_index=None, num_flows=None, cache_dir=None
     # 生成图表
     print("Generating plots...")
     plot_time_money_cost_relationship(all_path_costs, boundary, color_variations, params, zeta, subset_index)
+
+    
+    # Call the new function to plot the T_eqm flow cost
+    if subset_index == 0:
+        plot_teqm_flow_path_cost(all_path_costs, color_variations, boundary, params, zeta, subset_index, relation_matrix,
+                                money_coeffs, free_flow_time, max_capacity)
+
     plot_path_costs_with_upper_limit(all_path_costs, boundary, color_variations, params, zeta, subset_index)
     plot_path_costs_below_equilibrium(all_path_costs, boundary, color_variations, params, zeta, subset_index)
     print("Plots generated successfully.")
@@ -592,8 +670,8 @@ def main():
         # 使用默认配置运行
         result = run_with_params(
             zeta=32,
-            subset_index=2,
-            num_flows=5000,
+            subset_index=0,
+            num_flows=10000,
             cache_dir='matlab/cache',
             results_dir='results',
             plot_params=PlotParams(save_path='results/', figure_dpi=600)

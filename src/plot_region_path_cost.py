@@ -29,7 +29,7 @@ from scipy.interpolate import interp1d
 # ============================== 基本常量 ==============================
 RHO: float = 15
 SIGMA: float = 0.02
-E: float = 8  # 误差上限 (与 Mathematica 变量 e 对应)
+E: float = 32  # 误差上限 (与 Mathematica 变量 e 对应)
 EPS: float = 1e-8  # 严格不等式缓冲 (与 Mathematica 变量 eps 对应)
 
 # 边界条件 (与 box 变量对应)
@@ -599,7 +599,9 @@ color_Teqm = "#984ea3" # 紫色 - T_eqm
 
 # --------------------------- 创建绘图函数 ---------------------------
 
-def create_plot(plot_num, show_reg2=True, show_reg=True, show_reg3=False, show_eqm=False, show_points=False, results_dir='results'):
+def create_plot(
+    plot_num, show_reg2=True, show_reg=True, show_reg3=False, show_eqm=False, show_points=False, results_dir='results', plot_specific_points=None
+):
     """创建不同的区域图
     
     参数:
@@ -609,6 +611,7 @@ def create_plot(plot_num, show_reg2=True, show_reg=True, show_reg3=False, show_e
         show_reg3: 是否显示RBS_0^ζ区域
         show_eqm: 是否显示T_eqm区域
         show_points: 是否显示散点
+        plot_specific_points: 指定绘制的散点区域，可选值为['s', 'rs', 'bs', 't_eqm']
     """
     # 创建图形和轴
     fig, ax = plt.subplots(figsize=(8, 6), constrained_layout=True)
@@ -649,54 +652,62 @@ def create_plot(plot_num, show_reg2=True, show_reg=True, show_reg3=False, show_e
     if show_points:
         # 新增: 绘制S_0^ζ区域的散点
         if s_constraint_points.size > 0:
-            ax.scatter(
-                s_constraint_points[:, 0],
-                s_constraint_points[:, 1],
-                color=color_S0,
-                marker="^",  # 使用三角形标记，与其他区域区分开
-                s=45,
-                linewidth=0.8,
-                edgecolor='k',
-                label=r"Flows of $S_0^\varepsilon$",
-                zorder=15,  # 确保点在区域之上
-            )
+            if not plot_specific_points or 's' in plot_specific_points:
+                s_pts = s_constraint_points[0:1] if plot_specific_points and len(plot_specific_points) == 1 else s_constraint_points
+                ax.scatter(
+                    s_pts[:, 0],
+                    s_pts[:, 1],
+                    color=color_S0,
+                    marker="^",  # 使用三角形标记，与其他区域区分开
+                    s=45,
+                    linewidth=0.8,
+                    edgecolor='k',
+                    label=r"Flows of $S_0^\varepsilon$",
+                    zorder=15,  # 确保点在区域之上
+                )
             
         if path_constraint_points.size > 0:
-            ax.scatter(
-                path_constraint_points[:, 0],
-                path_constraint_points[:, 1],
-                color=color_RBS0,
-                marker="o",
-                s=40,
-                linewidth=0.8,
-                edgecolor='k',
-                label=r"Flows of $RBS_0^\varepsilon$",
-                zorder=15,  # 确保点在区域之上
-            )
+            if not plot_specific_points or 'rs' in plot_specific_points:
+                rs_pts = path_constraint_points[0:1] if plot_specific_points and len(plot_specific_points) == 1 else path_constraint_points
+                ax.scatter(
+                    rs_pts[:, 0],
+                    rs_pts[:, 1],
+                    color=color_RBS0,
+                    marker="o",
+                    s=40,
+                    linewidth=0.8,
+                    edgecolor='k',
+                    label=r"Flows of $RBS_0^\varepsilon$",
+                    zorder=15,  # 确保点在区域之上
+                )
         if all_constraint_points.size > 0:
-            ax.scatter(
-                all_constraint_points[:, 0],
-                all_constraint_points[:, 1],
-                color=color_BS0,
-                marker="s",
-                s=40,
-                linewidth=0.8,
-                edgecolor='k',
-                label=r"Flows of $BS_0^\varepsilon$",
-                zorder=15,
-            )
+            if not plot_specific_points or 'bs' in plot_specific_points:
+                bs_pts = all_constraint_points[0:1] if plot_specific_points and len(plot_specific_points) == 1 else all_constraint_points
+                ax.scatter(
+                    bs_pts[:, 0],
+                    bs_pts[:, 1],
+                    color=color_BS0,
+                    marker="s",
+                    s=40,
+                    linewidth=0.8,
+                    edgecolor='k',
+                    label=r"Flows of $BS_0^\varepsilon$",
+                    zorder=15,
+                )
         if tmax_constraint_points.size > 0:
-            ax.scatter(
-                tmax_constraint_points[:, 0],
-                tmax_constraint_points[:, 1],
-                color=color_Teqm,
-                marker="D",
-                s=40,
-                linewidth=0.8,
-                edgecolor='k',
-                label=r"Flows of $T_{eqm}$",
-                zorder=15,
-            )
+            if not plot_specific_points or 't_eqm' in plot_specific_points:
+                t_eqm_pts = tmax_constraint_points[0:1] if plot_specific_points and len(plot_specific_points) == 1 else tmax_constraint_points
+                ax.scatter(
+                    t_eqm_pts[:, 0],
+                    t_eqm_pts[:, 1],
+                    color=color_Teqm,
+                    marker="D",
+                    s=40,
+                    linewidth=0.8,
+                    edgecolor='k',
+                    label=r"Flows of $T_{eqm}$",
+                    zorder=15,
+                )
     
     # 设置轴标签和范围
     ax.set_xlabel(r"$f_1$")
@@ -727,7 +738,7 @@ def create_plot(plot_num, show_reg2=True, show_reg=True, show_reg3=False, show_e
         2: " ",
         3: " "
     }
-    ax.set_title(plot_titles.get(plot_num, f"图 {plot_num}"))
+    # ax.set_title(plot_titles.get(plot_num, f"图 {plot_num}"))
     
     # 输出PDF格式
     filename = f"region_path_cost_e{int(E)}_plot{plot_num}.pdf"
@@ -754,3 +765,11 @@ if __name__ == "__main__":
 
     # 图3: 绘制全部区域和散点
     fig3 = create_plot(plot_num=3, show_reg2=True, show_reg=True, show_reg3=True, show_eqm=True, show_points=True, results_dir=results_dir)
+
+    # 图4: 不绘制RBS_0^ε区域
+    fig4 = create_plot(plot_num=4, show_reg2=True, show_reg=True, show_reg3=False, show_eqm=True, show_points=False, results_dir=results_dir)
+
+    # 图5: 绘制前两个区域以及RBS_0^ε区域的第一个散点
+    fig5 = create_plot(plot_num=5, show_reg2=True, show_reg=True, show_reg3=False, show_eqm=False, show_points=True, results_dir=results_dir, plot_specific_points=['t_eqm'])
+# # 显示所有图形
+# plt.show()
