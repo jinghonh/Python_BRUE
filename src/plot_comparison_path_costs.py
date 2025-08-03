@@ -576,7 +576,7 @@ def plot_two_regions_path_costs(zeta_value, figsize=(10, 8)):
                 
                 # 绘制有流量路径的连接线和散点
                 line = ax.plot(sorted_times, sorted_monies, '-', color=color, linewidth=1.5,
-                       marker=marker, markersize=12, label=line_label, alpha=0.8,
+                       marker=marker, markersize=18, label=line_label, alpha=0.8,
                        markeredgecolor='black', markeredgewidth=1.0, zorder=99)
                 
                 # 如果是第一个有标签的线，保存图例句柄
@@ -609,12 +609,12 @@ def plot_two_regions_path_costs(zeta_value, figsize=(10, 8)):
         txt = ax.text(
             time, money-0.11 if label_text == 'A' or label_text == 'B' else money,
             label_text,
-            fontsize=10,
+            fontsize=12,
             fontweight='bold',
             ha='center',
             va='center',
             color='black',
-            zorder=100  # 确保文字在最上层，但不遮挡标记边界
+            zorder=120  # 确保文字在最上层，但不遮挡标记边界
         )
         # 添加白色描边使文字在彩色标记上清晰可见
         # txt.set_path_effects([pe.withStroke(linewidth=2, foreground='white')])
@@ -669,7 +669,7 @@ def plot_two_regions_path_costs(zeta_value, figsize=(10, 8)):
                 else:
                     eps_label = rf'$\varepsilon = \mathbf{{{interval_width}}}$'
                 ax.text(mid_point, y_pos + 0.01*y_range, eps_label,
-                       fontsize=18, ha='center', va='bottom', color=region_colors[key])
+                       fontsize=18, ha='center', va='bottom', color=region_colors[key], zorder=100)
                 
                 # 5. 方案标签
                 ax.text(t_max + 0.01 * x_range, y_pos, f'{region_short[key]}{idx+1}', 
