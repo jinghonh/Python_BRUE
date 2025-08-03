@@ -447,7 +447,7 @@ def plot_comparison_path_costs(zeta_value, figsize=(10, 8)):
     # plt.title(f'Path Cost Comparison ($\\varepsilon = {zeta_value}$)', fontsize=14)
     plt.tight_layout()
     plt.savefig(f'results/path_costs_comparison_zeta{zeta_value}.pdf', format='pdf', dpi=300)
-    plt.show()
+    # plt.show()
 
     # Save CSV
     if csv_rows:
@@ -457,6 +457,143 @@ def plot_comparison_path_costs(zeta_value, figsize=(10, 8)):
         csv_path = os.path.join('results', f'flow_costs_zeta{zeta_value}.csv')
         df_out.to_csv(csv_path, index=False)
         print(f"Flow and cost data saved to {csv_path}")
+
+# 绘制前两个区域的成本折线图，不包括Tmax
+def plot_two_regions_path_costs(zeta_value, figsize=(10, 8)):
+    """
+    绘制仅包含前两个区域(S和BS)的成本折线图，不绘制Tmax上限
+    
+    参数:
+        zeta_value: epsilon值
+        figsize: 图形大小
+    """
+    # 加载散点JSON数据
+    scatter_file = os.path.join('results', f'scatter_points_e{zeta_value}.json')
+    try:
+        with open(scatter_file, 'r') as f:
+            scatter_data = json.load(f)
+    except FileNotFoundError:
+        print(f"警告: 未找到散点文件: {scatter_file}")
+        return
+    
+    # 从MATLAB缓存加载关系矩阵
+    mat_file = os.path.join('matlab', 'cache', f'cache_zeta{32}_subset2.mat')
+    try:
+        mat_data = load_mat_data(mat_file)
+        relation_matrix = mat_data['relationMatrix']
+    except Exception as e:
+        print(f"警告: 加载关系矩阵失败: {e}")
+        return
+
+    fig, ax = plt.subplots(figsize=figsize)
+    
+    # 仅定义前两个区域：JSON键、颜色、图例标签和散点标记
+    regions = [
+        ('s_constraint_points', '#ea9999', r'$S_0^\varepsilon$', '^'),
+        ('all_constraint_points', '#1f77b4', r'$BS_0^\varepsilon$', 's')
+    ]
+    total_flow = 10000.0
+    
+    # 存储CSV行的列表
+    csv_rows = []
+    region_short = {
+        's_constraint_points': 'S',
+        'all_constraint_points': 'BS'
+    }
+    
+    # 对于每个区域
+    for key, color, label, marker in regions:
+        pts_list = scatter_data.get(key, [])
+        for idx_pt, pt in enumerate(pts_list):
+            f1, f2 = pt
+            # 确定路径上的流量：f1、f2、f5，其他为零
+            f5 = total_flow - f1 - f2
+            n_paths = relation_matrix.shape[0]
+            flow = np.zeros(n_paths)
+            flow[0] = f1  # 路径1
+            flow[1] = f2  # 路径2
+            # 路径5的索引在完整的6路径集中是4
+            if n_paths >= 5:
+                flow[4] = f5  # 路径5
+            
+            # 计算所有路径的成本
+            costs = calculate_all_path_costs(flow, relation_matrix)
+            times = costs[:, 0]
+            monies = costs[:, 1]
+            
+            # 仅为第一个样本添加标签
+            lbl = label if idx_pt == 0 else None
+            
+            # 只处理有流量的路径
+            flow_paths_idx = np.where(flow > 0)[0]
+            
+            if len(flow_paths_idx) > 0:
+                # 提取有流量路径的成本
+                flow_times = times[flow_paths_idx]
+                flow_monies = monies[flow_paths_idx]
+                
+                # 按金钱成本排序，用于绘制连接线
+                sorted_indices = np.argsort(flow_monies)
+                sorted_times = flow_times[sorted_indices]
+                sorted_monies = flow_monies[sorted_indices]
+                
+                # 绘制有流量路径的连接线和散点
+                ax.plot(sorted_times, sorted_monies, '-', color=color, linewidth=1.5, marker=marker, markersize=8, label=lbl)
+                
+                # 不再绘制没有流量的路径
+                
+                # --- 收集CSV行 ---
+                region_code = region_short.get(key, key)
+                for p_idx in flow_paths_idx:
+                    csv_rows.append({
+                        'region': region_code,
+                        'sample': idx_pt + 1,
+                        'path_id': p_idx + 1,
+                        'flow': flow[p_idx],
+                        'time_cost': times[p_idx],
+                        'money_cost': monies[p_idx]
+                    })
+    
+    # --- 在最右侧位置标注路径标签，只标注有流量的路径 ---
+    label_pos = {}
+    for row in csv_rows:
+        pid = row['path_id']
+        t = row['time_cost']
+        m = row['money_cost']
+        flow = row['flow']
+        # 只为有流量的路径添加标签
+        if flow > 0:
+            if pid not in label_pos or t > label_pos[pid][0]:
+                label_pos[pid] = (t, m)
+    
+    if label_pos:
+        xs = np.array([v[0] for v in label_pos.values()])
+        # margin = (xs.max() - xs.min()) * 0.05 if len(xs) > 1 else 2
+        fixed_x = xs.max()
+        for pid, (tx, my) in label_pos.items():
+            # offset_x = fixed_x - 2 if pid == 3 else fixed_x
+            # 水平线
+            ax.plot([tx, fixed_x - 0.1], [my, my], color='gray', linestyle=':', linewidth=3)
+            # 标签
+            ax.text(fixed_x, my, f'$P_{pid}$', fontsize=24, va='center', ha='left')
+
+    # 完成并保存
+    ax.set_xlabel('Time Cost', fontsize=12)
+    ax.set_ylabel('Money Cost', fontsize=12)
+    ax.grid(True)
+    ax.legend(loc='best', fontsize=10, framealpha=1)
+    plt.tight_layout()
+    plt.savefig(f'results/two_regions_path_costs_zeta{zeta_value}.pdf', format='pdf', dpi=300)
+    # plt.show()
+
+    # 保存CSV，只保存有流量的路径
+    if csv_rows:
+        import pandas as _pd
+        df_out = _pd.DataFrame(csv_rows)
+        os.makedirs('results', exist_ok=True)
+        csv_path = os.path.join('results', f'two_regions_flow_costs_zeta{zeta_value}.csv')
+        df_out.to_csv(csv_path, index=False)
+        print(f"流量和成本数据已保存至 {csv_path}")
 
 # 主函数
 def main():
@@ -469,6 +606,8 @@ def main():
     # Plot comparison for JSON-based data
     for zeta in [8, 16, 24, 32]:
         plot_comparison_path_costs(zeta)
+        # 添加调用新的两区域绘图函数
+    plot_two_regions_path_costs(24)
     # Optionally, existing three regions comparison calls can remain or be removed.
 
 if __name__ == "__main__":

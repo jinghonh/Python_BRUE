@@ -771,5 +771,8 @@ if __name__ == "__main__":
 
     # 图5: 绘制前两个区域以及RBS_0^ε区域的第一个散点
     fig5 = create_plot(plot_num=5, show_reg2=True, show_reg=True, show_reg3=False, show_eqm=False, show_points=True, results_dir=results_dir, plot_specific_points=['t_eqm'])
+
+    # 绘制前两个区域以及前两个区域的两个散点
+    fig6 = create_plot(plot_num=6, show_reg2=True, show_reg=True, show_reg3=False, show_eqm=False, show_points=True, results_dir=results_dir, plot_specific_points=['s', 'bs'])
 # # 显示所有图形
 # plt.show()
