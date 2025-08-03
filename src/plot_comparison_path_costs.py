@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib.lines import Line2D
+import matplotlib.patheffects as pe  # 用于给文字添加描边效果，避免覆盖标记
 import json
 import os
 from scipy.io import loadmat  # 添加导入.mat文件的库
@@ -519,6 +520,11 @@ def plot_two_regions_path_costs(zeta_value, figsize=(10, 8)):
     
     # 存储图例句柄
     legend_handles = []
+    
+    # 定义字母标签和存储点的位置
+    point_labels = ['A', 'B', 'C', 'D']
+    point_label_idx = 0  # 用于跟踪标签索引
+    labeled_points = []  # 存储带标签的点: [(x, y, label, color), ...]
 
     # 对于每个区域
     for key, color, label, marker in regions:
@@ -559,7 +565,9 @@ def plot_two_regions_path_costs(zeta_value, figsize=(10, 8)):
                 # 存储这个方案的时间成本范围
                 time_min = np.min(sorted_times)
                 time_max = np.max(sorted_times)
-                region_time_ranges[key].append((time_min, time_max, sorted_monies[0], idx_pt))
+                # 获取当前字母标签（若超出范围则为空字符串）
+                current_letter = point_labels[point_label_idx - 1] if point_label_idx - 1 < len(point_labels) else ''
+                region_time_ranges[key].append((time_min, time_max, sorted_monies[0], idx_pt, current_letter))
                 
                 # 仅为每个区域的第一个有效方案添加图例
                 line_label = label if not region_legend_added else None
@@ -567,13 +575,23 @@ def plot_two_regions_path_costs(zeta_value, figsize=(10, 8)):
                     region_legend_added = True
                 
                 # 绘制有流量路径的连接线和散点
-                line = ax.plot(sorted_times, sorted_monies, '-', color=color, linewidth=1.5, 
-                       marker=marker, markersize=8, label=line_label, alpha=0.8)
+                line = ax.plot(sorted_times, sorted_monies, '-', color=color, linewidth=1.5,
+                       marker=marker, markersize=12, label=line_label, alpha=0.8,
+                       markeredgecolor='black', markeredgewidth=1.0, zorder=99)
                 
                 # 如果是第一个有标签的线，保存图例句柄
                 if line_label:
                     legend_handles.append(line[0])
                 
+                # 为这条折线的所有散点添加同一个字母标签（例如A、B、C、D）
+                # 只有当还有可用标签时才添加
+                if point_label_idx < len(point_labels):
+                    current_letter = point_labels[point_label_idx]
+                    for t_val, m_val in zip(sorted_times, sorted_monies):
+                        labeled_points.append((t_val, m_val, current_letter, color))
+                    # 一个折线使用一个字母，之后切换到下一个字母
+                    point_label_idx += 1
+ 
                 # --- 收集CSV行 ---
                 region_code = region_short.get(key, key)
                 for p_idx in flow_paths_idx:
@@ -585,6 +603,21 @@ def plot_two_regions_path_costs(zeta_value, figsize=(10, 8)):
                         'time_cost': times[p_idx],
                         'money_cost': monies[p_idx]
                     })
+    
+    # 绘制带有字母标签的点
+    for time, money, label_text, point_color in labeled_points:
+        txt = ax.text(
+            time, money-0.11 if label_text == 'A' or label_text == 'B' else money,
+            label_text,
+            fontsize=10,
+            fontweight='bold',
+            ha='center',
+            va='center',
+            color='black',
+            zorder=100  # 确保文字在最上层，但不遮挡标记边界
+        )
+        # 添加白色描边使文字在彩色标记上清晰可见
+        # txt.set_path_effects([pe.withStroke(linewidth=2, foreground='white')])
 
     # 使用更好的视觉效果显示时间成本区间
     ax_top = ax.twiny()  # 创建一个共享y轴的新x轴
@@ -610,7 +643,7 @@ def plot_two_regions_path_costs(zeta_value, figsize=(10, 8)):
     
     # 绘制区间并添加标签
     for key, ranges in region_time_ranges.items():
-        for i, (t_min, t_max, money, idx) in enumerate(ranges):
+        for i, (t_min, t_max, money, idx, letter_tag) in enumerate(ranges):
             if i < 2:  # 只处理每个区域的前两个方案
                 y_pos = y_min + y_range * interval_positions[key][i]  # 从下往上计算位置
                 
@@ -627,12 +660,16 @@ def plot_two_regions_path_costs(zeta_value, figsize=(10, 8)):
                 ax.annotate('', xy=(t_max, y_pos), xytext=(t_min, y_pos),
                           arrowprops=dict(arrowstyle='<->', color=region_colors[key], linewidth=1.5))
                 
-                # 4. epsilon标签
+                # 4. epsilon标签，带字母上标
                 mid_point = (t_min + t_max) / 2
                 # 计算区间宽度并保留两位小数
                 interval_width = round(t_max - t_min, 2)
-                ax.text(mid_point, y_pos + 0.01*y_range, f'$\\varepsilon = \mathbf{{{interval_width}}}$', 
-                      fontsize=18, ha='center', va='bottom', color=region_colors[key])
+                if letter_tag:
+                    eps_label = rf'$\varepsilon^{{{letter_tag}}} = \mathbf{{{interval_width}}}$'
+                else:
+                    eps_label = rf'$\varepsilon = \mathbf{{{interval_width}}}$'
+                ax.text(mid_point, y_pos + 0.01*y_range, eps_label,
+                       fontsize=18, ha='center', va='bottom', color=region_colors[key])
                 
                 # 5. 方案标签
                 ax.text(t_max + 0.01 * x_range, y_pos, f'{region_short[key]}{idx+1}', 
@@ -706,7 +743,7 @@ def main():
     for zeta in [8, 16, 24, 32]:
         plot_comparison_path_costs(zeta)
         # 添加调用新的两区域绘图函数
-        plot_two_regions_path_costs(zeta)  # 为每个zeta值都生成两区域对比图
+        plot_two_regions_path_costs(zeta)
     
     # Optionally, existing three regions comparison calls can remain or be removed.
 
