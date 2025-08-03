@@ -23,7 +23,9 @@ from typing import Callable, Tuple, Dict, Any, List
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import LinearSegmentedColormap
+# 绘图相关
 from matplotlib.patches import Patch
+import matplotlib.patheffects as patheffects  # 用于给文字添加描边效果
 from scipy.interpolate import interp1d
 
 # ============================== 基本常量 ==============================
@@ -674,15 +676,18 @@ def create_plot(
                 if plot_num == 6:  # 只在fig6中添加标签
                     for i, (x, y) in enumerate(s_pts):
                         if point_label_idx < len(point_labels):
-                            ax.text(
-                                x, y-30, 
-                                point_labels[point_label_idx], 
-                                ha='center', 
-                                va='center',
-                                fontsize=9,
+                            ax.annotate(
+                                point_labels[point_label_idx],
+                                xy=(x, y),
+                                xytext=(8, 8),  # 相对于标记的偏移（点）
+                                textcoords='offset points',
+                                fontsize=13,
                                 weight='bold',
                                 color='k',
-                                zorder=20
+                                ha='left',
+                                va='top',
+                                zorder=20,
+                                bbox=dict(boxstyle="round,pad=0.1", fc="white", alpha=0.8, ec="none"),
                             )
                             point_label_idx += 1
             
@@ -705,15 +710,18 @@ def create_plot(
                 if plot_num == 6:  # 只在fig6中添加标签
                     for i, (x, y) in enumerate(rs_pts):
                         if point_label_idx < len(point_labels):
-                            ax.text(
-                                x, y, 
-                                point_labels[point_label_idx], 
-                                ha='center', 
-                                va='center',
-                                fontsize=10,
+                            ax.annotate(
+                                point_labels[point_label_idx],
+                                xy=(x, y),
+                                xytext=(8, 8),
+                                textcoords='offset points',
+                                fontsize=13,
                                 weight='bold',
                                 color='k',
-                                zorder=20
+                                ha='left',
+                                va='bottom',
+                                zorder=20,
+                                bbox=dict(boxstyle="round,pad=0.2", fc="white", alpha=0.8, ec="none"),
                             )
                             point_label_idx += 1
                 
@@ -736,15 +744,18 @@ def create_plot(
                 if plot_num == 6:  # 只在fig6中添加标签
                     for i, (x, y) in enumerate(bs_pts):
                         if point_label_idx < len(point_labels):
-                            ax.text(
-                                x, y, 
-                                point_labels[point_label_idx], 
-                                ha='center', 
-                                va='center',
-                                fontsize=10,
+                            ax.annotate(
+                                point_labels[point_label_idx],
+                                xy=(x, y),
+                                xytext=(8, 8),
+                                textcoords='offset points',
+                                fontsize=13,
                                 weight='bold',
                                 color='k',
-                                zorder=20
+                                ha='left',
+                                va='bottom',
+                                zorder=20,
+                                bbox=dict(boxstyle="round,pad=0.1", fc="white", alpha=0.8, ec="none"),
                             )
                             point_label_idx += 1
         
@@ -767,15 +778,18 @@ def create_plot(
                 if plot_num == 6:  # 只在fig6中添加标签
                     for i, (x, y) in enumerate(t_eqm_pts):
                         if point_label_idx < len(point_labels):
-                            ax.text(
-                                x, y, 
-                                point_labels[point_label_idx], 
-                                ha='center', 
-                                va='center',
-                                fontsize=10,
+                            ax.annotate(
+                                point_labels[point_label_idx],
+                                xy=(x, y),
+                                xytext=(8, 8),
+                                textcoords='offset points',
+                                fontsize=13,
                                 weight='bold',
                                 color='k',
-                                zorder=20
+                                ha='left',
+                                va='bottom',
+                                zorder=20,
+                                bbox=dict(boxstyle="round,pad=0.2", fc="white", alpha=0.8, ec="none"),
                             )
                             point_label_idx += 1
     
