@@ -29,7 +29,7 @@ from scipy.interpolate import interp1d
 # ============================== 基本常量 ==============================
 RHO: float = 15
 SIGMA: float = 0.02
-E: float = 32  # 误差上限 (与 Mathematica 变量 e 对应)
+E: float = 24  # 误差上限 (与 Mathematica 变量 e 对应)
 EPS: float = 1e-8  # 严格不等式缓冲 (与 Mathematica 变量 eps 对应)
 
 # 边界条件 (与 box 变量对应)
@@ -649,22 +649,42 @@ def create_plot(
         legend_elements.append(Patch(facecolor=color_Teqm, edgecolor=color_Teqm, alpha=0.7, label=r"$T_{eqm}$"))
     
     # 绘制散点
+    point_label_idx = 0  # 用于标记点的索引
+    point_labels = ['A', 'B', 'C', 'D']  # 点的标签
+    
     if show_points:
         # 新增: 绘制S_0^ζ区域的散点
         if s_constraint_points.size > 0:
             if not plot_specific_points or 's' in plot_specific_points:
                 s_pts = s_constraint_points[0:1] if plot_specific_points and len(plot_specific_points) == 1 else s_constraint_points
+                # 绘制散点
                 ax.scatter(
                     s_pts[:, 0],
                     s_pts[:, 1],
                     color=color_S0,
                     marker="^",  # 使用三角形标记，与其他区域区分开
-                    s=45,
+                    s=120,  # 增大标记尺寸以容纳字母
                     linewidth=0.8,
                     edgecolor='k',
                     label=r"Flows of $S_0^\varepsilon$",
                     zorder=15,  # 确保点在区域之上
+                    alpha=0.9,  # 稍微增加透明度使文字更清晰
                 )
+                # 在标记内部添加字母
+                if plot_num == 6:  # 只在fig6中添加标签
+                    for i, (x, y) in enumerate(s_pts):
+                        if point_label_idx < len(point_labels):
+                            ax.text(
+                                x, y-30, 
+                                point_labels[point_label_idx], 
+                                ha='center', 
+                                va='center',
+                                fontsize=9,
+                                weight='bold',
+                                color='k',
+                                zorder=20
+                            )
+                            point_label_idx += 1
             
         if path_constraint_points.size > 0:
             if not plot_specific_points or 'rs' in plot_specific_points:
@@ -674,12 +694,29 @@ def create_plot(
                     rs_pts[:, 1],
                     color=color_RBS0,
                     marker="o",
-                    s=40,
+                    s=120,  # 增大标记尺寸以容纳字母
                     linewidth=0.8,
                     edgecolor='k',
                     label=r"Flows of $RBS_0^\varepsilon$",
                     zorder=15,  # 确保点在区域之上
+                    alpha=0.9,  # 稍微增加透明度使文字更清晰
                 )
+                # 在标记内部添加字母
+                if plot_num == 6:  # 只在fig6中添加标签
+                    for i, (x, y) in enumerate(rs_pts):
+                        if point_label_idx < len(point_labels):
+                            ax.text(
+                                x, y, 
+                                point_labels[point_label_idx], 
+                                ha='center', 
+                                va='center',
+                                fontsize=10,
+                                weight='bold',
+                                color='k',
+                                zorder=20
+                            )
+                            point_label_idx += 1
+                
         if all_constraint_points.size > 0:
             if not plot_specific_points or 'bs' in plot_specific_points:
                 bs_pts = all_constraint_points[0:1] if plot_specific_points and len(plot_specific_points) == 1 else all_constraint_points
@@ -688,12 +725,29 @@ def create_plot(
                     bs_pts[:, 1],
                     color=color_BS0,
                     marker="s",
-                    s=40,
+                    s=120,  # 增大标记尺寸以容纳字母
                     linewidth=0.8,
                     edgecolor='k',
                     label=r"Flows of $BS_0^\varepsilon$",
                     zorder=15,
+                    alpha=0.9,  # 稍微增加透明度使文字更清晰
                 )
+                # 在标记内部添加字母
+                if plot_num == 6:  # 只在fig6中添加标签
+                    for i, (x, y) in enumerate(bs_pts):
+                        if point_label_idx < len(point_labels):
+                            ax.text(
+                                x, y, 
+                                point_labels[point_label_idx], 
+                                ha='center', 
+                                va='center',
+                                fontsize=10,
+                                weight='bold',
+                                color='k',
+                                zorder=20
+                            )
+                            point_label_idx += 1
+        
         if tmax_constraint_points.size > 0:
             if not plot_specific_points or 't_eqm' in plot_specific_points:
                 t_eqm_pts = tmax_constraint_points[0:1] if plot_specific_points and len(plot_specific_points) == 1 else tmax_constraint_points
@@ -702,12 +756,28 @@ def create_plot(
                     t_eqm_pts[:, 1],
                     color=color_Teqm,
                     marker="D",
-                    s=40,
+                    s=120,  # 增大标记尺寸以容纳字母
                     linewidth=0.8,
                     edgecolor='k',
                     label=r"Flows of $T_{eqm}$",
                     zorder=15,
+                    alpha=0.9,  # 稍微增加透明度使文字更清晰
                 )
+                # 在标记内部添加字母
+                if plot_num == 6:  # 只在fig6中添加标签
+                    for i, (x, y) in enumerate(t_eqm_pts):
+                        if point_label_idx < len(point_labels):
+                            ax.text(
+                                x, y, 
+                                point_labels[point_label_idx], 
+                                ha='center', 
+                                va='center',
+                                fontsize=10,
+                                weight='bold',
+                                color='k',
+                                zorder=20
+                            )
+                            point_label_idx += 1
     
     # 设置轴标签和范围
     ax.set_xlabel(r"$f_1$")
