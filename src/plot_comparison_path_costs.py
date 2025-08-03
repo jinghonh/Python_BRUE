@@ -421,23 +421,36 @@ def plot_comparison_path_costs(zeta_value, figsize=(10, 8)):
     except FileNotFoundError:
         pass
     # --- annotate path labels at rightmost occurrence ---
-    label_pos = {}
+    path_points = {}  # 存储每个路径ID对应的所有点
+    
+    # 收集每个路径ID对应的所有点
     for row in csv_rows:
         pid = row['path_id']
         t = row['time_cost']
         m = row['money_cost']
-        if pid not in label_pos or t > label_pos[pid][0]:
-            label_pos[pid] = (t, m)
-    if label_pos:
-        xs = np.array([v[0] for v in label_pos.values()])
-        margin = (xs.max() - xs.min()) * 0.05 if len(xs) > 1 else 2
-        fixed_x = xs.max() - margin-5
-        for pid, (tx, my) in label_pos.items():
-            offset_x = fixed_x - 2 if pid == 3 else fixed_x
-            # horizontal line
-            ax.plot([tx, offset_x - 0.5], [my, my], color='gray', linestyle=':', linewidth=3)
-            # label
-            ax.text(offset_x, my, f'$P_{pid}$', fontsize=24, va='center', ha='left')
+        if pid not in path_points:
+            path_points[pid] = []
+        path_points[pid].append((t, m))
+    
+    if path_points:
+        # 找出所有点的最大时间成本用于放置标签
+        all_time_costs = [max(points, key=lambda x: x[0])[0] for points in path_points.values()]
+        max_time = max(all_time_costs) if all_time_costs else 0
+        
+        for pid, points in path_points.items():
+            # 对每个路径ID找到时间成本最大和最小的点
+            max_point = max(points, key=lambda x: x[0])
+            min_point = min(points, key=lambda x: x[0])
+            
+            # 获取金钱成本和时间成本
+            max_t, m = max_point  # 金钱成本使用最右侧点的值
+            min_t, _ = min_point  # 最小时间成本点
+            
+            # 绘制水平虚线（从最左侧点到标签位置，与标签保持相同高度）
+            ax.plot([min_t, max_time + 0.5], [m, m], color='gray', linestyle=':', linewidth=3)
+            
+            # 添加路径标签
+            ax.text(max_time + 0.6, m, f'$P_{pid}$', fontsize=24, va='center', ha='left')
 
     # Finalize and save
     ax.set_xlabel('Time Cost', fontsize=12)
@@ -555,7 +568,9 @@ def plot_two_regions_path_costs(zeta_value, figsize=(10, 8)):
                     })
     
     # --- 在最右侧位置标注路径标签，只标注有流量的路径 ---
-    label_pos = {}
+    path_points = {}  # 存储每个路径ID对应的所有点
+    
+    # 首先收集每个路径ID对应的所有点
     for row in csv_rows:
         pid = row['path_id']
         t = row['time_cost']
@@ -563,25 +578,35 @@ def plot_two_regions_path_costs(zeta_value, figsize=(10, 8)):
         flow = row['flow']
         # 只为有流量的路径添加标签
         if flow > 0:
-            if pid not in label_pos or t > label_pos[pid][0]:
-                label_pos[pid] = (t, m)
+            if pid not in path_points:
+                path_points[pid] = []
+            path_points[pid].append((t, m))
     
-    if label_pos:
-        xs = np.array([v[0] for v in label_pos.values()])
-        # margin = (xs.max() - xs.min()) * 0.05 if len(xs) > 1 else 2
-        fixed_x = xs.max()
-        for pid, (tx, my) in label_pos.items():
-            # offset_x = fixed_x - 2 if pid == 3 else fixed_x
-            # 水平线
-            ax.plot([tx, fixed_x - 0.1], [my, my], color='gray', linestyle=':', linewidth=3)
-            # 标签
-            ax.text(fixed_x, my, f'$P_{pid}$', fontsize=24, va='center', ha='left')
+    if path_points:
+        # 找出所有点的最大时间成本用于放置标签
+        all_time_costs = [max(points, key=lambda x: x[0])[0] for points in path_points.values()]
+        max_time = max(all_time_costs) if all_time_costs else 0
+        
+        for pid, points in path_points.items():
+            # 对每个路径ID找到时间成本最大和最小的点
+            max_point = max(points, key=lambda x: x[0])
+            min_point = min(points, key=lambda x: x[0])
+            
+            # 获取金钱成本和时间成本
+            max_t, m = max_point  # 金钱成本使用最右侧点的值
+            min_t, _ = min_point  # 最小时间成本点
+            
+            # 绘制水平虚线（从最左侧点到标签位置，与标签保持相同高度）
+            ax.plot([min_t, max_time + 0.5], [m, m], color='gray', linestyle=':', linewidth=3)
+            
+            # 添加路径标签
+            ax.text(max_time + 0.8, m, f'$P_{pid}$', fontsize=24, va='center', ha='left')
 
     # 完成并保存
     ax.set_xlabel('Time Cost', fontsize=12)
     ax.set_ylabel('Money Cost', fontsize=12)
     ax.grid(True)
-    ax.legend(loc='best', fontsize=10, framealpha=1)
+    ax.legend(loc='best', fontsize=24, framealpha=1)
     plt.tight_layout()
     plt.savefig(f'results/two_regions_path_costs_zeta{zeta_value}.pdf', format='pdf', dpi=300)
     # plt.show()
