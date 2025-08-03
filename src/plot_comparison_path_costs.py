@@ -4,6 +4,9 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib.lines import Line2D
 import matplotlib.patheffects as pe  # 用于给文字添加描边效果，避免覆盖标记
+
+# 统一样式配置
+from plot_styles import REGION_STYLES
 import json
 import os
 from scipy.io import loadmat  # 添加导入.mat文件的库
@@ -185,17 +188,10 @@ def plot_three_regions_comparison(df, zeta_value, figsize=(10, 8), use_mat_file=
     # 创建图形
     fig, ax = plt.subplots(figsize=figsize)
     
-    # 设置颜色和标记样式
-    colors = {
-        1: [0.0, 0.6, 0.3],  # 绿色 - 区域1：只满足路径约束
-        2: [0.85, 0.4, 0.0], # 橙色 - 区域2：满足全部约束但违反T_max
-        3: [0.0, 0.4, 0.8]   # 蓝色 - 区域3：满足全部约束且满足T_max
-    }
-    markers = {
-        1: 'o',  # 区域1：圆形
-        2: 's',  # 区域2：方形
-        3: 'd'   # 区域3：菱形
-    }
+    # 使用统一样式（根据需要映射区域编号 -> 样式键）
+    region_key_map = {1: "RBS", 2: "BS", 3: "S"}
+    colors = {k: REGION_STYLES[v].color for k, v in region_key_map.items()}
+    markers = {k: REGION_STYLES[v].marker for k, v in region_key_map.items()}
     
     legend_handles = []
     
@@ -357,9 +353,9 @@ def plot_comparison_path_costs(zeta_value, figsize=(10, 8)):
     fig, ax = plt.subplots(figsize=figsize)
     # Define regions: JSON key, color, legend label, and marker for scattering other paths
     regions = [
-        ('s_constraint_points', '#ea9999', r'$S_0^\varepsilon$', '^'),
-        ('all_constraint_points', '#1f77b4', r'$BS_0^\varepsilon$', 's'),
-        ('path_constraint_points', '#4daf4a', r'$RBS_0^\varepsilon$', 'o')
+        ('s_constraint_points', REGION_STYLES['S'].color, REGION_STYLES['S'].label, REGION_STYLES['S'].marker),
+        ('all_constraint_points', REGION_STYLES['BS'].color, REGION_STYLES['BS'].label, REGION_STYLES['BS'].marker),
+        ('path_constraint_points', REGION_STYLES['RBS'].color, REGION_STYLES['RBS'].label, REGION_STYLES['RBS'].marker)
     ]
     total_flow = 10000.0
     # storage for csv rows
@@ -503,8 +499,8 @@ def plot_two_regions_path_costs(zeta_value, figsize=(10, 8)):
     
     # 仅定义前两个区域：JSON键、颜色、图例标签和散点标记
     regions = [
-        ('s_constraint_points', '#ea9999', r'$S_0^\varepsilon$', '^'),
-        ('all_constraint_points', '#1f77b4', r'$BS_0^\varepsilon$', 's')
+        ('s_constraint_points', REGION_STYLES['S'].color, REGION_STYLES['S'].label, REGION_STYLES['S'].marker),
+        ('all_constraint_points', REGION_STYLES['BS'].color, REGION_STYLES['BS'].label, REGION_STYLES['BS'].marker)
     ]
     total_flow = 10000.0
     
@@ -522,7 +518,7 @@ def plot_two_regions_path_costs(zeta_value, figsize=(10, 8)):
     legend_handles = []
     
     # 定义字母标签和存储点的位置
-    point_labels = ['A', 'B', 'C', 'D']
+    point_labels = ['D', 'C', 'A', 'B']  # 点的标签
     point_label_idx = 0  # 用于跟踪标签索引
     labeled_points = []  # 存储带标签的点: [(x, y, label, color), ...]
 
@@ -576,7 +572,7 @@ def plot_two_regions_path_costs(zeta_value, figsize=(10, 8)):
                 
                 # 绘制有流量路径的连接线和散点
                 line = ax.plot(sorted_times, sorted_monies, '-', color=color, linewidth=1.5,
-                       marker=marker, markersize=18, label=line_label, alpha=0.8,
+                       marker=marker, markersize=25, label=line_label, alpha=0.8,
                        markeredgecolor='black', markeredgewidth=1.0, zorder=99)
                 
                 # 如果是第一个有标签的线，保存图例句柄
@@ -609,7 +605,7 @@ def plot_two_regions_path_costs(zeta_value, figsize=(10, 8)):
         txt = ax.text(
             time, money-0.11 if label_text == 'A' or label_text == 'B' else money,
             label_text,
-            fontsize=12,
+            fontsize=18,
             fontweight='bold',
             ha='center',
             va='center',
@@ -629,7 +625,10 @@ def plot_two_regions_path_costs(zeta_value, figsize=(10, 8)):
     y_min = ax.get_ylim()[0]
     y_range = y_max - y_min
     
-    region_colors = {'s_constraint_points': '#ea9999', 'all_constraint_points': '#1f77b4'}
+    region_colors = {
+        's_constraint_points': REGION_STYLES['S'].color,
+        'all_constraint_points': REGION_STYLES['BS'].color,
+    }
     
     # 区间位置的相对高度（S区域放在上方，BS区域放在下方）
     interval_positions = {
@@ -716,7 +715,7 @@ def plot_two_regions_path_costs(zeta_value, figsize=(10, 8)):
     ax.grid(True, linestyle='--', alpha=0.7)
     
     # 只使用收集的图例句柄，确保每个区域只有一个图例项
-    ax.legend(handles=legend_handles, loc='best', fontsize=14, framealpha=1)
+    ax.legend(handles=legend_handles, loc='best', fontsize=30, framealpha=1)
     
     plt.tight_layout()
     plt.savefig(f'results/two_regions_path_costs_zeta{zeta_value}.pdf', format='pdf', dpi=300)

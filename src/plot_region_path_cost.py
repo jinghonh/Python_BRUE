@@ -28,6 +28,9 @@ from matplotlib.patches import Patch
 import matplotlib.patheffects as patheffects  # 用于给文字添加描边效果
 from scipy.interpolate import interp1d
 
+# 从统一配置读取区域样式
+from plot_styles import REGION_STYLES
+
 # ============================== 基本常量 ==============================
 RHO: float = 15
 SIGMA: float = 0.02
@@ -593,12 +596,22 @@ plt.rcParams.update({
     "savefig.pad_inches": 0.05,
 })
 
-# 定义一套柔和且清晰的学术颜色方案 (基于 ColorBrewer Set2) 别修改注释
-color_S0 = "#ea9999"   # 更红的柔和红色 - S_0^ζ（替换原灰色，更适合大面积底色）
-color_BS0 = "#1f77b4"  # 蓝色 - BS_0^ζ
-color_RBS0 = "#4daf4a"  # 绿色 - RBS_0^ζ
-color_Teqm = "#984ea3" # 紫色 - T_eqm
+# --------------------------- 颜色和标记 ---------------------------
+# 统一从配置文件提取，后续若需调整仅修改 plot_styles.py
+color_S0 = REGION_STYLES["S"].color
+color_BS0 = REGION_STYLES["BS"].color
+color_RBS0 = REGION_STYLES["RBS"].color
+color_Teqm = REGION_STYLES["T_eqm"].color
 
+# 便捷获取标记
+marker_S0 = REGION_STYLES["S"].marker
+marker_BS0 = REGION_STYLES["BS"].marker
+marker_RBS0 = REGION_STYLES["RBS"].marker
+marker_Teqm = REGION_STYLES["T_eqm"].marker
+print(f"color_S0: {color_S0}, marker_S0: {marker_S0}")
+print(f"color_BS0: {color_BS0}, marker_BS0: {marker_BS0}")
+print(f"color_RBS0: {color_RBS0}, marker_RBS0: {marker_RBS0}")
+print(f"color_Teqm: {color_Teqm}, marker_Teqm: {marker_Teqm}")
 # --------------------------- 创建绘图函数 ---------------------------
 
 def create_plot(
@@ -652,7 +665,7 @@ def create_plot(
     
     # 绘制散点
     point_label_idx = 0  # 用于标记点的索引
-    point_labels = ['A', 'B', 'C', 'D']  # 点的标签
+    point_labels = ['D', 'C', 'A', 'B']  # 点的标签
     
     if show_points:
         # 新增: 绘制S_0^ζ区域的散点
@@ -664,7 +677,7 @@ def create_plot(
                     s_pts[:, 0],
                     s_pts[:, 1],
                     color=color_S0,
-                    marker="^",  # 使用三角形标记，与其他区域区分开
+                    marker=marker_S0,
                     s=120,  # 增大标记尺寸以容纳字母
                     linewidth=0.8,
                     edgecolor='k',
@@ -698,7 +711,7 @@ def create_plot(
                     rs_pts[:, 0],
                     rs_pts[:, 1],
                     color=color_RBS0,
-                    marker="o",
+                    marker=marker_RBS0,
                     s=120,  # 增大标记尺寸以容纳字母
                     linewidth=0.8,
                     edgecolor='k',
@@ -732,7 +745,7 @@ def create_plot(
                     bs_pts[:, 0],
                     bs_pts[:, 1],
                     color=color_BS0,
-                    marker="s",
+                    marker=marker_BS0,
                     s=120,  # 增大标记尺寸以容纳字母
                     linewidth=0.8,
                     edgecolor='k',
@@ -766,7 +779,7 @@ def create_plot(
                     t_eqm_pts[:, 0],
                     t_eqm_pts[:, 1],
                     color=color_Teqm,
-                    marker="D",
+                    marker=marker_Teqm,
                     s=120,  # 增大标记尺寸以容纳字母
                     linewidth=0.8,
                     edgecolor='k',
@@ -838,25 +851,153 @@ def create_plot(
 
     
     return fig
+
+# ====================== 批量绘制不同 ε 的图 ======================
+
+
+def generate_plots_for_e(e_val: int, results_dir: str = "results"):
+    """根据给定 ε (zeta) 值重新计算区域并输出全部 6 张图。"""
+    import numpy as _np
+
+    # --- 使用全局变量，后续 create_plot 直接读取 ---
+    global E, ZETA_VALUE
+    global mask_reg, mask_reg2, mask_reg3, mask_eqm
+    global P1_VALS, P2_VALS, P5_VALS
+    global mid_path, eqm_limit_x, left_boundary_x
+    global s_constraint_points, path_constraint_points, all_constraint_points, tmax_constraint_points
+
+    # 更新 epsilon / zeta 值
+    E = float(e_val)
+    ZETA_VALUE = E
+
+    print(f"\n====================  生成 ε = {E} 的区域图  ====================")
+
+    # ---------- Re-compute feasible masks ----------
+    mask_reg = feasible_mask(F1_GRID, F2_GRID)
+    if not _np.any(mask_reg):
+        raise RuntimeError(f"❌ 可行域为空；请检查参数 ε = {E}")
+
+    # 路径成本矩阵
+    P1_VALS = path1(F1_GRID, F2_GRID)
+    P2_VALS = path2(F1_GRID, F2_GRID)
+    P5_VALS = path5(F1_GRID, F2_GRID)
+
+    # 取可行域内的值
+    P1_INSIDE = P1_VALS[mask_reg]
+    P2_INSIDE = P2_VALS[mask_reg]
+    P5_INSIDE = P5_VALS[mask_reg]
+
+    # 最大最小值
+    r1_max, r1_min = P1_INSIDE.max(), P1_INSIDE.min()
+    r2_max, r2_min = P2_INSIDE.max(), P2_INSIDE.min()
+    r5_max, r5_min = P5_INSIDE.max(), P5_INSIDE.min()
+
+    left_boundary_x = _np.array([r1_min, r2_min, r5_min])
+    default_upper_limit_x = _np.array([(r1_max + r1_min) / 2, (r2_max + r2_min) / 2, (r5_max + r5_min) / 2])
+    upper_limit_y = _np.array([20.0, 15.0, 2.0])
+
+    # 计算/读取 mid_path (t_max) 与 eqm_limit_x (t_eqm)
+    mid_path, eqm_limit_x = get_or_compute_path_limits(
+        left_boundary_x=left_boundary_x,
+        upper_limit_x=default_upper_limit_x,
+        upper_limit_y=upper_limit_y,
+        e_value=E,
+        results_dir=results_dir,
+        zeta=int(E),
+    )
+
+    # ---------- Re-compute masks with new thresholds ----------
+    mask_reg3 = mask_reg & (
+        (P1_VALS <= mid_path[0]) & (P2_VALS <= mid_path[1]) & (P5_VALS <= mid_path[2])
+    )
+    mask_reg2 = _box_constraints(F1_GRID, F2_GRID) & (
+        (max_path(F1_GRID, F2_GRID) - min_path(F1_GRID, F2_GRID)) <= E
+    )
+    mask_eqm = mask_reg & (
+        (P1_VALS <= eqm_limit_x[0])
+        & (P2_VALS <= eqm_limit_x[1])
+        & (P5_VALS <= eqm_limit_x[2])
+    )
+
+    # ---------- 更新/生成散点 ----------
+    (
+        s_constraint_points,
+        path_constraint_points,
+        all_constraint_points,
+        tmax_constraint_points,
+    ) = get_or_generate_scatter_points(
+        mask_reg2=mask_reg2,
+        mask_reg=mask_reg,
+        mask_reg3=mask_reg3,
+        mask_eqm=mask_eqm,
+        F1_GRID=F1_GRID,
+        F2_GRID=F2_GRID,
+        e_value=E,
+        num_points=2,
+        results_dir=results_dir,
+    )
+
+    # ---------- 绘制六张图 ----------
+    create_plot(
+        plot_num=1,
+        show_reg2=True,
+        show_reg=True,
+        show_reg3=False,
+        show_eqm=False,
+        show_points=False,
+        results_dir=results_dir,
+    )
+    create_plot(
+        plot_num=2,
+        show_reg2=True,
+        show_reg=True,
+        show_reg3=True,
+        show_eqm=True,
+        show_points=False,
+        results_dir=results_dir,
+    )
+    create_plot(
+        plot_num=3,
+        show_reg2=True,
+        show_reg=True,
+        show_reg3=True,
+        show_eqm=True,
+        show_points=True,
+        results_dir=results_dir,
+    )
+    create_plot(
+        plot_num=4,
+        show_reg2=True,
+        show_reg=True,
+        show_reg3=False,
+        show_eqm=True,
+        show_points=False,
+        results_dir=results_dir,
+    )
+    create_plot(
+        plot_num=5,
+        show_reg2=True,
+        show_reg=True,
+        show_reg3=False,
+        show_eqm=False,
+        show_points=True,
+        results_dir=results_dir,
+        plot_specific_points=["t_eqm"],
+    )
+    create_plot(
+        plot_num=6,
+        show_reg2=True,
+        show_reg=True,
+        show_reg3=False,
+        show_eqm=False,
+        show_points=True,
+        results_dir=results_dir,
+        plot_specific_points=["s", "bs"],
+    )
+
+    print(f"✅ ε = {E} 的区域图全部生成完毕\n")
+
 if __name__ == "__main__":
-    # --------------------------- 创建三个不同的图 ---------------------------
-
-    # 图1: 只绘制前两个区域
-    fig1 = create_plot(plot_num=1, show_reg2=True, show_reg=True, show_reg3=False, show_eqm=False, show_points=False, results_dir=results_dir)
-
-    # 图2: 绘制全部区域
-    fig2 = create_plot(plot_num=2, show_reg2=True, show_reg=True, show_reg3=True, show_eqm=True, show_points=False, results_dir=results_dir)
-
-    # 图3: 绘制全部区域和散点
-    fig3 = create_plot(plot_num=3, show_reg2=True, show_reg=True, show_reg3=True, show_eqm=True, show_points=True, results_dir=results_dir)
-
-    # 图4: 不绘制RBS_0^ε区域
-    fig4 = create_plot(plot_num=4, show_reg2=True, show_reg=True, show_reg3=False, show_eqm=True, show_points=False, results_dir=results_dir)
-
-    # 图5: 绘制前两个区域以及RBS_0^ε区域的第一个散点
-    fig5 = create_plot(plot_num=5, show_reg2=True, show_reg=True, show_reg3=False, show_eqm=False, show_points=True, results_dir=results_dir, plot_specific_points=['t_eqm'])
-
-    # 绘制前两个区域以及前两个区域的两个散点
-    fig6 = create_plot(plot_num=6, show_reg2=True, show_reg=True, show_reg3=False, show_eqm=False, show_points=True, results_dir=results_dir, plot_specific_points=['s', 'bs'])
-# # 显示所有图形
-# plt.show()
+    # 一次性生成多个 ε 值的所有结果图
+    for _eps in [8, 16, 24, 32]:
+        generate_plots_for_e(_eps)
