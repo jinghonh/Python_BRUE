@@ -2,8 +2,10 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+# --- Matplotlib helpers
 from matplotlib.lines import Line2D
 import matplotlib.patheffects as pe  # 用于给文字添加描边效果，避免覆盖标记
+from matplotlib.colors import to_rgb, to_hex
 
 # 统一样式配置
 from plot_styles import REGION_STYLES
@@ -192,6 +194,28 @@ def plot_three_regions_comparison(df, zeta_value, figsize=(10, 8), use_mat_file=
     region_key_map = {1: "RBS", 2: "BS", 3: "S"}
     colors = {k: REGION_STYLES[v].color for k, v in region_key_map.items()}
     markers = {k: REGION_STYLES[v].marker for k, v in region_key_map.items()}
+
+# ----------------------------------------------------------------------
+# 辅助函数：根据给定颜色生成浅/深色变体
+# ----------------------------------------------------------------------
+
+
+def _lighten_color(color: str, amount: float = 0.4) -> str:
+    """Blend color towards white by given amount (0~1)."""
+    r, g, b = to_rgb(color)
+    r = r + (1 - r) * amount
+    g = g + (1 - g) * amount
+    b = b + (1 - b) * amount
+    return to_hex((r, g, b))
+
+
+def _darken_color(color: str, amount: float = 0.25) -> str:
+    """Blend color towards black by given amount (0~1)."""
+    r, g, b = to_rgb(color)
+    r *= (1 - amount)
+    g *= (1 - amount)
+    b *= (1 - amount)
+    return to_hex((r, g, b))
     
     legend_handles = []
     
@@ -219,8 +243,16 @@ def plot_three_regions_comparison(df, zeta_value, figsize=(10, 8), use_mat_file=
                 x_max = max(x_max, np.max(time_costs))
                 
                 # 绘制散点
-                scatter = ax.scatter(time_costs, money_costs, c=[colors[region]], 
-                                     marker=markers[region], s=60, alpha=0.8)
+                scatter = ax.scatter(
+                    time_costs,
+                    money_costs,
+                    facecolor=_lighten_color(colors[region], 0.4),
+                    edgecolor=_darken_color(colors[region], 0.25),
+                    marker=markers[region],
+                    s=60,
+                    alpha=0.9,
+                    linewidths=0.8,
+                )
                 
                 # 对于同一方案中的每个唯一金钱成本（即同一路径），连接这些点
                 for path_id in unique_paths:
@@ -392,7 +424,15 @@ def plot_comparison_path_costs(zeta_value, figsize=(10, 8)):
             ax.plot(times_line, monies_line, '-', color=color, linewidth=1.5, marker=marker, markersize=8, label=lbl)
             # Scatter other paths
             other_idx = [i for i in range(len(times)) if i not in line_idx]
-            ax.scatter(times[other_idx], monies[other_idx], color=color, marker=marker, s=50)
+            ax.scatter(
+                times[other_idx],
+                monies[other_idx],
+                facecolor=_lighten_color(color, 0.4),
+                edgecolor=_darken_color(color, 0.25),
+                marker=marker,
+                s=50,
+                linewidths=0.6,
+            )
 
             # --- collect csv rows ---
             region_code = region_short.get(key, key)
@@ -571,9 +611,23 @@ def plot_two_regions_path_costs(zeta_value, figsize=(10, 8)):
                     region_legend_added = True
                 
                 # 绘制有流量路径的连接线和散点
-                line = ax.plot(sorted_times, sorted_monies, '-', color=color, linewidth=1.5,
-                       marker=marker, markersize=25, label=line_label, alpha=0.8,
-                       markeredgecolor='black', markeredgewidth=1.0, zorder=99)
+                light_c = _lighten_color(color, 0.4)
+                dark_c = _darken_color(color, 0.25)
+                line = ax.plot(
+                    sorted_times,
+                    sorted_monies,
+                    '-',
+                    color=color,  # 线条保持基准色
+                    linewidth=1.5,
+                    marker=marker,
+                    markersize=25,
+                    label=line_label,
+                    alpha=0.85,
+                    markeredgecolor=dark_c,
+                    markeredgewidth=1.2,
+                    markerfacecolor=light_c,
+                    zorder=99,
+                )
                 
                 # 如果是第一个有标签的线，保存图例句柄
                 if line_label:
@@ -584,7 +638,7 @@ def plot_two_regions_path_costs(zeta_value, figsize=(10, 8)):
                 if point_label_idx < len(point_labels):
                     current_letter = point_labels[point_label_idx]
                     for t_val, m_val in zip(sorted_times, sorted_monies):
-                        labeled_points.append((t_val, m_val, current_letter, color))
+                        labeled_points.append((t_val, m_val, current_letter, dark_c))
                     # 一个折线使用一个字母，之后切换到下一个字母
                     point_label_idx += 1
  
@@ -603,14 +657,15 @@ def plot_two_regions_path_costs(zeta_value, figsize=(10, 8)):
     # 绘制带有字母标签的点
     for time, money, label_text, point_color in labeled_points:
         txt = ax.text(
-            time, money-0.11 if label_text == 'A' or label_text == 'B' else money,
+            time,
+            money-0.1,
             label_text,
-            fontsize=18,
+            fontsize=22,
             fontweight='bold',
             ha='center',
             va='center',
-            color='black',
-            zorder=120  # 确保文字在最上层，但不遮挡标记边界
+            color=point_color,  # 与 marker 边色一致
+            zorder=120,  # 确保文字在最上层，但不遮挡标记边界
         )
         # 添加白色描边使文字在彩色标记上清晰可见
         # txt.set_path_effects([pe.withStroke(linewidth=2, foreground='white')])
