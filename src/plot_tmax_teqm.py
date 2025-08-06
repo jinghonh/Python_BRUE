@@ -24,13 +24,13 @@ class PlotParams:
 
 def load_tmax_teqm_data(zeta):
     """
-    加载指定zeta值的t_max和t_eqm数据
+    加载指定zeta值的TTB_max_delta和TTB_max数据
     
     Args:
         zeta (int): zeta值
     
     Returns:
-        dict: 包含money_values, t_max, t_eqm的字典
+        dict: 包含money_values, TTB_max_delta, TTB_max的字典
     """
     # 获取项目根目录
     current_dir = Path(__file__).parent
@@ -61,7 +61,7 @@ def configure_plot(ax, params, title, xlabel, ylabel):
 
 def plot_tmax_teqm(zeta_values, params=None):
     """
-    根据多个zeta值绘制t_max和t_eqm的折线图
+    根据多个zeta值绘制TTB_max_delta和TTB_max的折线图
     
     Args:
         zeta_values (list): zeta值列表
@@ -98,23 +98,23 @@ def plot_tmax_teqm(zeta_values, params=None):
             # 选择当前zeta值对应的标记
             marker = markers[i % len(markers)]
             
-            # 绘制T_max，使用实线 (-) 和红色系，添加标记
-            ax.plot(data['t_max'], data['money_values'], '-', 
+            # 绘制TTB_max_delta，使用实线 (-) 和红色系，添加标记
+            ax.plot(data['TTB_max_delta'], data['money_values'], '-', 
                    color=tmax_color, linewidth=2, 
                    marker=marker, markersize=8, markerfacecolor=tmax_color, markeredgecolor='black', markeredgewidth=0.5)
             
             # 绘制T_eqm，使用虚线 (--) 和紫色系，添加标记
-            ax.plot(data['t_eqm'], data['money_values'], '--', 
+            ax.plot(data['TTB_max'], data['money_values'], '--', 
                    color=teqm_color, linewidth=2, 
                    marker=marker, markersize=8, markerfacecolor=teqm_color, markeredgecolor='black', markeredgewidth=0.5)
             
             # 只为第一个zeta值创建zeta图例条目
             if i == 0:
-                # 为T_max和T_eqm创建图例条目
+                # 为TTB_max_delta和T_eqm创建图例条目
                 legend_handles.append(plt.Line2D([0], [0], color=tmax_color, lw=2, linestyle='-', 
-                                              label=r'$T_{max}$'))
+                                              label=r'$TTB_{max} + \delta_k$'))
                 legend_handles.append(plt.Line2D([0], [0], color=teqm_color, lw=2, linestyle='--', 
-                                              label=r'$T_{eqm}$'))
+                                              label=r'$TTB_{max}$'))
             
             # 为每个zeta值创建图例条目，使用黑色以便区分
             legend_handles.append(plt.Line2D([0], [0], marker=marker, color='black', 

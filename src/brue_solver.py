@@ -309,7 +309,7 @@ class BRUESolver(BRUEBase):
             else:
                 plt.title(f'Path Cost Analysis - {group_name}\nε = {epsilon:.2f}')
 
-            plt.xlabel('Travel Time Cost')
+            plt.xlabel('Travel Time')
             plt.ylabel('Money Cost')
             plt.grid(True, alpha=0.3)
 
@@ -406,7 +406,7 @@ class BRUESolver(BRUEBase):
                             fontsize=8)
 
             # Set properties
-            ax.set_xlabel('Travel Time Cost')
+            ax.set_xlabel('Travel Time')
             ax.set_ylabel('Money Cost')
             ax.set_title(f'{scenario_name}\n'
                          f'Non-dominated: {sorted(non_dominated_paths)}\n'

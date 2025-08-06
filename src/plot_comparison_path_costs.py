@@ -142,17 +142,17 @@ def calculate_all_path_costs(flow, relation_matrix):
     path_costs = np.column_stack((RT, path_money))
     return path_costs
 
-# 从.mat文件计算T_max上限
+# 从.mat文件计算TTB_max_delta上限
 def calculate_tmax_from_mat(mat_file_path):
     """
-    从.mat文件中读取数据并计算T_max上限
+    从.mat文件中读取数据并计算TTB_max_delta上限
     
     参数:
         mat_file_path: .mat文件路径
         
     返回:
-        upper_limit_x: T_max上限的x坐标
-        upper_limit_y: T_max上限的y坐标
+        upper_limit_x: TTB_max_delta上限的x坐标
+        upper_limit_y: TTB_max_delta上限的y坐标
     """
     try:
         # 读取.mat文件
@@ -187,7 +187,7 @@ def calculate_tmax_from_mat(mat_file_path):
         all_money_costs = np.array(all_money_costs)
         boundary = calculate_feasible_region_boundary(all_time_costs, all_money_costs)
         
-        # 计算T_max上限（使用边界中点）
+        # 计算TTB_max_delta上限（使用边界中点）
         upper_limit_x = (boundary['rightX'] + boundary['leftX']) / 2
         upper_limit_y = boundary['rightY']
         
@@ -203,7 +203,7 @@ def calculate_tmax_from_mat(mat_file_path):
         return upper_limit_x, upper_limit_y
         
     except Exception as e:
-        print(f"从.mat文件计算T_max时出错: {e}")
+        print(f"从.mat文件计算TTB_max_delta时出错: {e}")
         return np.array([]), np.array([])
 
 # 绘制三区域路径成本对比图
@@ -302,9 +302,9 @@ def plot_three_regions_comparison(df, zeta_value, figsize=(10, 8), use_mat_file=
                 # 添加到图例句柄
                 legend_handles.append(mpatches.Patch(color=colors[region], label=label))
     
-    # 绘制 T_max 上限线
+    # 绘制 TTB_max_delta 上限线
     if use_mat_file:
-        # 从.mat文件计算T_max上限
+        # 从.mat文件计算TTB_max_delta上限
         mat_file_path = f'matlab/cache/cache_zeta{zeta_value}_subset0.mat'
         upper_limit_x, upper_limit_y = calculate_tmax_from_mat(mat_file_path)
         
@@ -314,17 +314,17 @@ def plot_three_regions_comparison(df, zeta_value, figsize=(10, 8), use_mat_file=
             upper_limit_x = upper_limit_x[sort_idx]
             upper_limit_y = upper_limit_y[sort_idx]
             
-            # 绘制T_max线
+            # 绘制TTB_max_delta线
             ax.plot(upper_limit_x, upper_limit_y, '-.', color=[0.8, 0.2, 0.2], linewidth=2)
         else:
-            print(f"警告: 无法从.mat文件计算T_max上限")
+            print(f"警告: 无法从.mat文件计算TTB_max_delta上限")
     else:
-        # 使用CSV数据中的T_max上限
-        tmax_data = df_zeta[df_zeta['区域'] == 4]  # 使用区域4表示 T_max 数据
+        # 使用CSV数据中的TTB_max_delta上限
+        tmax_data = df_zeta[df_zeta['区域'] == 4]  # 使用区域4表示 TTB_max_delta 数据
         if not tmax_data.empty:
             # 按金钱成本排序
             tmax_data = tmax_data.sort_values('金钱成本')
-            # 绘制实际 T_max 线
+            # 绘制实际 TTB_max_delta 线
             ax.plot(tmax_data['时间成本'].values, tmax_data['金钱成本'].values, 
                     '-.', color=[0.8, 0.2, 0.2], linewidth=2)
         else:
@@ -347,7 +347,7 @@ def plot_three_regions_comparison(df, zeta_value, figsize=(10, 8), use_mat_file=
                     fontsize=10, va='center', ha='left', color='#4D4D4D')
     
     # 设置轴标签和图例
-    ax.set_xlabel('Time Cost', fontsize=12)
+    ax.set_xlabel('Time', fontsize=12)
     ax.set_ylabel('Money Cost', fontsize=12)
     ax.grid(True)
     
@@ -355,7 +355,7 @@ def plot_three_regions_comparison(df, zeta_value, figsize=(10, 8), use_mat_file=
     ax.set_xlim(x_min - margin, x_max + margin * 5)
     
     # 添加图例
-    handles = legend_handles + [Line2D([0], [0], linestyle='-.', color=[0.8, 0.2, 0.2], label='$T_{max}$')]
+    handles = legend_handles + [Line2D([0], [0], linestyle='-.', color=[0.8, 0.2, 0.2], label=r'$TTB_{max} + \delta_k$')]
     ax.legend(handles=handles, loc='best', fontsize=10, framealpha=1)
     
     
@@ -448,15 +448,15 @@ def plot_comparison_path_costs(zeta_value, figsize=(10, 8)):
                     'money_cost': monies[p_idx]
                 })
 
-    # Plot T_max upper bound from JSON
+    # Plot TTB_max_delta upper bound from JSON
     tmax_file = os.path.join('results', f'tmax_teqm_zeta{zeta_value}.json')
     try:
         with open(tmax_file, 'r') as f:
             tmax_data = json.load(f)
         mvals = np.array(tmax_data['money_values'], dtype=float)
-        tmax_arr = np.array(tmax_data['t_max'], dtype=float)
+        tmax_arr = np.array(tmax_data['TTB_max_delta'], dtype=float)
         idx_t = np.argsort(mvals)
-        ax.plot(tmax_arr[idx_t], mvals[idx_t], '-', color=[0.8, 0.2, 0.2], linewidth=3, label=r'$T_{max}$')
+        ax.plot(tmax_arr[idx_t], mvals[idx_t], '-', color=[0.8, 0.2, 0.2], linewidth=3, label=r'$TTB_{max} + \delta_k$')
     except FileNotFoundError:
         pass
     # --- annotate path labels at rightmost occurrence ---
@@ -492,7 +492,7 @@ def plot_comparison_path_costs(zeta_value, figsize=(10, 8)):
             ax.text(max_time + 0.6, m, f'$P_{pid}$', fontsize=24, va='center', ha='left')
 
     # Finalize and save
-    ax.set_xlabel('Time Cost', fontsize=12)
+    ax.set_xlabel('Time', fontsize=12)
     ax.set_ylabel('Money Cost', fontsize=12)
     ax.grid(True)
     ax.legend(loc='best', fontsize=10, framealpha=1)
@@ -699,7 +699,7 @@ def plot_two_regions_path_costs(zeta_value, figsize=(10, 8)):
     
     # 绘制区间并添加标签
     for key, ranges in region_time_ranges.items():
-        for i, (t_min, t_max, money, idx, letter_tag) in enumerate(ranges):
+        for i, (t_min, TTB_max_delta, money, idx, letter_tag) in enumerate(ranges):
             if i < 2:  # 只处理每个区域的前两个方案
                 y_pos = y_min + y_range * interval_positions[key][i]  # 从下往上计算位置
                 
@@ -709,17 +709,17 @@ def plot_two_regions_path_costs(zeta_value, figsize=(10, 8)):
                        color=region_colors[key], linewidth=2)
                 
                 # 2. 右侧竖线
-                ax.plot([t_max, t_max], [y_pos - 0.01*y_range, y_pos + 0.01*y_range], 
+                ax.plot([TTB_max_delta, TTB_max_delta], [y_pos - 0.01*y_range, y_pos + 0.01*y_range], 
                        color=region_colors[key], linewidth=2)
                 
                 # 3. 中间连接线和箭头
-                ax.annotate('', xy=(t_max, y_pos), xytext=(t_min, y_pos),
+                ax.annotate('', xy=(TTB_max_delta, y_pos), xytext=(t_min, y_pos),
                           arrowprops=dict(arrowstyle='<->', color=region_colors[key], linewidth=1.5))
                 
                 # 4. epsilon标签，带字母上标
-                mid_point = (t_min + t_max) / 2
+                mid_point = (t_min + TTB_max_delta) / 2
                 # 计算区间宽度并保留两位小数
-                interval_width = round(t_max - t_min, 2)
+                interval_width = round(TTB_max_delta - t_min, 2)
                 if letter_tag:
                     eps_label = rf'$\varepsilon^{{{letter_tag}}} = \mathbf{{{interval_width}}}$'
                 else:
@@ -728,7 +728,7 @@ def plot_two_regions_path_costs(zeta_value, figsize=(10, 8)):
                        fontsize=18, ha='center', va='bottom', color=region_colors[key], zorder=100)
                 
                 # 5. 方案标签
-                ax.text(t_max + 0.01 * x_range, y_pos, f'{region_short[key]}{idx+1}', 
+                ax.text(TTB_max_delta + 0.01 * x_range, y_pos, f'{region_short[key]}{idx+1}', 
                       fontsize=12, va='center', color=region_colors[key], fontweight='bold')
 
     # --- 在最右侧位置标注路径标签，只标注有流量的路径 ---
@@ -767,7 +767,7 @@ def plot_two_regions_path_costs(zeta_value, figsize=(10, 8)):
             ax.text(max_time + 0.8, m, f'$P_{pid}$', fontsize=20, va='center', ha='left')
 
     # 完成并保存
-    ax.set_xlabel('Time Cost', fontsize=14)
+    ax.set_xlabel('Time', fontsize=14)
     ax.set_ylabel('Money Cost', fontsize=14)
     ax.grid(True, linestyle='--', alpha=0.7)
     

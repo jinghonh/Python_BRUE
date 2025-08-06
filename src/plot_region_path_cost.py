@@ -158,7 +158,7 @@ def calculate_equilibrium_line(left_boundary_x, upper_limit_x, upper_limit_y):
 
 def get_or_compute_path_limits(left_boundary_x, upper_limit_x, upper_limit_y, e_value, results_dir='results', zeta=16):
     """
-    获取t_max和t_eqm值，从plot_path_costs.py生成的JSON文件中读取
+    获取TTB_max_delta和TTB_max值，从plot_path_costs.py生成的JSON文件中读取
     
     参数:
         left_boundary_x: 左边界X值
@@ -169,7 +169,7 @@ def get_or_compute_path_limits(left_boundary_x, upper_limit_x, upper_limit_y, e_
         zeta: zeta值，对应plot_path_costs.py生成的文件名
         
     返回:
-        Tuple[np.ndarray, np.ndarray]: mid_path(t_max)和eqm_limit_x(t_eqm)数组
+        Tuple[np.ndarray, np.ndarray]: mid_path(TTB_max_delta)和eqm_limit_x(TTB_max)数组
     """
     # 创建存储目录
     os.makedirs(results_dir, exist_ok=True)
@@ -178,37 +178,37 @@ def get_or_compute_path_limits(left_boundary_x, upper_limit_x, upper_limit_y, e_
     
     # 检查是否存在缓存文件
     if os.path.exists(cache_file):
-        print(f"正在从 {cache_file} 加载 t_max(mid_path) 和 t_eqm(eqm_limit_x) 数据")
+        print(f"正在从 {cache_file} 加载 TTB_max_delta(mid_path) 和 TTB_max(eqm_limit_x) 数据")
         try:
             with open(cache_file, 'r') as f:
                 data = json.load(f)
             
-            # 从JSON加载数据 - plot_path_costs.py中的t_max对应mid_path，t_eqm对应eqm_limit_x
+            # 从JSON加载数据 - plot_path_costs.py中的TTB_max_delta对应mid_path，TTB_max对应eqm_limit_x
             money_values = np.array(data['money_values'])
-            t_max_values = np.array(data['t_max'])  # 对应mid_path
-            t_eqm_values = np.array(data['t_eqm'])  # 对应eqm_limit_x
+            TTB_max_delta_values = np.array(data['TTB_max_delta'])  # 对应mid_path
+            TTB_max_values = np.array(data['TTB_max'])  # 对应eqm_limit_x
             
             # 如果货币值与缓存不同，需要进行插值
             if len(money_values) != len(upper_limit_y) or not np.allclose(money_values, upper_limit_y):
-                # 为t_max(mid_path)创建插值函数
+                # 为TTB_max_delta(mid_path)创建插值函数
                 f_tmax = interp1d(
-                    money_values, t_max_values,
+                    money_values, TTB_max_delta_values,
                     kind='linear', bounds_error=False, fill_value="extrapolate"
                 )
                 mid_path = f_tmax(upper_limit_y)
                 
-                # 为t_eqm(eqm_limit_x)创建插值函数
+                # 为TTB_max(eqm_limit_x)创建插值函数
                 f_teqm = interp1d(
-                    money_values, t_eqm_values,
+                    money_values, TTB_max_values,
                     kind='linear', bounds_error=False, fill_value="extrapolate"
                 )
                 eqm_limit_x = f_teqm(upper_limit_y)
             else:
                 # 直接使用缓存值
-                mid_path = t_max_values
-                eqm_limit_x = t_eqm_values
+                mid_path = TTB_max_delta_values
+                eqm_limit_x = TTB_max_values
                 
-            print(f"成功加载 zeta={zeta} 的 t_max(mid_path) 和 t_eqm(eqm_limit_x) 数据")
+            print(f"成功加载 zeta={zeta} 的 TTB_max_delta(mid_path) 和 TTB_max(eqm_limit_x) 数据")
             return mid_path, eqm_limit_x
         except Exception as e:
             print(f"从缓存加载数据时出错: {e}")
@@ -216,7 +216,7 @@ def get_or_compute_path_limits(left_boundary_x, upper_limit_x, upper_limit_y, e_
     
     # 文件不存在或加载失败，使用默认值
     print(f"找不到zeta={zeta}的数据文件，使用默认计算值")
-    mid_path = upper_limit_x  # 默认使用传入的upper_limit_x作为mid_path(t_max)
+    mid_path = upper_limit_x  # 默认使用传入的upper_limit_x作为mid_path(TTB_max_delta)
     eqm_limit_x = calculate_equilibrium_line(left_boundary_x, upper_limit_x, upper_limit_y)
     
     print(f"注意：未找到由plot_path_costs.py生成的数据文件，请先运行该脚本生成tmax_teqm_zeta{zeta}.json")
@@ -499,7 +499,7 @@ left_boundary_x = np.array([r1_min, r2_min, r5_min])
 default_upper_limit_x = np.array([(r1_max + r1_min) / 2, (r2_max + r2_min) / 2, (r5_max + r5_min) / 2])
 upper_limit_y = np.array([20.0, 15.0, 2.0])
 
-# 使用JSON文件加载或计算mid_path(t_max)和eqm_limit_x(t_eqm)
+# 使用JSON文件加载或计算mid_path(TTB_max_delta)和eqm_limit_x(TTB_max)
 results_dir = 'results'
 # 定义zeta值，与plot_path_costs.py保持一致
 ZETA_VALUE = E  # 默认值为16，可以根据需要修改
@@ -514,9 +514,9 @@ mid_path, eqm_limit_x = get_or_compute_path_limits(
 
 # 输出计算结果
 print(f"左边界X: {left_boundary_x}")
-print(f"中点路径X (t_max): {mid_path}")
+print(f"中点路径X (TTB_max_delta): {mid_path}")
 print(f"上限Y (货币成本): {upper_limit_y}")
-print(f"平衡线X (t_eqm): {eqm_limit_x}")
+print(f"平衡线X (TTB_max): {eqm_limit_x}")
 print(f"使用的zeta值: {ZETA_VALUE}")
 
 # --------------------------- 其他区域 ---------------------------
@@ -626,7 +626,7 @@ def create_plot(
         show_reg3: 是否显示RBS_0^ζ区域
         show_eqm: 是否显示T_eqm区域
         show_points: 是否显示散点
-        plot_specific_points: 指定绘制的散点区域，可选值为['s', 'rs', 'bs', 't_eqm']
+        plot_specific_points: 指定绘制的散点区域，可选值为['s', 'rs', 'bs', 'TTB_max']
     """
     # 创建图形和轴
     fig, ax = plt.subplots(figsize=(8, 6), constrained_layout=True)
@@ -661,7 +661,7 @@ def create_plot(
             F1_GRID, F2_GRID, mask_eqm, levels=[0.5, 1.5], colors=[color_Teqm], alpha=0.7, zorder=4
         )
         ax.contour(F1_GRID, F2_GRID, mask_eqm.astype(int),  levels=[0.5], colors="k", linewidths=0.6, zorder=10)
-        legend_elements.append(Patch(facecolor=color_Teqm, edgecolor=color_Teqm, alpha=0.7, label=r"$T_{eqm}$"))
+        legend_elements.append(Patch(facecolor=color_Teqm, edgecolor=color_Teqm, alpha=0.7, label=r"$TTB_{max}$"))
     
     # 绘制散点
     point_label_idx = 0  # 用于标记点的索引
@@ -773,23 +773,23 @@ def create_plot(
                             point_label_idx += 1
         
         if tmax_constraint_points.size > 0:
-            if not plot_specific_points or 't_eqm' in plot_specific_points:
-                t_eqm_pts = tmax_constraint_points[0:1] if plot_specific_points and len(plot_specific_points) == 1 else tmax_constraint_points
+            if not plot_specific_points or 'TTB_max' in plot_specific_points:
+                TTB_max_pts = tmax_constraint_points[0:1] if plot_specific_points and len(plot_specific_points) == 1 else tmax_constraint_points
                 ax.scatter(
-                    t_eqm_pts[:, 0],
-                    t_eqm_pts[:, 1],
+                    TTB_max_pts[:, 0],
+                    TTB_max_pts[:, 1],
                     color=color_Teqm,
                     marker=marker_Teqm,
                     s=120,  # 增大标记尺寸以容纳字母
                     linewidth=0.8,
                     edgecolor='k',
-                    label=r"Flows of $T_{eqm}$",
+                    label=r"Flows of $TTB_{max}$",
                     zorder=15,
                     alpha=0.9,  # 稍微增加透明度使文字更清晰
                 )
                 # 在标记内部添加字母
                 if plot_num == 6:  # 只在fig6中添加标签
-                    for i, (x, y) in enumerate(t_eqm_pts):
+                    for i, (x, y) in enumerate(TTB_max_pts):
                         if point_label_idx < len(point_labels):
                             ax.annotate(
                                 point_labels[point_label_idx],
@@ -896,7 +896,7 @@ def generate_plots_for_e(e_val: int, results_dir: str = "results"):
     default_upper_limit_x = _np.array([(r1_max + r1_min) / 2, (r2_max + r2_min) / 2, (r5_max + r5_min) / 2])
     upper_limit_y = _np.array([20.0, 15.0, 2.0])
 
-    # 计算/读取 mid_path (t_max) 与 eqm_limit_x (t_eqm)
+    # 计算/读取 mid_path (TTB_max_delta) 与 eqm_limit_x (TTB_max)
     mid_path, eqm_limit_x = get_or_compute_path_limits(
         left_boundary_x=left_boundary_x,
         upper_limit_x=default_upper_limit_x,
@@ -982,7 +982,7 @@ def generate_plots_for_e(e_val: int, results_dir: str = "results"):
         show_eqm=False,
         show_points=True,
         results_dir=results_dir,
-        plot_specific_points=["t_eqm"],
+        plot_specific_points=["TTB_max"],
     )
     create_plot(
         plot_num=6,

@@ -180,7 +180,7 @@ class BRUESetSolver(BRUESolver):
                            label=f'Path {i+1}' if sol == solutions[0] else "")
         
         plt.title(f'Cost Space (ζ = {zeta})')
-        plt.xlabel('Travel Time Cost')
+        plt.xlabel('Travel Time')
         plt.ylabel('Money Cost')
         plt.grid(True, alpha=0.3)
         plt.legend()

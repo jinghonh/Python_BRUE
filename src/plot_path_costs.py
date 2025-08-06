@@ -128,7 +128,7 @@ def calculate_equilibrium_line(left_boundary_x: np.ndarray, upper_limit_x: np.nd
     
     Args:
         left_boundary_x: The left boundary X values (time costs)
-        upper_limit_x: The upper limit X values (T_max)
+        upper_limit_x: The upper limit X values (TTB_max_delta)
         upper_limit_y: The money costs corresponding to the boundaries
         
     Returns:
@@ -153,9 +153,9 @@ def calculate_equilibrium_line(left_boundary_x: np.ndarray, upper_limit_x: np.nd
     return eqm_limit_x
 
 
-def get_or_compute_t_max_t_eqm(boundary: Boundary, zeta: int, results_dir: str = 'results') -> Tuple[np.ndarray, np.ndarray]:
+def get_or_compute_TTB_max_delta_TTB_max(boundary: Boundary, zeta: int, results_dir: str = 'results') -> Tuple[np.ndarray, np.ndarray]:
     """
-    获取或计算特定zeta值的t_max和t_eqm，使用JSON格式存储以便手动编辑
+    获取或计算特定zeta值的TTB_max_delta和TTB_max，使用JSON格式存储以便手动编辑
     
     Args:
         boundary: 边界数据
@@ -163,7 +163,7 @@ def get_or_compute_t_max_t_eqm(boundary: Boundary, zeta: int, results_dir: str =
         results_dir: 结果存储目录
         
     Returns:
-        Tuple[np.ndarray, np.ndarray]: t_max和t_eqm数组
+        Tuple[np.ndarray, np.ndarray]: TTB_max_delta和TTB_max数组
     """
     # 创建存储目录
     os.makedirs(results_dir, exist_ok=True)
@@ -171,60 +171,60 @@ def get_or_compute_t_max_t_eqm(boundary: Boundary, zeta: int, results_dir: str =
     
     # 检查是否存在缓存文件
     if os.path.exists(cache_file):
-        print(f"Loading t_max and t_eqm from {cache_file}")
+        print(f"Loading TTB_max_delta and TTB_max from {cache_file}")
         try:
             with open(cache_file, 'r') as f:
                 data = json.load(f)
             
             # 从JSON加载数据
             money_values = np.array(data['money_values'])
-            t_max_values = np.array(data['t_max'])
-            t_eqm_values = np.array(data['t_eqm'])
+            TTB_max_delta_values = np.array(data['TTB_max_delta'])
+            TTB_max_values = np.array(data['TTB_max'])
             
             # 如果边界货币值与缓存不同，需要进行插值
             if len(money_values) != len(boundary.left_y) or not np.allclose(money_values, boundary.left_y):
-                # 为t_max创建插值函数
+                # 为TTB_max_delta创建插值函数
                 f_tmax = interp1d(
-                    money_values, t_max_values,
+                    money_values, TTB_max_delta_values,
                     kind='linear', bounds_error=False, fill_value="extrapolate"
                 )
-                t_max = f_tmax(boundary.left_y)
+                TTB_max_delta = f_tmax(boundary.left_y)
                 
-                # 为t_eqm创建插值函数
+                # 为TTB_max创建插值函数
                 f_teqm = interp1d(
-                    money_values, t_eqm_values,
+                    money_values, TTB_max_values,
                     kind='linear', bounds_error=False, fill_value="extrapolate"
                 )
-                t_eqm = f_teqm(boundary.left_y)
+                TTB_max = f_teqm(boundary.left_y)
             else:
                 # 直接使用缓存值
-                t_max = t_max_values
-                t_eqm = t_eqm_values
+                TTB_max_delta = TTB_max_delta_values
+                TTB_max = TTB_max_values
                 
-            print(f"Successfully loaded t_max and t_eqm for zeta={zeta}")
-            return t_max, t_eqm
+            print(f"Successfully loaded TTB_max_delta and TTB_max for zeta={zeta}")
+            return TTB_max_delta, TTB_max
         except Exception as e:
-            print(f"Error loading t_max and t_eqm from cache: {e}")
+            print(f"Error loading TTB_max_delta and TTB_max from cache: {e}")
             print("Computing new values...")
     
-    # 计算t_max和t_eqm
-    print(f"Computing new t_max and t_eqm for zeta={zeta}")
-    t_max = boundary.left_x * 0.3 + boundary.right_x * 0.7
-    t_eqm = calculate_equilibrium_line(boundary.left_x, t_max, boundary.left_y)
+    # 计算TTB_max_delta和TTB_max
+    print(f"Computing new TTB_max_delta and TTB_max for zeta={zeta}")
+    TTB_max_delta = boundary.left_x * 0.3 + boundary.right_x * 0.7
+    TTB_max = calculate_equilibrium_line(boundary.left_x, TTB_max_delta, boundary.left_y)
     
     # 将数据保存为JSON格式（易于编辑）
     data = {
         'money_values': boundary.left_y.tolist(),
-        't_max': t_max.tolist(),
-        't_eqm': t_eqm.tolist(),
-        'description': f"T_max和T_eqm数据，用于zeta={zeta}的所有子集。可以手动编辑这些值以确保一致性。"
+        'TTB_max_delta': TTB_max_delta.tolist(),
+        'TTB_max': TTB_max.tolist(),
+        'description': f"TTB_max_delta和T_eqm数据，用于zeta={zeta}的所有子集。可以手动编辑这些值以确保一致性。"
     }
     
     with open(cache_file, 'w') as f:
         json.dump(data, f, indent=2)
     
-    print(f"Saved t_max and t_eqm to {cache_file}")
-    return t_max, t_eqm
+    print(f"Saved TTB_max_delta and TTB_max to {cache_file}")
+    return TTB_max_delta, TTB_max
 
 
 def configure_plot(ax: plt.Axes, params: PlotParams, title: str, xlabel: str, ylabel: str):
@@ -250,7 +250,7 @@ def plot_time_money_cost_relationship(all_path_costs: List[np.ndarray], boundary
                                       color_variations: np.ndarray, params: PlotParams, zeta: int, subset_index: int):
     """Plot the time-money cost relationship."""
     fig, ax = plt.subplots(figsize=params.figure_size)
-    configure_plot(ax, params, 'Path Time-Money Cost Relationship', r'Time Cost', r'Money Cost')
+    configure_plot(ax, params, 'Path Time-Money Cost Relationship', r'Time', r'Money Cost')
 
     if boundary.left_x.size > 0:
         boundary_x = np.concatenate([boundary.left_x, boundary.right_x[::-1]])
@@ -316,7 +316,7 @@ def plot_teqm_flow_path_cost(all_path_costs: List[np.ndarray], color_variations:
     
     # 5. Plotting
     fig, ax = plt.subplots(figsize=params.figure_size)
-    configure_plot(ax, params, f'Path Costs with Highlighted T_eqm Flow (Zeta={zeta})', r'Time Cost', r'Money Cost')
+    configure_plot(ax, params, f'Path Costs with Highlighted T_eqm Flow (Zeta={zeta})', r'Time', r'Money Cost')
     
     # Layer 1: Plot background feasible region
     if boundary.left_x.size > 0:
@@ -333,7 +333,7 @@ def plot_teqm_flow_path_cost(all_path_costs: List[np.ndarray], color_variations:
 
     # Layer 3: Plot the prominent T_eqm cost line
     sort_idx = np.argsort(teqm_costs[:, 1])
-    ax.plot(teqm_costs[sort_idx, 0], teqm_costs[sort_idx, 1], '-', color='#984ea3', linewidth=2.5, marker='D', markersize=8, label=r'Flow from $T_{eqm}$ point', zorder=10)
+    ax.plot(teqm_costs[sort_idx, 0], teqm_costs[sort_idx, 1], '-', color='#984ea3', linewidth=2.5, marker='D', markersize=8, label=r'Flow from $TTB_{max}$ point', zorder=10)
     
     # 6. Add legend and save
     handles, labels = ax.get_legend_handles_labels()
@@ -349,7 +349,7 @@ def plot_path_costs_with_upper_limit(all_path_costs: List[np.ndarray], boundary:
                                      color_variations: np.ndarray, params: PlotParams, zeta: int, subset_index: int):
     """Plot path costs with an upper limit and equilibrium line, with correct layering."""
     fig, ax = plt.subplots(figsize=params.figure_size)
-    configure_plot(ax, params, 'Path Costs with Upper Limit', r'Time Cost', r'Money Cost')
+    configure_plot(ax, params, 'Path Costs with Upper Limit', r'Time', r'Money Cost')
 
     # --- Data Processing ---
     if boundary.left_x.size == 0:
@@ -357,10 +357,10 @@ def plot_path_costs_with_upper_limit(all_path_costs: List[np.ndarray], boundary:
         plt.close(fig)
         return
 
-    # 使用共享函数获取t_max和t_eqm
-    t_max, t_eqm = get_or_compute_t_max_t_eqm(boundary, zeta, params.save_path)
+    # 使用共享函数获取TTB_max_delta和TTB_max
+    TTB_max_delta, TTB_max = get_or_compute_TTB_max_delta_TTB_max(boundary, zeta, params.save_path)
     
-    f_tmax = interp1d(boundary.left_y, t_max, kind='nearest', bounds_error=False, fill_value="extrapolate")
+    f_tmax = interp1d(boundary.left_y, TTB_max_delta, kind='nearest', bounds_error=False, fill_value="extrapolate")
 
     feasible_paths_data = []
     infeasible_paths_data = []
@@ -415,9 +415,9 @@ def plot_path_costs_with_upper_limit(all_path_costs: List[np.ndarray], boundary:
         if feasible_handle is None:
             feasible_handle = h
 
-    # Layer 5: T_max and T_eqm lines (Topmost)
-    t_max_handle = ax.plot(t_max, boundary.left_y, '-', color=[0.8, 0.2, 0.2], linewidth=2.5, label=r'$T_{max}$', zorder=10)[0]
-    t_eqm_handle = ax.plot(t_eqm, boundary.left_y, '-.', color=[0.5, 0.0, 0.8], linewidth=2.5, label=r'$T_{eqm}$', zorder=10)[0]
+    # Layer 5: TTB_max_delta and T_eqm lines (Topmost)
+    TTB_max_delta_handle = ax.plot(TTB_max_delta, boundary.left_y, '-', color=[0.8, 0.2, 0.2], linewidth=2.5, label=r'$TTB_{max} + \delta_k$', zorder=10)[0]
+    TTB_max_handle = ax.plot(TTB_max, boundary.left_y, '-.', color=[0.5, 0.0, 0.8], linewidth=2.5, label=r'$TTB_{max}$', zorder=10)[0]
 
     # 添加图例
     legend_handles = []
@@ -442,13 +442,13 @@ def plot_path_costs_with_upper_limit(all_path_costs: List[np.ndarray], boundary:
         legend_handles.append(infeasible_handle)
         legend_labels.append('Infeasible Flow Paths')
     
-    # T_max线
-    legend_handles.append(t_max_handle)
-    legend_labels.append(r'$T_{max}$')
+    # TTB_max_delta线
+    legend_handles.append(TTB_max_delta_handle)
+    legend_labels.append(r'$TTB_{max} + \delta_k$')
     
     # T_eqm线
-    legend_handles.append(t_eqm_handle)
-    legend_labels.append(r'$T_{eqm}$')
+    legend_handles.append(TTB_max_handle)
+    legend_labels.append(r'$TTB_{max}$')
     
     # 显示图例
     ax.legend(
@@ -469,7 +469,7 @@ def plot_path_costs_below_equilibrium(all_path_costs: List[np.ndarray], boundary
                                       color_variations: np.ndarray, params: PlotParams, zeta: int, subset_index: int):
     """筛选并绘制T_eqm（紫色折线）下方的可行方案。"""
     fig, ax = plt.subplots(figsize=params.figure_size)
-    configure_plot(ax, params, 'Path Costs Below Equilibrium Line', r'Time Cost', r'Money Cost')
+    configure_plot(ax, params, 'Path Costs Below Equilibrium Line', r'Time', r'Money Cost')
 
     # --- Data Processing ---
     if boundary.left_x.size == 0:
@@ -477,11 +477,11 @@ def plot_path_costs_below_equilibrium(all_path_costs: List[np.ndarray], boundary
         plt.close(fig)
         return
 
-    # 使用共享函数获取t_max和t_eqm
-    t_max, t_eqm = get_or_compute_t_max_t_eqm(boundary, zeta, params.save_path)
+    # 使用共享函数获取TTB_max_delta和TTB_max
+    TTB_max_delta, TTB_max = get_or_compute_TTB_max_delta_TTB_max(boundary, zeta, params.save_path)
     
     # 创建T_eqm的插值函数用于判断
-    f_teqm = interp1d(boundary.left_y, t_eqm, kind='nearest', bounds_error=False, fill_value="extrapolate")
+    f_teqm = interp1d(boundary.left_y, TTB_max, kind='nearest', bounds_error=False, fill_value="extrapolate")
 
     # 筛选出所有点都在T_eqm下方的路径
     below_eqm_paths_data = []
@@ -536,7 +536,7 @@ def plot_path_costs_below_equilibrium(all_path_costs: List[np.ndarray], boundary
         ax.scatter(costs[:, 0], costs[:, 1], s=35, c=[color], marker='o', alpha=0.6, edgecolors='none', zorder=4)
 
     # Layer 5: T_eqm line (Topmost)
-    ax.plot(t_eqm, boundary.left_y, '-.', color=[0.5, 0.0, 0.8], linewidth=2.5, label=r'$T_{eqm}$', zorder=10)
+    ax.plot(TTB_max, boundary.left_y, '-.', color=[0.5, 0.0, 0.8], linewidth=2.5, label=r'$TTB_{max}$', zorder=10)
 
     # 添加图例
     handles, labels = ax.get_legend_handles_labels()
@@ -667,15 +667,27 @@ def main():
             results_dir=args.results_dir
         )
     else:
-        # 使用默认配置运行
-        result = run_with_params(
-            zeta=32,
-            subset_index=0,
+        # 批量运行预设的 zeta 与 subset_index 组合，避免重复代码
+        default_run_configs = [
+            {"zeta": 8, "subset_index": 0},
+            {"zeta": 16, "subset_index": 0},
+            {"zeta": 16, "subset_index": 1},
+            {"zeta": 24, "subset_index": 0},
+            {"zeta": 24, "subset_index": 1},
+            {"zeta": 32, "subset_index": 0},
+            {"zeta": 32, "subset_index": 1},
+            {"zeta": 32, "subset_index": 2},
+        ]
+
+        common_kwargs = dict(
             num_flows=10000,
-            cache_dir='matlab/cache',
-            results_dir='results',
-            plot_params=PlotParams(save_path='results/', figure_dpi=600)
+            cache_dir="matlab/cache",
+            results_dir="results",
+            plot_params=PlotParams(save_path="results/", figure_dpi=600),
         )
+
+        for cfg in default_run_configs:
+            run_with_params(**cfg, **common_kwargs)
 
 
 # 示例用法 - 在直接运行脚本时使用
