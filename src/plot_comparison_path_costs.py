@@ -21,6 +21,30 @@ def load_data(file_path):
 def load_mat_data(file_path):
     return loadmat(file_path)
 
+
+# ----------------------------------------------------------------------
+# 辅助函数：根据给定颜色生成浅/深色变体
+# ----------------------------------------------------------------------
+
+
+def _lighten_color(color: str, amount: float = 0.4) -> str:
+    """Blend color towards white by given amount (0~1)."""
+    r, g, b = to_rgb(color)
+    r = r + (1 - r) * amount
+    g = g + (1 - g) * amount
+    b = b + (1 - b) * amount
+    return to_hex((r, g, b))
+
+
+def _darken_color(color: str, amount: float = 0.25) -> str:
+    """Blend color towards black by given amount (0~1)."""
+    r, g, b = to_rgb(color)
+    r *= (1 - amount)
+    g *= (1 - amount)
+    b *= (1 - amount)
+    return to_hex((r, g, b))
+    
+
 # 计算可行域边界
 def calculate_feasible_region_boundary(time_costs, money_costs):
     """
@@ -195,28 +219,6 @@ def plot_three_regions_comparison(df, zeta_value, figsize=(10, 8), use_mat_file=
     colors = {k: REGION_STYLES[v].color for k, v in region_key_map.items()}
     markers = {k: REGION_STYLES[v].marker for k, v in region_key_map.items()}
 
-# ----------------------------------------------------------------------
-# 辅助函数：根据给定颜色生成浅/深色变体
-# ----------------------------------------------------------------------
-
-
-def _lighten_color(color: str, amount: float = 0.4) -> str:
-    """Blend color towards white by given amount (0~1)."""
-    r, g, b = to_rgb(color)
-    r = r + (1 - r) * amount
-    g = g + (1 - g) * amount
-    b = b + (1 - b) * amount
-    return to_hex((r, g, b))
-
-
-def _darken_color(color: str, amount: float = 0.25) -> str:
-    """Blend color towards black by given amount (0~1)."""
-    r, g, b = to_rgb(color)
-    r *= (1 - amount)
-    g *= (1 - amount)
-    b *= (1 - amount)
-    return to_hex((r, g, b))
-    
     legend_handles = []
     
     # 计算图表的x轴范围，用于后续添加标签
@@ -356,7 +358,7 @@ def _darken_color(color: str, amount: float = 0.25) -> str:
     handles = legend_handles + [Line2D([0], [0], linestyle='-.', color=[0.8, 0.2, 0.2], label='$T_{max}$')]
     ax.legend(handles=handles, loc='best', fontsize=10, framealpha=1)
     
-    plt.title(f'Path Cost Comparison of Three Regions ($\\varepsilon = {zeta_value}$)', fontsize=14)
+    
     plt.tight_layout()
     plt.savefig(f'three_regions_comparison_zeta{zeta_value}.pdf', format='pdf', dpi=300)
     plt.show()
@@ -494,7 +496,7 @@ def plot_comparison_path_costs(zeta_value, figsize=(10, 8)):
     ax.set_ylabel('Money Cost', fontsize=12)
     ax.grid(True)
     ax.legend(loc='best', fontsize=10, framealpha=1)
-    # plt.title(f'Path Cost Comparison ($\\varepsilon = {zeta_value}$)', fontsize=14)
+    # 
     plt.tight_layout()
     plt.savefig(f'results/path_costs_comparison_zeta{zeta_value}.pdf', format='pdf', dpi=300)
     # plt.show()
