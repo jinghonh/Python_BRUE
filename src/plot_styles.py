@@ -17,5 +17,5 @@ REGION_STYLES = {
     # RBS_0^ε 区域（绿色、圆形）
     "RBS": RegionStyle(color="#4daf4a", marker="^", label=r"$RBS_0^\varepsilon$"),
     # T_eqm 区域（紫色、菱形）
-    "T_eqm": RegionStyle(color="#984ea3", marker="D", label=r"$TTB_{max}$"),
+    "TTB_max": RegionStyle(color="#984ea3", marker="D", label=r"$TTB_{max}$"),
 } 

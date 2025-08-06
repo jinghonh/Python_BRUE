@@ -499,6 +499,7 @@ def plot_comparison_path_costs(zeta_value, figsize=(10, 8)):
     # 
     plt.tight_layout()
     plt.savefig(f'results/path_costs_comparison_zeta{zeta_value}.pdf', format='pdf', dpi=300)
+    print(f'results/path_costs_comparison_zeta{zeta_value}.pdf saved')
     # plt.show()
 
     # Save CSV
@@ -508,7 +509,7 @@ def plot_comparison_path_costs(zeta_value, figsize=(10, 8)):
         os.makedirs('results', exist_ok=True)
         csv_path = os.path.join('results', f'flow_costs_zeta{zeta_value}.csv')
         df_out.to_csv(csv_path, index=False)
-        print(f"Flow and cost data saved to {csv_path}")
+        # print(f"Flow and cost data saved to {csv_path}")
 
 # 绘制前两个区域的成本折线图，不包括Tmax
 def plot_two_regions_path_costs(zeta_value, figsize=(10, 8)):
@@ -603,8 +604,8 @@ def plot_two_regions_path_costs(zeta_value, figsize=(10, 8)):
                 # 存储这个方案的时间成本范围
                 time_min = np.min(sorted_times)
                 time_max = np.max(sorted_times)
-                # 获取当前字母标签（若超出范围则为空字符串）
-                current_letter = point_labels[point_label_idx - 1] if point_label_idx - 1 < len(point_labels) else ''
+                # 确定当前字母标签（该折线即将使用的下一个标签）
+                current_letter = point_labels[point_label_idx] if point_label_idx < len(point_labels) else ''
                 region_time_ranges[key].append((time_min, time_max, sorted_monies[0], idx_pt, current_letter))
                 
                 # 仅为每个区域的第一个有效方案添加图例
@@ -727,8 +728,12 @@ def plot_two_regions_path_costs(zeta_value, figsize=(10, 8)):
                 ax.text(mid_point, y_pos + 0.01*y_range, eps_label,
                        fontsize=18, ha='center', va='bottom', color=region_colors[key], zorder=100)
                 
-                # 5. 方案标签
-                ax.text(TTB_max_delta + 0.01 * x_range, y_pos, f'{region_short[key]}{idx+1}', 
+                # 5. 方案标签 - 使用LaTeX格式 S_{letter_tag}
+                if letter_tag:
+                    scheme_label = rf'${region_short[key]}_{{{letter_tag}}}$'
+                else:
+                    scheme_label = rf'${region_short[key]}_{{{idx+1}}}$'
+                ax.text(TTB_max_delta + 0.01 * x_range, y_pos, scheme_label, 
                       fontsize=12, va='center', color=region_colors[key], fontweight='bold')
 
     # --- 在最右侧位置标注路径标签，只标注有流量的路径 ---
@@ -776,6 +781,7 @@ def plot_two_regions_path_costs(zeta_value, figsize=(10, 8)):
     
     plt.tight_layout()
     plt.savefig(f'results/two_regions_path_costs_zeta{zeta_value}.pdf', format='pdf', dpi=300)
+    print(f'results/two_regions_path_costs_zeta{zeta_value}.pdf saved')
     # plt.show()
 
     # 保存CSV，只保存有流量的路径
@@ -785,7 +791,7 @@ def plot_two_regions_path_costs(zeta_value, figsize=(10, 8)):
         os.makedirs('results', exist_ok=True)
         csv_path = os.path.join('results', f'two_regions_flow_costs_zeta{zeta_value}.csv')
         df_out.to_csv(csv_path, index=False)
-        print(f"流量和成本数据已保存至 {csv_path}")
+        # print(f"流量和成本数据已保存至 {csv_path}")
 
 # 主函数
 def main():

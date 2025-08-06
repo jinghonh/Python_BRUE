@@ -50,7 +50,7 @@ def load_tmax_teqm_data(zeta):
 
 def configure_plot(ax, params, title, xlabel, ylabel):
     """Apply common plot configurations."""
-    ax.set_title(title, fontsize=params.font_size + 4, fontweight='bold')
+    # ax.set_title(title, fontsize=params.font_size + 4, fontweight='bold')
     ax.set_xlabel(xlabel, fontsize=params.font_size + 2, fontweight='bold')
     ax.set_ylabel(ylabel, fontsize=params.font_size + 2, fontweight='bold')
     if params.show_grid:

@@ -601,21 +601,21 @@ plt.rcParams.update({
 color_S0 = REGION_STYLES["S"].color
 color_BS0 = REGION_STYLES["BS"].color
 color_RBS0 = REGION_STYLES["RBS"].color
-color_Teqm = REGION_STYLES["T_eqm"].color
+color_TTBmax = REGION_STYLES["TTB_max"].color
 
 # 便捷获取标记
 marker_S0 = REGION_STYLES["S"].marker
 marker_BS0 = REGION_STYLES["BS"].marker
 marker_RBS0 = REGION_STYLES["RBS"].marker
-marker_Teqm = REGION_STYLES["T_eqm"].marker
+marker_TTBmax = REGION_STYLES["TTB_max"].marker
 print(f"color_S0: {color_S0}, marker_S0: {marker_S0}")
 print(f"color_BS0: {color_BS0}, marker_BS0: {marker_BS0}")
 print(f"color_RBS0: {color_RBS0}, marker_RBS0: {marker_RBS0}")
-print(f"color_Teqm: {color_Teqm}, marker_Teqm: {marker_Teqm}")
+print(f"color_TTBmax: {color_TTBmax}, marker_TTBmax: {marker_TTBmax}")
 # --------------------------- 创建绘图函数 ---------------------------
 
 def create_plot(
-    plot_num, show_reg2=True, show_reg=True, show_reg3=False, show_eqm=False, show_points=False, results_dir='results', plot_specific_points=None
+    plot_num, show_reg2=True, show_reg=True, show_reg3=False, show_TTBmax=False, show_points=False, results_dir='results', plot_specific_points=None
 ):
     """创建不同的区域图
     
@@ -624,7 +624,7 @@ def create_plot(
         show_reg2: 是否显示S_0^ζ区域
         show_reg: 是否显示BS_0^ζ区域
         show_reg3: 是否显示RBS_0^ζ区域
-        show_eqm: 是否显示T_eqm区域
+        show_TTBmax: 是否显示TTB_max区域
         show_points: 是否显示散点
         plot_specific_points: 指定绘制的散点区域，可选值为['s', 'rs', 'bs', 'TTB_max']
     """
@@ -656,12 +656,12 @@ def create_plot(
         ax.contour(F1_GRID, F2_GRID, mask_reg3.astype(int), levels=[0.5], colors="k", linewidths=0.6, zorder=10)
         legend_elements.append(Patch(facecolor=color_RBS0, edgecolor=color_RBS0, alpha=0.7, label=r"$RBS_0^\varepsilon$"))
     
-    if show_eqm:
+    if show_TTBmax:
         ax.contourf(
-            F1_GRID, F2_GRID, mask_eqm, levels=[0.5, 1.5], colors=[color_Teqm], alpha=0.7, zorder=4
+            F1_GRID, F2_GRID, mask_eqm, levels=[0.5, 1.5], colors=[color_TTBmax], alpha=0.7, zorder=4
         )
         ax.contour(F1_GRID, F2_GRID, mask_eqm.astype(int),  levels=[0.5], colors="k", linewidths=0.6, zorder=10)
-        legend_elements.append(Patch(facecolor=color_Teqm, edgecolor=color_Teqm, alpha=0.7, label=r"$TTB_{max}$"))
+        legend_elements.append(Patch(facecolor=color_TTBmax, edgecolor=color_TTBmax, alpha=0.7, label=r"$TTB_{max}$"))
     
     # 绘制散点
     point_label_idx = 0  # 用于标记点的索引
@@ -778,8 +778,8 @@ def create_plot(
                 ax.scatter(
                     TTB_max_pts[:, 0],
                     TTB_max_pts[:, 1],
-                    color=color_Teqm,
-                    marker=marker_Teqm,
+                    color=color_TTBmax,
+                    marker=marker_TTBmax,
                     s=120,  # 增大标记尺寸以容纳字母
                     linewidth=0.8,
                     edgecolor='k',
@@ -841,6 +841,7 @@ def create_plot(
     filename = f"region_path_cost_e{int(E)}_plot{plot_num}.pdf"
     out_path = os.path.join(results_dir, filename)
     plt.savefig(out_path, dpi=600, bbox_inches='tight')
+    plt.close()
 
     print(f"✅ 图 {plot_num} 绘图完成，已保存至 {out_path}")
     
@@ -851,6 +852,204 @@ def create_plot(
 
     
     return fig
+
+def plot_rbs_point_region(F1_GRID, F2_GRID, mask_reg2, mask_reg, mask_reg3, mask_eqm,
+                          path_constraint_points, color_S0, color_BS0, color_RBS0, color_TTBmax,
+                          F1_MIN, F1_MAX, F2_MIN, F2_MAX, E, results_dir):
+    """
+    绘制全部区域 + 绿色区域(RBS)的一个点（使用黄色标记为"D"）
+    
+    参数:
+        F1_GRID, F2_GRID: 网格数据
+        mask_reg2, mask_reg, mask_reg3, mask_eqm: 各区域掩码
+        path_constraint_points: RBS区域的点
+        color_S0, color_BS0, color_RBS0, color_TTBmax: 各区域颜色
+        F1_MIN, F1_MAX, F2_MIN, F2_MAX: 坐标轴范围
+        E: epsilon值
+        results_dir: 结果保存目录
+    """
+    fig7, ax7 = plt.subplots(figsize=(8, 6), constrained_layout=True)
+    
+    # 绘制各区域
+    # S区域
+    ax7.contourf(F1_GRID, F2_GRID, mask_reg2, levels=[0.5, 1.5], colors=[color_S0], alpha=0.7, zorder=1)
+    ax7.contour(F1_GRID, F2_GRID, mask_reg2.astype(int), levels=[0.5], colors="k", linewidths=0.6, zorder=10)
+    
+    # BS区域
+    ax7.contourf(F1_GRID, F2_GRID, mask_reg, levels=[0.5, 1.5], colors=[color_BS0], alpha=0.7, zorder=2)
+    ax7.contour(F1_GRID, F2_GRID, mask_reg.astype(int),  levels=[0.5], colors="k", linewidths=0.6, zorder=10)
+    
+    # RBS区域
+    ax7.contourf(F1_GRID, F2_GRID, mask_reg3, levels=[0.5, 1.5], colors=[color_RBS0], alpha=0.7, zorder=3)
+    ax7.contour(F1_GRID, F2_GRID, mask_reg3.astype(int), levels=[0.5], colors="k", linewidths=0.6, zorder=10)
+    
+    # TTB_max区域
+    ax7.contourf(F1_GRID, F2_GRID, mask_eqm, levels=[0.5, 1.5], colors=[color_TTBmax], alpha=0.7, zorder=4)
+    ax7.contour(F1_GRID, F2_GRID, mask_eqm.astype(int),  levels=[0.5], colors="k", linewidths=0.6, zorder=10)
+    
+    # 绘制绿色区域(RBS)的点，使用黄色标记
+    if path_constraint_points.size > 0:
+        # 只取第一个点
+        rs_pt = path_constraint_points[0:1]
+        ax7.scatter(
+            rs_pt[:, 0],
+            rs_pt[:, 1],
+            color='yellow',  # 黄色
+            marker='D',      # 菱形标记
+            s=120,
+            linewidth=0.8,
+            edgecolor='k',
+            zorder=15,
+            alpha=0.9,
+        )
+        # 添加"D"标签
+        ax7.annotate(
+            "D",
+            xy=(rs_pt[0, 0], rs_pt[0, 1]),
+            xytext=(8, 8),
+            textcoords='offset points',
+            fontsize=13,
+            weight='bold',
+            color='k',
+            ha='left',
+            va='bottom',
+            zorder=20,
+            bbox=dict(boxstyle="round,pad=0.2", fc="white", alpha=0.8, ec="none"),
+        )
+    
+    # 添加图例
+    legend_elements = [
+        Patch(facecolor=color_S0, edgecolor=color_S0, alpha=0.7, label=r"$S_0^\varepsilon$"),
+        Patch(facecolor=color_BS0, edgecolor=color_BS0, alpha=0.7, label=r"$BS_0^\varepsilon$"),
+        Patch(facecolor=color_RBS0, edgecolor=color_RBS0, alpha=0.7, label=r"$RBS_0^\varepsilon$"),
+        Patch(facecolor=color_TTBmax, edgecolor=color_TTBmax, alpha=0.7, label=r"$TTB_{max}$"),
+    ]
+    
+    ax7.legend(
+        handles=legend_elements,
+        loc="upper right", 
+        fontsize=15,
+        borderpad=0.4,
+        labelspacing=0.3,
+        handletextpad=0.5,
+    )
+    
+    # 设置轴标签和范围
+    ax7.set_xlabel(r"$f_1$")
+    ax7.set_ylabel(r"$f_2$")
+    ax7.set_xlim(F1_MIN, F1_MAX)
+    ax7.set_ylim(F2_MIN, F2_MAX)
+    ax7.ticklabel_format(axis='both', style='sci', scilimits=(0,0), useMathText=True)
+    ax7.grid(True, linestyle=':', alpha=0.3, color='gray', linewidth=0.5)
+    
+    # 保存图7
+    filename7 = f"region_path_cost_e{int(E)}_plot7.pdf"
+    out_path7 = os.path.join(results_dir, filename7)
+    plt.savefig(out_path7, dpi=600, bbox_inches='tight')
+    plt.close()
+    print(f"✅ 图 7 绘图完成，已保存至 {out_path7}")
+    
+    return rs_pt[0] if path_constraint_points.size > 0 else None
+
+
+def plot_ttbmax_point_region(F1_GRID, F2_GRID, mask_reg2, mask_reg, mask_reg3, mask_eqm,
+                             tmax_constraint_points, color_S0, color_BS0, color_RBS0, color_TTBmax,
+                             F1_MIN, F1_MAX, F2_MIN, F2_MAX, E, results_dir):
+    """
+    绘制全部区域 + 紫色区域(TTB_max)的一个点（使用橙色标记为"D"）
+    
+    参数:
+        F1_GRID, F2_GRID: 网格数据
+        mask_reg2, mask_reg, mask_reg3, mask_eqm: 各区域掩码
+        tmax_constraint_points: TTB_max区域的点
+        color_S0, color_BS0, color_RBS0, color_TTBmax: 各区域颜色
+        F1_MIN, F1_MAX, F2_MIN, F2_MAX: 坐标轴范围
+        E: epsilon值
+        results_dir: 结果保存目录
+    """
+    fig8, ax8 = plt.subplots(figsize=(8, 6), constrained_layout=True)
+    
+    # 绘制各区域
+    # S区域
+    ax8.contourf(F1_GRID, F2_GRID, mask_reg2, levels=[0.5, 1.5], colors=[color_S0], alpha=0.7, zorder=1)
+    ax8.contour(F1_GRID, F2_GRID, mask_reg2.astype(int), levels=[0.5], colors="k", linewidths=0.6, zorder=10)
+    
+    # BS区域
+    ax8.contourf(F1_GRID, F2_GRID, mask_reg, levels=[0.5, 1.5], colors=[color_BS0], alpha=0.7, zorder=2)
+    ax8.contour(F1_GRID, F2_GRID, mask_reg.astype(int),  levels=[0.5], colors="k", linewidths=0.6, zorder=10)
+    
+    # RBS区域
+    ax8.contourf(F1_GRID, F2_GRID, mask_reg3, levels=[0.5, 1.5], colors=[color_RBS0], alpha=0.7, zorder=3)
+    ax8.contour(F1_GRID, F2_GRID, mask_reg3.astype(int), levels=[0.5], colors="k", linewidths=0.6, zorder=10)
+    
+    # TTB_max区域
+    ax8.contourf(F1_GRID, F2_GRID, mask_eqm, levels=[0.5, 1.5], colors=[color_TTBmax], alpha=0.7, zorder=4)
+    ax8.contour(F1_GRID, F2_GRID, mask_eqm.astype(int),  levels=[0.5], colors="k", linewidths=0.6, zorder=10)
+    
+    # 绘制紫色区域(TTB_max)的点，使用橙色标记
+    if tmax_constraint_points.size > 0:
+        # 只取第一个点
+        tmax_pt = tmax_constraint_points[0:1]
+        ax8.scatter(
+            tmax_pt[:, 0],
+            tmax_pt[:, 1],
+            color='orange',  # 橙色
+            marker='D',      # 菱形标记
+            s=120,
+            linewidth=0.8,
+            edgecolor='k',
+            zorder=15,
+            alpha=0.9,
+        )
+        # 添加"D"标签
+        ax8.annotate(
+            "D",
+            xy=(tmax_pt[0, 0], tmax_pt[0, 1]),
+            xytext=(8, 8),
+            textcoords='offset points',
+            fontsize=13,
+            weight='bold',
+            color='k',
+            ha='left',
+            va='bottom',
+            zorder=20,
+            bbox=dict(boxstyle="round,pad=0.2", fc="white", alpha=0.8, ec="none"),
+        )
+    
+    # 添加图例
+    legend_elements = [
+        Patch(facecolor=color_S0, edgecolor=color_S0, alpha=0.7, label=r"$S_0^\varepsilon$"),
+        Patch(facecolor=color_BS0, edgecolor=color_BS0, alpha=0.7, label=r"$BS_0^\varepsilon$"),
+        Patch(facecolor=color_RBS0, edgecolor=color_RBS0, alpha=0.7, label=r"$RBS_0^\varepsilon$"),
+        Patch(facecolor=color_TTBmax, edgecolor=color_TTBmax, alpha=0.7, label=r"$TTB_{max}$"),
+    ]
+    
+    ax8.legend(
+        handles=legend_elements,
+        loc="upper right", 
+        fontsize=15,
+        borderpad=0.4,
+        labelspacing=0.3,
+        handletextpad=0.5,
+    )
+    
+    # 设置轴标签和范围
+    ax8.set_xlabel(r"$f_1$")
+    ax8.set_ylabel(r"$f_2$")
+    ax8.set_xlim(F1_MIN, F1_MAX)
+    ax8.set_ylim(F2_MIN, F2_MAX)
+    ax8.ticklabel_format(axis='both', style='sci', scilimits=(0,0), useMathText=True)
+    ax8.grid(True, linestyle=':', alpha=0.3, color='gray', linewidth=0.5)
+    
+    # 保存图8
+    filename8 = f"region_path_cost_e{int(E)}_plot8.pdf"
+    out_path8 = os.path.join(results_dir, filename8)
+    plt.savefig(out_path8, dpi=600, bbox_inches='tight')
+    plt.close()
+    print(f"✅ 图 8 绘图完成，已保存至 {out_path8}")
+    
+    return tmax_pt[0] if tmax_constraint_points.size > 0 else None
+
 
 # ====================== 批量绘制不同 ε 的图 ======================
 
@@ -937,13 +1136,13 @@ def generate_plots_for_e(e_val: int, results_dir: str = "results"):
         results_dir=results_dir,
     )
 
-    # ---------- 绘制六张图 ----------
+    # ---------- 绘制八张图 ----------
     create_plot(
         plot_num=1,
         show_reg2=True,
         show_reg=True,
         show_reg3=False,
-        show_eqm=False,
+        show_TTBmax=False,
         show_points=False,
         results_dir=results_dir,
     )
@@ -952,7 +1151,7 @@ def generate_plots_for_e(e_val: int, results_dir: str = "results"):
         show_reg2=True,
         show_reg=True,
         show_reg3=True,
-        show_eqm=True,
+        show_TTBmax=True,
         show_points=False,
         results_dir=results_dir,
     )
@@ -961,7 +1160,7 @@ def generate_plots_for_e(e_val: int, results_dir: str = "results"):
         show_reg2=True,
         show_reg=True,
         show_reg3=True,
-        show_eqm=True,
+        show_TTBmax=True,
         show_points=True,
         results_dir=results_dir,
     )
@@ -970,7 +1169,7 @@ def generate_plots_for_e(e_val: int, results_dir: str = "results"):
         show_reg2=True,
         show_reg=True,
         show_reg3=False,
-        show_eqm=True,
+        show_TTBmax=True,
         show_points=False,
         results_dir=results_dir,
     )
@@ -979,7 +1178,7 @@ def generate_plots_for_e(e_val: int, results_dir: str = "results"):
         show_reg2=True,
         show_reg=True,
         show_reg3=False,
-        show_eqm=False,
+        show_TTBmax=False,
         show_points=True,
         results_dir=results_dir,
         plot_specific_points=["TTB_max"],
@@ -989,15 +1188,34 @@ def generate_plots_for_e(e_val: int, results_dir: str = "results"):
         show_reg2=True,
         show_reg=True,
         show_reg3=False,
-        show_eqm=False,
+        show_TTBmax=False,
         show_points=True,
         results_dir=results_dir,
         plot_specific_points=["s", "bs"],
+    )
+    # 调用封装好的函数绘制RBS和TTB_max点图
+    plot_rbs_point_region(
+        F1_GRID, F2_GRID, 
+        mask_reg2, mask_reg, mask_reg3, mask_eqm,
+        path_constraint_points, 
+        color_S0, color_BS0, color_RBS0, color_TTBmax,
+        F1_MIN, F1_MAX, F2_MIN, F2_MAX,
+        E, results_dir
+    )
+    
+    plot_ttbmax_point_region(
+        F1_GRID, F2_GRID, 
+        mask_reg2, mask_reg, mask_reg3, mask_eqm,
+        tmax_constraint_points, 
+        color_S0, color_BS0, color_RBS0, color_TTBmax,
+        F1_MIN, F1_MAX, F2_MIN, F2_MAX,
+        E, results_dir
     )
 
     print(f"✅ ε = {E} 的区域图全部生成完毕\n")
 
 if __name__ == "__main__":
     # 一次性生成多个 ε 值的所有结果图
-    for _eps in [8, 16, 24, 32]:
-        generate_plots_for_e(_eps)
+    # for _eps in [8, 16, 24, 32]:
+    #     generate_plots_for_e(_eps)
+    generate_plots_for_e(24)

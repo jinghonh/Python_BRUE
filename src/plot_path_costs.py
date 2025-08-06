@@ -171,7 +171,7 @@ def get_or_compute_TTB_max_delta_TTB_max(boundary: Boundary, zeta: int, results_
     
     # 检查是否存在缓存文件
     if os.path.exists(cache_file):
-        print(f"Loading TTB_max_delta and TTB_max from {cache_file}")
+        # print(f"Loading TTB_max_delta and TTB_max from {cache_file}")
         try:
             with open(cache_file, 'r') as f:
                 data = json.load(f)
@@ -201,7 +201,7 @@ def get_or_compute_TTB_max_delta_TTB_max(boundary: Boundary, zeta: int, results_
                 TTB_max_delta = TTB_max_delta_values
                 TTB_max = TTB_max_values
                 
-            print(f"Successfully loaded TTB_max_delta and TTB_max for zeta={zeta}")
+            # print(f"Successfully loaded TTB_max_delta and TTB_max for zeta={zeta}")
             return TTB_max_delta, TTB_max
         except Exception as e:
             print(f"Error loading TTB_max_delta and TTB_max from cache: {e}")
@@ -229,7 +229,7 @@ def get_or_compute_TTB_max_delta_TTB_max(boundary: Boundary, zeta: int, results_
 
 def configure_plot(ax: plt.Axes, params: PlotParams, title: str, xlabel: str, ylabel: str):
     """Apply common plot configurations."""
-    ax.set_title(title, fontsize=params.font_size + 4, fontweight='bold')
+    # ax.set_title(title, fontsize=params.font_size + 4, fontweight='bold')
     ax.set_xlabel(xlabel, fontsize=params.font_size + 2, fontweight='bold')
     ax.set_ylabel(ylabel, fontsize=params.font_size + 2, fontweight='bold')
     if params.show_grid:
@@ -316,7 +316,7 @@ def plot_teqm_flow_path_cost(all_path_costs: List[np.ndarray], color_variations:
     
     # 5. Plotting
     fig, ax = plt.subplots(figsize=params.figure_size)
-    configure_plot(ax, params, f'Path Costs with Highlighted T_eqm Flow (Zeta={zeta})', r'Time', r'Money Cost')
+    configure_plot(ax, params, f'Path Costs with Highlighted TTB_max Flow (Zeta={zeta})', r'Time', r'Money Cost')
     
     # Layer 1: Plot background feasible region
     if boundary.left_x.size > 0:
@@ -331,7 +331,7 @@ def plot_teqm_flow_path_cost(all_path_costs: List[np.ndarray], color_variations:
             ax.scatter(costs[:, 0], costs[:, 1], s=30, c=[color_variations[i]], marker='o', alpha=0.8,
                        edgecolors='none')
 
-    # Layer 3: Plot the prominent T_eqm cost line
+    # Layer 3: Plot the prominent TTB_max cost line
     sort_idx = np.argsort(teqm_costs[:, 1])
     ax.plot(teqm_costs[sort_idx, 0], teqm_costs[sort_idx, 1], '-', color='#984ea3', linewidth=2.5, marker='D', markersize=8, label=r'Flow from $TTB_{max}$ point', zorder=10)
     
@@ -548,6 +548,362 @@ def plot_path_costs_below_equilibrium(all_path_costs: List[np.ndarray], boundary
     plt.close(fig)
 
 
+def plot_rbs_point_cost(all_path_costs: List[np.ndarray], boundary: Boundary,
+                       color_variations: np.ndarray, params: PlotParams, zeta: int, subset_index: int,
+                       relation_matrix: np.ndarray, money_coeffs: np.ndarray, free_flow_time: np.ndarray,
+                       max_capacity: np.ndarray):
+    """
+    在plot_path_costs_with_upper_limit的基础上，额外绘制绿色区域(RBS)中一个点的双目标成本折线
+    
+    Args:
+        all_path_costs: 所有路径成本数据
+        boundary: 边界数据
+        color_variations: 颜色方案
+        params: 绘图参数
+        zeta: zeta值
+        subset_index: 子集索引
+        relation_matrix: 关系矩阵
+        money_coeffs: 金钱成本系数
+        free_flow_time: 自由流时间
+        max_capacity: 最大容量
+    """
+    # --- Data Processing ---
+    if boundary.left_x.size == 0:
+        print("Warning: Boundary data is empty. Skipping plot generation.")
+        return
+    
+    # 使用共享函数获取TTB_max_delta和TTB_max
+    TTB_max_delta, TTB_max = get_or_compute_TTB_max_delta_TTB_max(boundary, zeta, params.save_path)
+    
+    f_tmax = interp1d(boundary.left_y, TTB_max_delta, kind='nearest', bounds_error=False, fill_value="extrapolate")
+
+    feasible_paths_data = []
+    infeasible_paths_data = []
+    feasible_costs_points = []
+
+    for i, costs in enumerate(all_path_costs):
+        if costs.size > 0:
+            is_feasible = np.all(costs[:, 0] <= f_tmax(costs[:, 1]))
+            if is_feasible:
+                feasible_paths_data.append({'costs': costs, 'color': color_variations[i]})
+                feasible_costs_points.append(costs)
+            else:
+                infeasible_paths_data.append({'costs': costs, 'color': [0.8, 0.8, 0.8]})
+    
+    # 1. 加载散点数据获取RBS点
+    scatter_file = os.path.join('results', f'scatter_points_e{zeta}.json')
+    try:
+        with open(scatter_file, 'r') as f:
+            scatter_data = json.load(f)
+    except FileNotFoundError:
+        print(f"警告: RBS点的散点文件未找到: {scatter_file}")
+        return
+    
+    # 2. 获取RBS区域的第一个点
+    rbs_points = scatter_data.get('path_constraint_points', [])
+    if not rbs_points:
+        print(f"警告: 未在 {scatter_file} 中找到'path_constraint_points'")
+        return
+    
+    f1, f2 = rbs_points[0]
+    
+    # 3. 创建流量向量
+    f5 = 10000.0 - f1 - f2
+    n_paths = relation_matrix.shape[0]
+    rbs_flow = np.zeros(n_paths)
+    rbs_flow[0] = f1  # Path 1
+    rbs_flow[1] = f2  # Path 2
+    
+    if subset_index == 0 and n_paths >= 3:
+        rbs_flow[2] = f5  # Path 5 is at index 2 for subset 0
+    elif subset_index in [1, 2] and n_paths >= 5:
+        rbs_flow[4] = f5  # Path 5 is at index 4 for subsets 1 and 2
+            
+    # 4. 计算路径成本
+    x = rbs_flow @ relation_matrix
+    rt = calculate_real_time(np.atleast_2d(x), relation_matrix, free_flow_time, max_capacity)
+    path_time_costs = rt.flatten()
+    money_costs_per_path = money_coeffs @ relation_matrix.T
+    rbs_costs = np.column_stack((path_time_costs, money_costs_per_path))
+    
+    # --- Drawing Layers ---
+    fig, ax = plt.subplots(figsize=params.figure_size)
+    configure_plot(ax, params, f'Path Costs with Upper Limit and RBS Point (Zeta={zeta})', r'Time', r'Money Cost')
+
+    # Layer 1: Total Feasible Region (Background)
+    boundary_x = np.concatenate([boundary.left_x, boundary.right_x[::-1]])
+    boundary_y = np.concatenate([boundary.left_y, boundary.right_y[::-1]])
+    ax.fill(boundary_x, boundary_y, color=[0.9, 0.95, 1], alpha=1, edgecolor='none', label='Total Feasible Region')
+
+    # Layer 2: Infeasible Paths
+    infeasible_handle = None
+    for path in infeasible_paths_data:
+        costs = path['costs']
+        color = path['color']
+        ax.plot(costs[:, 0], costs[:, 1], '-', color=(*color[:3], 0.5), linewidth=1.0, zorder=2)
+        h = ax.scatter(costs[:, 0], costs[:, 1], s=25, c=[color], marker='o', alpha=0.3, edgecolors='none', zorder=2)
+        if infeasible_handle is None:
+            infeasible_handle = h
+
+    # Layer 3: Feasible Flow Sub-Region
+    feasible_region_handle = None
+    if feasible_costs_points:
+        all_feasible_time = np.concatenate([c[:, 0] for c in feasible_costs_points])
+        all_feasible_money = np.concatenate([c[:, 1] for c in feasible_costs_points])
+        if all_feasible_time.size > 2:
+            feasible_sub_boundary = calculate_feasible_region_boundary(all_feasible_time, all_feasible_money)
+            if feasible_sub_boundary.left_x.size > 0:
+                sub_boundary_x = np.concatenate([feasible_sub_boundary.left_x, feasible_sub_boundary.right_x[::-1]])
+                sub_boundary_y = np.concatenate([feasible_sub_boundary.left_y, feasible_sub_boundary.right_y[::-1]])
+                feasible_region_handle = ax.fill(sub_boundary_x, sub_boundary_y, color=[0.7, 0.95, 0.7], alpha=0.5,
+                        edgecolor=[0.4, 0.6, 0.4], linewidth=0.5, label='Feasible Flow Region', zorder=3)[0]
+
+    # Layer 4: Feasible Paths
+    feasible_handle = None
+    for path in feasible_paths_data:
+        costs = path['costs']
+        color = path['color']
+        ax.plot(costs[:, 0], costs[:, 1], '-', color=(*color[:3], 0.7), linewidth=1.2, zorder=4)
+        h = ax.scatter(costs[:, 0], costs[:, 1], s=30, c=[color], marker='o', alpha=0.8, edgecolors='none', zorder=4)
+        if feasible_handle is None:
+            feasible_handle = h
+
+    # Layer 5: TTB_max_delta and T_eqm lines
+    TTB_max_delta_handle = ax.plot(TTB_max_delta, boundary.left_y, '-', color=[0.8, 0.2, 0.2], linewidth=2.5, label=r'$TTB_{max} + \delta_k$', zorder=10)[0]
+    TTB_max_handle = ax.plot(TTB_max, boundary.left_y, '-.', color=[0.5, 0.0, 0.8], linewidth=2.5, label=r'$TTB_{max}$', zorder=10)[0]
+    
+    # Layer 6: RBS点的成本线 (最上层)
+    sort_idx = np.argsort(rbs_costs[:, 1])
+    rbs_handle = ax.plot(rbs_costs[sort_idx, 0], rbs_costs[sort_idx, 1], '-', color='yellow', linewidth=2.5, marker='D', markersize=8, label=r'Flow from $RBS_0^\varepsilon$ point', zorder=11)[0]
+
+    # 添加图例
+    legend_handles = []
+    legend_labels = []
+    
+    # 总可行区域
+    legend_handles.append(ax.fill([], [], color=[0.9, 0.95, 1], alpha=1, edgecolor='none')[0])
+    legend_labels.append('Total Feasible Region')
+    
+    # 可行流量区域
+    if feasible_region_handle is not None:
+        legend_handles.append(feasible_region_handle)
+        legend_labels.append('Feasible Flow Region')
+    
+    # 可行路径点
+    if feasible_handle is not None:
+        legend_handles.append(feasible_handle)
+        legend_labels.append('Feasible Flow Paths')
+    
+    # 不可行路径点
+    if infeasible_handle is not None:
+        legend_handles.append(infeasible_handle)
+        legend_labels.append('Infeasible Flow Paths')
+    
+    # TTB_max_delta线
+    legend_handles.append(TTB_max_delta_handle)
+    legend_labels.append(r'$TTB_{max} + \delta_k$')
+    
+    # T_eqm线
+    legend_handles.append(TTB_max_handle)
+    legend_labels.append(r'$TTB_{max}$')
+    
+    # RBS点的成本线
+    legend_handles.append(rbs_handle)
+    legend_labels.append(r'Flow from $RBS_0^\varepsilon$ point')
+    
+    # 显示图例
+    ax.legend(
+        legend_handles,
+        legend_labels,
+        loc='best',
+        fontsize=params.font_size - 1,
+        framealpha=0.9,
+        fancybox=True,
+        shadow=True
+    )
+
+    save_figure(fig, 'rbs_point_path_cost_with_limits', params, zeta, subset_index)
+    plt.close(fig)
+
+
+def plot_ttbmax_point_cost(all_path_costs: List[np.ndarray], boundary: Boundary,
+                         color_variations: np.ndarray, params: PlotParams, zeta: int, subset_index: int,
+                         relation_matrix: np.ndarray, money_coeffs: np.ndarray, free_flow_time: np.ndarray,
+                         max_capacity: np.ndarray):
+    """
+    在plot_path_costs_with_upper_limit的基础上，额外绘制紫色区域(TTB_max)中一个点的双目标成本折线
+    
+    Args:
+        all_path_costs: 所有路径成本数据
+        boundary: 边界数据
+        color_variations: 颜色方案
+        params: 绘图参数
+        zeta: zeta值
+        subset_index: 子集索引
+        relation_matrix: 关系矩阵
+        money_coeffs: 金钱成本系数
+        free_flow_time: 自由流时间
+        max_capacity: 最大容量
+    """
+    # --- Data Processing ---
+    if boundary.left_x.size == 0:
+        print("Warning: Boundary data is empty. Skipping plot generation.")
+        return
+    
+    # 使用共享函数获取TTB_max_delta和TTB_max
+    TTB_max_delta, TTB_max = get_or_compute_TTB_max_delta_TTB_max(boundary, zeta, params.save_path)
+    
+    f_tmax = interp1d(boundary.left_y, TTB_max_delta, kind='nearest', bounds_error=False, fill_value="extrapolate")
+
+    feasible_paths_data = []
+    infeasible_paths_data = []
+    feasible_costs_points = []
+
+    for i, costs in enumerate(all_path_costs):
+        if costs.size > 0:
+            is_feasible = np.all(costs[:, 0] <= f_tmax(costs[:, 1]))
+            if is_feasible:
+                feasible_paths_data.append({'costs': costs, 'color': color_variations[i]})
+                feasible_costs_points.append(costs)
+            else:
+                infeasible_paths_data.append({'costs': costs, 'color': [0.8, 0.8, 0.8]})
+    
+    # 1. 加载散点数据获取TTB_max点
+    scatter_file = os.path.join('results', f'scatter_points_e{zeta}.json')
+    try:
+        with open(scatter_file, 'r') as f:
+            scatter_data = json.load(f)
+    except FileNotFoundError:
+        print(f"警告: TTB_max点的散点文件未找到: {scatter_file}")
+        return
+    
+    # 2. 获取TTB_max区域的第一个点
+    ttbmax_points = scatter_data.get('tmax_constraint_points', [])
+    if not ttbmax_points:
+        print(f"警告: 未在 {scatter_file} 中找到'tmax_constraint_points'")
+        return
+    
+    f1, f2 = ttbmax_points[0]
+    
+    # 3. 创建流量向量
+    f5 = 10000.0 - f1 - f2
+    n_paths = relation_matrix.shape[0]
+    ttbmax_flow = np.zeros(n_paths)
+    ttbmax_flow[0] = f1  # Path 1
+    ttbmax_flow[1] = f2  # Path 2
+    
+    if subset_index == 0 and n_paths >= 3:
+        ttbmax_flow[2] = f5  # Path 5 is at index 2 for subset 0
+    elif subset_index in [1, 2] and n_paths >= 5:
+        ttbmax_flow[4] = f5  # Path 5 is at index 4 for subsets 1 and 2
+            
+    # 4. 计算路径成本
+    x = ttbmax_flow @ relation_matrix
+    rt = calculate_real_time(np.atleast_2d(x), relation_matrix, free_flow_time, max_capacity)
+    path_time_costs = rt.flatten()
+    money_costs_per_path = money_coeffs @ relation_matrix.T
+    ttbmax_costs = np.column_stack((path_time_costs, money_costs_per_path))
+    
+    # --- Drawing Layers ---
+    fig, ax = plt.subplots(figsize=params.figure_size)
+    configure_plot(ax, params, f'Path Costs with Upper Limit and TTB_max Point (Zeta={zeta})', r'Time', r'Money Cost')
+
+    # Layer 1: Total Feasible Region (Background)
+    boundary_x = np.concatenate([boundary.left_x, boundary.right_x[::-1]])
+    boundary_y = np.concatenate([boundary.left_y, boundary.right_y[::-1]])
+    ax.fill(boundary_x, boundary_y, color=[0.9, 0.95, 1], alpha=1, edgecolor='none', label='Total Feasible Region')
+
+    # Layer 2: Infeasible Paths
+    infeasible_handle = None
+    for path in infeasible_paths_data:
+        costs = path['costs']
+        color = path['color']
+        ax.plot(costs[:, 0], costs[:, 1], '-', color=(*color[:3], 0.5), linewidth=1.0, zorder=2)
+        h = ax.scatter(costs[:, 0], costs[:, 1], s=25, c=[color], marker='o', alpha=0.3, edgecolors='none', zorder=2)
+        if infeasible_handle is None:
+            infeasible_handle = h
+
+    # Layer 3: Feasible Flow Sub-Region
+    feasible_region_handle = None
+    if feasible_costs_points:
+        all_feasible_time = np.concatenate([c[:, 0] for c in feasible_costs_points])
+        all_feasible_money = np.concatenate([c[:, 1] for c in feasible_costs_points])
+        if all_feasible_time.size > 2:
+            feasible_sub_boundary = calculate_feasible_region_boundary(all_feasible_time, all_feasible_money)
+            if feasible_sub_boundary.left_x.size > 0:
+                sub_boundary_x = np.concatenate([feasible_sub_boundary.left_x, feasible_sub_boundary.right_x[::-1]])
+                sub_boundary_y = np.concatenate([feasible_sub_boundary.left_y, feasible_sub_boundary.right_y[::-1]])
+                feasible_region_handle = ax.fill(sub_boundary_x, sub_boundary_y, color=[0.7, 0.95, 0.7], alpha=0.5,
+                        edgecolor=[0.4, 0.6, 0.4], linewidth=0.5, label='Feasible Flow Region', zorder=3)[0]
+
+    # Layer 4: Feasible Paths
+    feasible_handle = None
+    for path in feasible_paths_data:
+        costs = path['costs']
+        color = path['color']
+        ax.plot(costs[:, 0], costs[:, 1], '-', color=(*color[:3], 0.7), linewidth=1.2, zorder=4)
+        h = ax.scatter(costs[:, 0], costs[:, 1], s=30, c=[color], marker='o', alpha=0.8, edgecolors='none', zorder=4)
+        if feasible_handle is None:
+            feasible_handle = h
+
+    # Layer 5: TTB_max_delta and T_eqm lines
+    TTB_max_delta_handle = ax.plot(TTB_max_delta, boundary.left_y, '-', color=[0.8, 0.2, 0.2], linewidth=2.5, label=r'$TTB_{max} + \delta_k$', zorder=10)[0]
+    TTB_max_handle = ax.plot(TTB_max, boundary.left_y, '-.', color=[0.5, 0.0, 0.8], linewidth=2.5, label=r'$TTB_{max}$', zorder=10)[0]
+    
+    # Layer 6: TTB_max点的成本线 (最上层)
+    sort_idx = np.argsort(ttbmax_costs[:, 1])
+    ttbmax_handle = ax.plot(ttbmax_costs[sort_idx, 0], ttbmax_costs[sort_idx, 1], '-', color='orange', linewidth=2.5, marker='D', markersize=8, label=r'Flow from $TTB_{max}$ point', zorder=11)[0]
+
+    # 添加图例
+    legend_handles = []
+    legend_labels = []
+    
+    # 总可行区域
+    legend_handles.append(ax.fill([], [], color=[0.9, 0.95, 1], alpha=1, edgecolor='none')[0])
+    legend_labels.append('Total Feasible Region')
+    
+    # 可行流量区域
+    if feasible_region_handle is not None:
+        legend_handles.append(feasible_region_handle)
+        legend_labels.append('Feasible Flow Region')
+    
+    # 可行路径点
+    if feasible_handle is not None:
+        legend_handles.append(feasible_handle)
+        legend_labels.append('Feasible Flow Paths')
+    
+    # 不可行路径点
+    if infeasible_handle is not None:
+        legend_handles.append(infeasible_handle)
+        legend_labels.append('Infeasible Flow Paths')
+    
+    # TTB_max_delta线
+    legend_handles.append(TTB_max_delta_handle)
+    legend_labels.append(r'$TTB_{max} + \delta_k$')
+    
+    # T_eqm线
+    legend_handles.append(TTB_max_handle)
+    legend_labels.append(r'$TTB_{max}$')
+    
+    # TTB_max点的成本线
+    legend_handles.append(ttbmax_handle)
+    legend_labels.append(r'Flow from $TTB_{max}$ point')
+    
+    # 显示图例
+    ax.legend(
+        legend_handles,
+        legend_labels,
+        loc='best',
+        fontsize=params.font_size - 1,
+        framealpha=0.9,
+        fancybox=True,
+        shadow=True
+    )
+
+    save_figure(fig, 'ttbmax_point_path_cost_with_limits', params, zeta, subset_index)
+    plt.close(fig)
+
+
 def run_with_params(zeta=None, subset_index=None, num_flows=None, cache_dir=None, results_dir=None, plot_params=None):
     """
     使用内部参数运行路径成本绘图功能
@@ -585,7 +941,7 @@ def run_with_params(zeta=None, subset_index=None, num_flows=None, cache_dir=None
         print(f"Error: Cache file not found at {cache_file}")
         return None
     
-    print(f"Loading data from {cache_file}...")
+    # print(f"Loading data from {cache_file}...")
     data = loadmat(cache_file)
     total_valid_flow = data.get('totalValidFlow')
     relation_matrix = data.get('relationMatrix')
@@ -622,10 +978,15 @@ def run_with_params(zeta=None, subset_index=None, num_flows=None, cache_dir=None
     plot_time_money_cost_relationship(all_path_costs, boundary, color_variations, params, zeta, subset_index)
 
     
-    # Call the new function to plot the T_eqm flow cost
+    # Call the new functions to plot special points' path costs
     if subset_index == 0:
         plot_teqm_flow_path_cost(all_path_costs, color_variations, boundary, params, zeta, subset_index, relation_matrix,
                                 money_coeffs, free_flow_time, max_capacity)
+        # 新增：绘制RBS点和TTB_max点的双目标成本折线图
+        plot_rbs_point_cost(all_path_costs, boundary, color_variations, params, zeta, subset_index, relation_matrix,
+                          money_coeffs, free_flow_time, max_capacity)
+        plot_ttbmax_point_cost(all_path_costs, boundary, color_variations, params, zeta, subset_index, relation_matrix,
+                             money_coeffs, free_flow_time, max_capacity)
 
     plot_path_costs_with_upper_limit(all_path_costs, boundary, color_variations, params, zeta, subset_index)
     plot_path_costs_below_equilibrium(all_path_costs, boundary, color_variations, params, zeta, subset_index)
@@ -669,14 +1030,14 @@ def main():
     else:
         # 批量运行预设的 zeta 与 subset_index 组合，避免重复代码
         default_run_configs = [
-            {"zeta": 8, "subset_index": 0},
-            {"zeta": 16, "subset_index": 0},
-            {"zeta": 16, "subset_index": 1},
+            # {"zeta": 8, "subset_index": 0},
+            # {"zeta": 16, "subset_index": 0},
+            # {"zeta": 16, "subset_index": 1},
             {"zeta": 24, "subset_index": 0},
-            {"zeta": 24, "subset_index": 1},
-            {"zeta": 32, "subset_index": 0},
-            {"zeta": 32, "subset_index": 1},
-            {"zeta": 32, "subset_index": 2},
+            # {"zeta": 24, "subset_index": 1},
+            # {"zeta": 32, "subset_index": 0},
+            # {"zeta": 32, "subset_index": 1},
+            # {"zeta": 32, "subset_index": 2},
         ]
 
         common_kwargs = dict(
