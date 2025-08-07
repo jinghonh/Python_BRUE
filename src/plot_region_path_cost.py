@@ -654,14 +654,14 @@ def create_plot(
             F1_GRID, F2_GRID, mask_reg3, levels=[0.5, 1.5], colors=[color_RBS0], alpha=0.7, zorder=3
         )
         ax.contour(F1_GRID, F2_GRID, mask_reg3.astype(int), levels=[0.5], colors="k", linewidths=0.6, zorder=10)
-        legend_elements.append(Patch(facecolor=color_RBS0, edgecolor=color_RBS0, alpha=0.7, label=r"$RBS_0^\varepsilon$"))
+        legend_elements.append(Patch(facecolor=color_RBS0, edgecolor=color_RBS0, alpha=0.7, label=r"$RBS_0^\varepsilon-TTB_{max}+\delta_k$"))
     
     if show_TTBmax:
         ax.contourf(
             F1_GRID, F2_GRID, mask_eqm, levels=[0.5, 1.5], colors=[color_TTBmax], alpha=0.7, zorder=4
         )
         ax.contour(F1_GRID, F2_GRID, mask_eqm.astype(int),  levels=[0.5], colors="k", linewidths=0.6, zorder=10)
-        legend_elements.append(Patch(facecolor=color_TTBmax, edgecolor=color_TTBmax, alpha=0.7, label=r"$TTB_{max}$"))
+        legend_elements.append(Patch(facecolor=color_TTBmax, edgecolor=color_TTBmax, alpha=0.7, label=r"$RBS_0^\varepsilon-TTB_{max}$"))
     
     # 绘制散点
     point_label_idx = 0  # 用于标记点的索引
@@ -778,7 +778,7 @@ def create_plot(
                 ax.scatter(
                     TTB_max_pts[:, 0],
                     TTB_max_pts[:, 1],
-                    color=color_TTBmax,
+                    color="orange",
                     marker=marker_TTBmax,
                     s=120,  # 增大标记尺寸以容纳字母
                     linewidth=0.8,
@@ -902,9 +902,9 @@ def plot_rbs_point_region(F1_GRID, F2_GRID, mask_reg2, mask_reg, mask_reg3, mask
             zorder=15,
             alpha=0.9,
         )
-        # 添加"D"标签
+        # 添加"B"标签
         ax7.annotate(
-            "D",
+            "B",
             xy=(rs_pt[0, 0], rs_pt[0, 1]),
             xytext=(8, 8),
             textcoords='offset points',
@@ -921,8 +921,8 @@ def plot_rbs_point_region(F1_GRID, F2_GRID, mask_reg2, mask_reg, mask_reg3, mask
     legend_elements = [
         Patch(facecolor=color_S0, edgecolor=color_S0, alpha=0.7, label=r"$S_0^\varepsilon$"),
         Patch(facecolor=color_BS0, edgecolor=color_BS0, alpha=0.7, label=r"$BS_0^\varepsilon$"),
-        Patch(facecolor=color_RBS0, edgecolor=color_RBS0, alpha=0.7, label=r"$RBS_0^\varepsilon$"),
-        Patch(facecolor=color_TTBmax, edgecolor=color_TTBmax, alpha=0.7, label=r"$TTB_{max}$"),
+        Patch(facecolor=color_RBS0, edgecolor=color_RBS0, alpha=0.7, label=r"$RBS_0^\varepsilon-TTB_{max}+\delta_k$"),
+        Patch(facecolor=color_TTBmax, edgecolor=color_TTBmax, alpha=0.7, label=r"$RBS_0^\varepsilon-TTB_{max}$"),
     ]
     
     ax7.legend(
@@ -1001,9 +1001,9 @@ def plot_ttbmax_point_region(F1_GRID, F2_GRID, mask_reg2, mask_reg, mask_reg3, m
             zorder=15,
             alpha=0.9,
         )
-        # 添加"D"标签
+        # 添加"A"标签
         ax8.annotate(
-            "D",
+            "A",
             xy=(tmax_pt[0, 0], tmax_pt[0, 1]),
             xytext=(8, 8),
             textcoords='offset points',
@@ -1020,8 +1020,8 @@ def plot_ttbmax_point_region(F1_GRID, F2_GRID, mask_reg2, mask_reg, mask_reg3, m
     legend_elements = [
         Patch(facecolor=color_S0, edgecolor=color_S0, alpha=0.7, label=r"$S_0^\varepsilon$"),
         Patch(facecolor=color_BS0, edgecolor=color_BS0, alpha=0.7, label=r"$BS_0^\varepsilon$"),
-        Patch(facecolor=color_RBS0, edgecolor=color_RBS0, alpha=0.7, label=r"$RBS_0^\varepsilon$"),
-        Patch(facecolor=color_TTBmax, edgecolor=color_TTBmax, alpha=0.7, label=r"$TTB_{max}$"),
+        Patch(facecolor=color_RBS0, edgecolor=color_RBS0, alpha=0.7, label=r"$RBS_0^\varepsilon-TTB_{max}+\delta_k$"),
+        Patch(facecolor=color_TTBmax, edgecolor=color_TTBmax, alpha=0.7, label=r"$RBS_0^\varepsilon-TTB_{max}$"),
     ]
     
     ax8.legend(
@@ -1216,6 +1216,6 @@ def generate_plots_for_e(e_val: int, results_dir: str = "results"):
 
 if __name__ == "__main__":
     # 一次性生成多个 ε 值的所有结果图
-    # for _eps in [8, 16, 24, 32]:
-    #     generate_plots_for_e(_eps)
-    generate_plots_for_e(24)
+    for _eps in [8, 16, 24, 32]:
+        generate_plots_for_e(_eps)
+    # generate_plots_for_e(24)

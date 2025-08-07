@@ -255,7 +255,7 @@ def plot_time_money_cost_relationship(all_path_costs: List[np.ndarray], boundary
     if boundary.left_x.size > 0:
         boundary_x = np.concatenate([boundary.left_x, boundary.right_x[::-1]])
         boundary_y = np.concatenate([boundary.left_y, boundary.right_y[::-1]])
-        ax.fill(boundary_x, boundary_y, color=[0.9, 0.95, 1], alpha=1, edgecolor='none', label='Feasible Region'); ax.plot(boundary.left_x, boundary.left_y, '-', color=[0.4, 0.5, 0.8], linewidth=0.5); ax.plot(boundary.right_x, boundary.right_y, '-', color=[0.4, 0.5, 0.8], linewidth=0.5)
+        ax.fill(boundary_x, boundary_y, color=[0.9, 0.95, 1], alpha=1, edgecolor='none'); ax.plot(boundary.left_x, boundary.left_y, '-', color=[0.4, 0.5, 0.8], linewidth=0.5); ax.plot(boundary.right_x, boundary.right_y, '-', color=[0.4, 0.5, 0.8], linewidth=0.5)
 
     for i, costs in enumerate(all_path_costs):
         if costs.size > 0:
@@ -333,7 +333,7 @@ def plot_teqm_flow_path_cost(all_path_costs: List[np.ndarray], color_variations:
 
     # Layer 3: Plot the prominent TTB_max cost line
     sort_idx = np.argsort(teqm_costs[:, 1])
-    ax.plot(teqm_costs[sort_idx, 0], teqm_costs[sort_idx, 1], '-', color='#984ea3', linewidth=2.5, marker='D', markersize=8, label=r'Flow from $TTB_{max}$ point', zorder=10)
+    ax.plot(teqm_costs[sort_idx, 0], teqm_costs[sort_idx, 1], '-', color='orange', linewidth=2.5, marker='D', markersize=8, label=r'Path ﬂow set A', zorder=10)
     
     # 6. Add legend and save
     handles, labels = ax.get_legend_handles_labels()
@@ -380,7 +380,7 @@ def plot_path_costs_with_upper_limit(all_path_costs: List[np.ndarray], boundary:
     # Layer 1: Total Feasible Region (Background)
     boundary_x = np.concatenate([boundary.left_x, boundary.right_x[::-1]])
     boundary_y = np.concatenate([boundary.left_y, boundary.right_y[::-1]])
-    ax.fill(boundary_x, boundary_y, color=[0.9, 0.95, 1], alpha=1, edgecolor='none', label='Total Feasible Region')
+    ax.fill(boundary_x, boundary_y, color=[0.9, 0.95, 1], alpha=1, edgecolor='none')
 
     # Layer 2: Infeasible Paths
     infeasible_handle = None
@@ -403,7 +403,7 @@ def plot_path_costs_with_upper_limit(all_path_costs: List[np.ndarray], boundary:
                 sub_boundary_x = np.concatenate([feasible_sub_boundary.left_x, feasible_sub_boundary.right_x[::-1]])
                 sub_boundary_y = np.concatenate([feasible_sub_boundary.left_y, feasible_sub_boundary.right_y[::-1]])
                 feasible_region_handle = ax.fill(sub_boundary_x, sub_boundary_y, color=[0.7, 0.95, 0.7], alpha=0.5,
-                        edgecolor=[0.4, 0.6, 0.4], linewidth=0.5, label='Feasible Flow Region', zorder=3)[0]
+                        edgecolor=[0.4, 0.6, 0.4], linewidth=0.5, zorder=3)[0]
 
     # Layer 4: Feasible Paths
     feasible_handle = None
@@ -422,25 +422,6 @@ def plot_path_costs_with_upper_limit(all_path_costs: List[np.ndarray], boundary:
     # 添加图例
     legend_handles = []
     legend_labels = []
-    
-    # 总可行区域
-    legend_handles.append(ax.fill([], [], color=[0.9, 0.95, 1], alpha=1, edgecolor='none')[0])
-    legend_labels.append('Total Feasible Region')
-    
-    # 可行流量区域
-    if feasible_region_handle is not None:
-        legend_handles.append(feasible_region_handle)
-        legend_labels.append('Feasible Flow Region')
-    
-    # 可行路径点
-    if feasible_handle is not None:
-        legend_handles.append(feasible_handle)
-        legend_labels.append('Feasible Flow Paths')
-    
-    # 不可行路径点
-    if infeasible_handle is not None:
-        legend_handles.append(infeasible_handle)
-        legend_labels.append('Infeasible Flow Paths')
     
     # TTB_max_delta线
     legend_handles.append(TTB_max_delta_handle)
@@ -507,7 +488,7 @@ def plot_path_costs_below_equilibrium(all_path_costs: List[np.ndarray], boundary
     # Layer 1: Total Feasible Region (Background)
     boundary_x = np.concatenate([boundary.left_x, boundary.right_x[::-1]])
     boundary_y = np.concatenate([boundary.left_y, boundary.right_y[::-1]])
-    ax.fill(boundary_x, boundary_y, color=[0.95, 0.95, 0.95], alpha=1, edgecolor='none', label='Total Feasible Region')
+    ax.fill(boundary_x, boundary_y, color=[0.95, 0.95, 0.95], alpha=1, edgecolor='none')
 
     # Layer 2: Other Paths (非平衡线下方的路径)
     for path in other_paths_data:
@@ -633,7 +614,7 @@ def plot_rbs_point_cost(all_path_costs: List[np.ndarray], boundary: Boundary,
     # Layer 1: Total Feasible Region (Background)
     boundary_x = np.concatenate([boundary.left_x, boundary.right_x[::-1]])
     boundary_y = np.concatenate([boundary.left_y, boundary.right_y[::-1]])
-    ax.fill(boundary_x, boundary_y, color=[0.9, 0.95, 1], alpha=1, edgecolor='none', label='Total Feasible Region')
+    ax.fill(boundary_x, boundary_y, color=[0.9, 0.95, 1], alpha=1, edgecolor='none')
 
     # Layer 2: Infeasible Paths
     infeasible_handle = None
@@ -674,30 +655,27 @@ def plot_rbs_point_cost(all_path_costs: List[np.ndarray], boundary: Boundary,
     
     # Layer 6: RBS点的成本线 (最上层)
     sort_idx = np.argsort(rbs_costs[:, 1])
-    rbs_handle = ax.plot(rbs_costs[sort_idx, 0], rbs_costs[sort_idx, 1], '-', color='yellow', linewidth=2.5, marker='D', markersize=8, label=r'Flow from $RBS_0^\varepsilon$ point', zorder=11)[0]
+    rbs_handle = ax.plot(rbs_costs[sort_idx, 0], rbs_costs[sort_idx, 1], '-', color='yellow', linewidth=2.5, marker='D', markersize=8, zorder=11)[0]
+    
+    # # 在第一个点上添加"B"标签
+    # first_point_idx = sort_idx[0]
+    # ax.annotate(
+    #     "B",
+    #     xy=(rbs_costs[first_point_idx, 0], rbs_costs[first_point_idx, 1]),
+    #     xytext=(8, 8),
+    #     textcoords='offset points',
+    #     fontsize=13,
+    #     weight='bold',
+    #     color='k',
+    #     ha='left',
+    #     va='bottom',
+    #     zorder=20,
+    #     bbox=dict(boxstyle="round,pad=0.2", fc="white", alpha=0.8, ec="none"),
+    # )
 
     # 添加图例
     legend_handles = []
     legend_labels = []
-    
-    # 总可行区域
-    legend_handles.append(ax.fill([], [], color=[0.9, 0.95, 1], alpha=1, edgecolor='none')[0])
-    legend_labels.append('Total Feasible Region')
-    
-    # 可行流量区域
-    if feasible_region_handle is not None:
-        legend_handles.append(feasible_region_handle)
-        legend_labels.append('Feasible Flow Region')
-    
-    # 可行路径点
-    if feasible_handle is not None:
-        legend_handles.append(feasible_handle)
-        legend_labels.append('Feasible Flow Paths')
-    
-    # 不可行路径点
-    if infeasible_handle is not None:
-        legend_handles.append(infeasible_handle)
-        legend_labels.append('Infeasible Flow Paths')
     
     # TTB_max_delta线
     legend_handles.append(TTB_max_delta_handle)
@@ -706,10 +684,10 @@ def plot_rbs_point_cost(all_path_costs: List[np.ndarray], boundary: Boundary,
     # T_eqm线
     legend_handles.append(TTB_max_handle)
     legend_labels.append(r'$TTB_{max}$')
-    
+
     # RBS点的成本线
     legend_handles.append(rbs_handle)
-    legend_labels.append(r'Flow from $RBS_0^\varepsilon$ point')
+    legend_labels.append(r'Path flow set B')
     
     # 显示图例
     ax.legend(
@@ -811,7 +789,7 @@ def plot_ttbmax_point_cost(all_path_costs: List[np.ndarray], boundary: Boundary,
     # Layer 1: Total Feasible Region (Background)
     boundary_x = np.concatenate([boundary.left_x, boundary.right_x[::-1]])
     boundary_y = np.concatenate([boundary.left_y, boundary.right_y[::-1]])
-    ax.fill(boundary_x, boundary_y, color=[0.9, 0.95, 1], alpha=1, edgecolor='none', label='Total Feasible Region')
+    ax.fill(boundary_x, boundary_y, color=[0.9, 0.95, 1], alpha=1, edgecolor='none')
 
     # Layer 2: Infeasible Paths
     infeasible_handle = None
@@ -852,30 +830,27 @@ def plot_ttbmax_point_cost(all_path_costs: List[np.ndarray], boundary: Boundary,
     
     # Layer 6: TTB_max点的成本线 (最上层)
     sort_idx = np.argsort(ttbmax_costs[:, 1])
-    ttbmax_handle = ax.plot(ttbmax_costs[sort_idx, 0], ttbmax_costs[sort_idx, 1], '-', color='orange', linewidth=2.5, marker='D', markersize=8, label=r'Flow from $TTB_{max}$ point', zorder=11)[0]
+    ttbmax_handle = ax.plot(ttbmax_costs[sort_idx, 0], ttbmax_costs[sort_idx, 1], '-', color='orange', linewidth=2.5, marker='D', markersize=8, zorder=11)[0]
+    
+    # # 在第一个点上添加"A"标签
+    # first_point_idx = sort_idx[0]
+    # ax.annotate(
+    #     "A",
+    #     xy=(ttbmax_costs[first_point_idx, 0], ttbmax_costs[first_point_idx, 1]),
+    #     xytext=(8, 8),
+    #     textcoords='offset points',
+    #     fontsize=13,
+    #     weight='bold',
+    #     color='k',
+    #     ha='left',
+    #     va='bottom',
+    #     zorder=20,
+    #     bbox=dict(boxstyle="round,pad=0.2", fc="white", alpha=0.8, ec="none"),
+    # )
 
     # 添加图例
     legend_handles = []
     legend_labels = []
-    
-    # 总可行区域
-    legend_handles.append(ax.fill([], [], color=[0.9, 0.95, 1], alpha=1, edgecolor='none')[0])
-    legend_labels.append('Total Feasible Region')
-    
-    # 可行流量区域
-    if feasible_region_handle is not None:
-        legend_handles.append(feasible_region_handle)
-        legend_labels.append('Feasible Flow Region')
-    
-    # 可行路径点
-    if feasible_handle is not None:
-        legend_handles.append(feasible_handle)
-        legend_labels.append('Feasible Flow Paths')
-    
-    # 不可行路径点
-    if infeasible_handle is not None:
-        legend_handles.append(infeasible_handle)
-        legend_labels.append('Infeasible Flow Paths')
     
     # TTB_max_delta线
     legend_handles.append(TTB_max_delta_handle)
@@ -887,7 +862,7 @@ def plot_ttbmax_point_cost(all_path_costs: List[np.ndarray], boundary: Boundary,
     
     # TTB_max点的成本线
     legend_handles.append(ttbmax_handle)
-    legend_labels.append(r'Flow from $TTB_{max}$ point')
+    legend_labels.append(r'Path flow set A')
     
     # 显示图例
     ax.legend(
@@ -1030,14 +1005,14 @@ def main():
     else:
         # 批量运行预设的 zeta 与 subset_index 组合，避免重复代码
         default_run_configs = [
-            # {"zeta": 8, "subset_index": 0},
-            # {"zeta": 16, "subset_index": 0},
-            # {"zeta": 16, "subset_index": 1},
+            {"zeta": 8, "subset_index": 0},
+            {"zeta": 16, "subset_index": 0},
+            {"zeta": 16, "subset_index": 1},
             {"zeta": 24, "subset_index": 0},
-            # {"zeta": 24, "subset_index": 1},
-            # {"zeta": 32, "subset_index": 0},
-            # {"zeta": 32, "subset_index": 1},
-            # {"zeta": 32, "subset_index": 2},
+            {"zeta": 24, "subset_index": 1},
+            {"zeta": 32, "subset_index": 0},
+            {"zeta": 32, "subset_index": 1},
+            {"zeta": 32, "subset_index": 2},
         ]
 
         common_kwargs = dict(
