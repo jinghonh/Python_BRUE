@@ -250,7 +250,7 @@ def plot_time_money_cost_relationship(all_path_costs: List[np.ndarray], boundary
                                       color_variations: np.ndarray, params: PlotParams, zeta: int, subset_index: int):
     """Plot the time-money cost relationship."""
     fig, ax = plt.subplots(figsize=params.figure_size)
-    configure_plot(ax, params, 'Path Time-Money Cost Relationship', r'Time', r'Money Cost')
+    configure_plot(ax, params, 'Path Time-Monetary Cost Relationship', r'Time', r'Monetary Cost')
 
     if boundary.left_x.size > 0:
         boundary_x = np.concatenate([boundary.left_x, boundary.right_x[::-1]])
@@ -316,13 +316,13 @@ def plot_teqm_flow_path_cost(all_path_costs: List[np.ndarray], color_variations:
     
     # 5. Plotting
     fig, ax = plt.subplots(figsize=params.figure_size)
-    configure_plot(ax, params, f'Path Costs with Highlighted TTB_max Flow (Zeta={zeta})', r'Time', r'Money Cost')
+    configure_plot(ax, params, f'Path Costs with Highlighted TTB_max Flow (Zeta={zeta})', r'Time', r'Monetary Cost')
     
     # Layer 1: Plot background feasible region
     if boundary.left_x.size > 0:
         boundary_x = np.concatenate([boundary.left_x, boundary.right_x[::-1]])
         boundary_y = np.concatenate([boundary.left_y, boundary.right_y[::-1]])
-        ax.fill(boundary_x, boundary_y, color=[0.9, 0.95, 1], alpha=1, edgecolor='none', label='Feasible Region'); ax.plot(boundary.left_x, boundary.left_y, '-', color=[0.4, 0.5, 0.8], linewidth=0.5); ax.plot(boundary.right_x, boundary.right_y, '-', color=[0.4, 0.5, 0.8], linewidth=0.5)
+        ax.fill(boundary_x, boundary_y, color=[0.9, 0.95, 1], alpha=1, edgecolor='none'); ax.plot(boundary.left_x, boundary.left_y, '-', color=[0.4, 0.5, 0.8], linewidth=0.5); ax.plot(boundary.right_x, boundary.right_y, '-', color=[0.4, 0.5, 0.8], linewidth=0.5)
 
     # Layer 2: Plot all other flows
     for i, costs in enumerate(all_path_costs):
@@ -349,7 +349,7 @@ def plot_path_costs_with_upper_limit(all_path_costs: List[np.ndarray], boundary:
                                      color_variations: np.ndarray, params: PlotParams, zeta: int, subset_index: int):
     """Plot path costs with an upper limit and equilibrium line, with correct layering."""
     fig, ax = plt.subplots(figsize=params.figure_size)
-    configure_plot(ax, params, 'Path Costs with Upper Limit', r'Time', r'Money Cost')
+    configure_plot(ax, params, 'Path Costs with Upper Limit', r'Time', r'Monetary Cost')
 
     # --- Data Processing ---
     if boundary.left_x.size == 0:
@@ -450,7 +450,7 @@ def plot_path_costs_below_equilibrium(all_path_costs: List[np.ndarray], boundary
                                       color_variations: np.ndarray, params: PlotParams, zeta: int, subset_index: int):
     """筛选并绘制T_eqm（紫色折线）下方的可行方案。"""
     fig, ax = plt.subplots(figsize=params.figure_size)
-    configure_plot(ax, params, 'Path Costs Below Equilibrium Line', r'Time', r'Money Cost')
+    configure_plot(ax, params, 'Path Costs Below Equilibrium Line', r'Time', r'Monetary Cost')
 
     # --- Data Processing ---
     if boundary.left_x.size == 0:
@@ -507,7 +507,7 @@ def plot_path_costs_below_equilibrium(all_path_costs: List[np.ndarray], boundary
                 below_eqm_x = np.concatenate([below_eqm_boundary.left_x, below_eqm_boundary.right_x[::-1]])
                 below_eqm_y = np.concatenate([below_eqm_boundary.left_y, below_eqm_boundary.right_y[::-1]])
                 ax.fill(below_eqm_x, below_eqm_y, color=[0.9, 0.8, 1.0], alpha=0.5,
-                        edgecolor=[0.6, 0.4, 0.7], linewidth=0.5, label='Below Equilibrium Region', zorder=3)
+                        edgecolor=[0.6, 0.4, 0.7], linewidth=0.5, zorder=3)
 
     # Layer 4: Below Equilibrium Paths
     for path in below_eqm_paths_data:
@@ -517,13 +517,18 @@ def plot_path_costs_below_equilibrium(all_path_costs: List[np.ndarray], boundary
         ax.scatter(costs[:, 0], costs[:, 1], s=35, c=[color], marker='o', alpha=0.6, edgecolors='none', zorder=4)
 
     # Layer 5: T_eqm line (Topmost)
-    ax.plot(TTB_max, boundary.left_y, '-.', color=[0.5, 0.0, 0.8], linewidth=2.5, label=r'$TTB_{max}$', zorder=10)
-
-    # 添加图例
-    handles, labels = ax.get_legend_handles_labels()
-    if handles:
-        unique_labels = dict(zip(labels, handles))
-        ax.legend(unique_labels.values(), unique_labels.keys(), loc='best', fontsize=params.font_size - 1)
+    TTB_max_handle = ax.plot(
+        TTB_max,
+        boundary.left_y,
+        '-.',
+        color=[0.5, 0.0, 0.8],
+        linewidth=2.5,
+        label=r'$TTB_{max}$',
+        zorder=10,
+    )[0]
+    # 明确设置虚线样式并加长图例线段，避免在图例中显示为实线
+    TTB_max_handle.set_dashes([6, 2, 1, 2])
+    ax.legend([TTB_max_handle], [r'$TTB_{max}$'], loc='best', fontsize=params.font_size - 1, handlelength=4, handletextpad=0.6)
 
     save_figure(fig, 'path_costs_below_equilibrium', params, zeta, subset_index)
     plt.close(fig)
@@ -609,7 +614,7 @@ def plot_rbs_point_cost(all_path_costs: List[np.ndarray], boundary: Boundary,
     
     # --- Drawing Layers ---
     fig, ax = plt.subplots(figsize=params.figure_size)
-    configure_plot(ax, params, f'Path Costs with Upper Limit and RBS Point (Zeta={zeta})', r'Time', r'Money Cost')
+    configure_plot(ax, params, f'Path Costs with Upper Limit and RBS Point (Zeta={zeta})', r'Time', r'Monetary Cost')
 
     # Layer 1: Total Feasible Region (Background)
     boundary_x = np.concatenate([boundary.left_x, boundary.right_x[::-1]])
@@ -784,7 +789,7 @@ def plot_ttbmax_point_cost(all_path_costs: List[np.ndarray], boundary: Boundary,
     
     # --- Drawing Layers ---
     fig, ax = plt.subplots(figsize=params.figure_size)
-    configure_plot(ax, params, f'Path Costs with Upper Limit and TTB_max Point (Zeta={zeta})', r'Time', r'Money Cost')
+    configure_plot(ax, params, f'Path Costs with Upper Limit and TTB_max Point (Zeta={zeta})', r'Time', r'Monetary Cost')
 
     # Layer 1: Total Feasible Region (Background)
     boundary_x = np.concatenate([boundary.left_x, boundary.right_x[::-1]])
@@ -1007,12 +1012,12 @@ def main():
         default_run_configs = [
             {"zeta": 8, "subset_index": 0},
             {"zeta": 16, "subset_index": 0},
-            {"zeta": 16, "subset_index": 1},
+            # {"zeta": 16, "subset_index": 1},
             {"zeta": 24, "subset_index": 0},
-            {"zeta": 24, "subset_index": 1},
+            # {"zeta": 24, "subset_index": 1},
             {"zeta": 32, "subset_index": 0},
-            {"zeta": 32, "subset_index": 1},
-            {"zeta": 32, "subset_index": 2},
+            # {"zeta": 32, "subset_index": 1},
+            # {"zeta": 32, "subset_index": 2},
         ]
 
         common_kwargs = dict(

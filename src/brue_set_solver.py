@@ -181,7 +181,7 @@ class BRUESetSolver(BRUESolver):
         
         plt.title(f'Cost Space (ζ = {zeta})')
         plt.xlabel('Travel Time')
-        plt.ylabel('Money Cost')
+        plt.ylabel('Monetary Cost')
         plt.grid(True, alpha=0.3)
         plt.legend()
         plt.show()

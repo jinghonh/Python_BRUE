@@ -17,6 +17,7 @@ from __future__ import annotations
 import math
 import json
 import os
+import time
 from pathlib import Path
 from typing import Callable, Tuple, Dict, Any, List
 
@@ -31,18 +32,7 @@ from scipy.interpolate import interp1d
 # 从统一配置读取区域样式
 from plot_styles import REGION_STYLES
 
-# ============================== 基本常量 ==============================
-RHO: float = 15
-SIGMA: float = 0.02
-E: float = 24  # 误差上限 (与 Mathematica 变量 e 对应)
-EPS: float = 1e-8  # 严格不等式缓冲 (与 Mathematica 变量 eps 对应)
 
-# 边界条件 (与 box 变量对应)
-F1_MIN, F1_MAX = 1000.0, 8000.0
-F2_MIN, F2_MAX = 0.0, 7000.0
-TOTAL_MAX = 10000.0
-
-# ============================ 链路/路径函数 ===========================
 
 def link1(f1: np.ndarray | float) -> np.ndarray | float:
     return 18.0 * (1 + 0.15 * (f1 / 3600.0) ** 4)
@@ -174,7 +164,7 @@ def get_or_compute_path_limits(left_boundary_x, upper_limit_x, upper_limit_y, e_
     # 创建存储目录
     os.makedirs(results_dir, exist_ok=True)
     # 使用与plot_path_costs.py相同的文件名格式
-    cache_file = os.path.join(results_dir, f"tmax_teqm_zeta{zeta}.json")
+    cache_file = os.path.join(results_dir, f"tmax_teqm_zeta{int(zeta)}.json")
     
     # 检查是否存在缓存文件
     if os.path.exists(cache_file):
@@ -463,155 +453,112 @@ def get_or_generate_scatter_points(mask_reg2, mask_reg, mask_reg3, mask_eqm, F1_
     print(f"已保存散点数据到 {cache_file}")
     return s_constraint_points, path_constraint_points, all_constraint_points, tmax_constraint_points
 
-# --------------------------- 网格采样 ---------------------------
 
-STEP = 10  # 调节步长可提升/降低精度
-f1_vals = np.arange(F1_MIN, F1_MAX + STEP, STEP)
-f2_vals = np.arange(F2_MIN, F2_MAX + STEP, STEP)
-F1_GRID, F2_GRID = np.meshgrid(f1_vals, f2_vals, indexing="ij")
+def _prepare_plot_data(e_val: float, results_dir: str = "results"):
+    """根据给定的 epsilon 值计算和更新绘图所需的全局变量。"""
+    global E, ZETA_VALUE
+    global mask_reg, mask_reg2, mask_reg3, mask_eqm
+    global P1_VALS, P2_VALS, P5_VALS
+    global mid_path, eqm_limit_x, left_boundary_x
+    global s_constraint_points, path_constraint_points, all_constraint_points, tmax_constraint_points
 
-mask_reg = feasible_mask(F1_GRID, F2_GRID)
-if not np.any(mask_reg):
-    raise RuntimeError("❌ 可行域为空；请放宽 E 或其他排序约束。")
-
-# ---------------------- 计算 max/min/mid ----------------------
-
-# 在采样网格上近似取最值（若需更精确可结合 SciPy 优化器）
-P1_VALS = path1(F1_GRID, F2_GRID)
-P2_VALS = path2(F1_GRID, F2_GRID)
-P5_VALS = path5(F1_GRID, F2_GRID)
-
-# 只考虑可行域内值
-P1_INSIDE = P1_VALS[mask_reg]
-P2_INSIDE = P2_VALS[mask_reg]
-P5_INSIDE = P5_VALS[mask_reg]
-
-r1_max, r1_min = P1_INSIDE.max(), P1_INSIDE.min()
-r2_max, r2_min = P2_INSIDE.max(), P2_INSIDE.min()
-r5_max, r5_min = P5_INSIDE.max(), P5_INSIDE.min()
-
-# ---------------------- 计算 mid_path 和平衡线 ----------------------
-
-# 计算左边界 - 使用最小值作为近似
-left_boundary_x = np.array([r1_min, r2_min, r5_min])
-
-# 设置默认的upper_limit_x和upper_limit_y
-default_upper_limit_x = np.array([(r1_max + r1_min) / 2, (r2_max + r2_min) / 2, (r5_max + r5_min) / 2])
-upper_limit_y = np.array([20.0, 15.0, 2.0])
-
-# 使用JSON文件加载或计算mid_path(TTB_max_delta)和eqm_limit_x(TTB_max)
-results_dir = 'results'
-# 定义zeta值，与plot_path_costs.py保持一致
-ZETA_VALUE = E  # 默认值为16，可以根据需要修改
-mid_path, eqm_limit_x = get_or_compute_path_limits(
-    left_boundary_x=left_boundary_x,
-    upper_limit_x=default_upper_limit_x,
-    upper_limit_y=upper_limit_y,
-    e_value=E,
-    results_dir=results_dir,
-    zeta=ZETA_VALUE  # 传递zeta参数
-)
-
-# 输出计算结果
-print(f"左边界X: {left_boundary_x}")
-print(f"中点路径X (TTB_max_delta): {mid_path}")
-print(f"上限Y (货币成本): {upper_limit_y}")
-print(f"平衡线X (TTB_max): {eqm_limit_x}")
-print(f"使用的zeta值: {ZETA_VALUE}")
-
-# --------------------------- 其他区域 ---------------------------
-
-mask_reg3 = mask_reg & (
-    (P1_VALS <= mid_path[0]) & (P2_VALS <= mid_path[1]) & (P5_VALS <= mid_path[2])
-)
-mask_reg2 = _box_constraints(F1_GRID, F2_GRID) & (
-    (max_path(F1_GRID, F2_GRID) - min_path(F1_GRID, F2_GRID)) <= E
-)
-
-# 平衡线区域 - Pi_VALS < eqmLimitX
-mask_eqm = mask_reg & (
-    (P1_VALS <= eqm_limit_x[0]) & 
-    (P2_VALS <= eqm_limit_x[1]) & 
-    (P5_VALS <= eqm_limit_x[2])
-)
-
-# 使用函数获取或生成散点数据
-s_constraint_points, path_constraint_points, all_constraint_points, tmax_constraint_points = get_or_generate_scatter_points(
-    mask_reg2=mask_reg2,
-    mask_reg=mask_reg, 
-    mask_reg3=mask_reg3, 
-    mask_eqm=mask_eqm,
-    F1_GRID=F1_GRID,
-    F2_GRID=F2_GRID,
-    e_value=E,
-    num_points=2,  # 每个区域生成2个点
-    results_dir=results_dir
-)
-
-# --------------------------- 设置绘图样式 ---------------------------
-
-# 设置学术期刊风格
-plt.rcParams.update({
-    # 基础字体设置
-    "font.family": "serif",
-    "font.serif": ["Times New Roman"],
-    "font.size": 11,
+    E = e_val
+    ZETA_VALUE = e_val
     
-    # LaTeX设置
-    "text.usetex": True,
-    "text.latex.preamble": r"\usepackage{amsmath}\usepackage{amssymb}",
-    
-    # 图形风格
-    "axes.linewidth": 0.8,
-    "axes.labelsize": 15,
-    "axes.titlesize": 15,
-    "axes.grid": True,
-    "grid.linestyle": ":",
-    "grid.linewidth": 0.5,
-    "grid.alpha": 0.3,
-    
-    # 刻度设置
-    "xtick.direction": "in",
-    "ytick.direction": "in",
-    "xtick.major.size": 3.0,
-    "ytick.major.size": 3.0,
-    "xtick.minor.size": 1.5,
-    "ytick.minor.size": 1.5,
-    "xtick.major.width": 0.8,
-    "ytick.major.width": 0.8,
-    "xtick.minor.width": 0.6,
-    "ytick.minor.width": 0.6,
-    
-    # 图例设置
-    "legend.frameon": True,
-    "legend.framealpha": 0.8,
-    "legend.edgecolor": "k",
-    "legend.fancybox": False,
-    "legend.fontsize": 15,
-    
-    # 保存设置
-    "savefig.dpi": 600,
-    "savefig.format": "pdf",
-    "savefig.bbox": "tight",
-    "savefig.pad_inches": 0.05,
-})
+    # 路径成本矩阵
+    P1_VALS = path1(F1_GRID, F2_GRID)
+    P2_VALS = path2(F1_GRID, F2_GRID)
+    P5_VALS = path5(F1_GRID, F2_GRID)
 
-# --------------------------- 颜色和标记 ---------------------------
-# 统一从配置文件提取，后续若需调整仅修改 plot_styles.py
-color_S0 = REGION_STYLES["S"].color
-color_BS0 = REGION_STYLES["BS"].color
-color_RBS0 = REGION_STYLES["RBS"].color
-color_TTBmax = REGION_STYLES["TTB_max"].color
+    # 更新可行域掩码
+    mask_reg = feasible_mask(F1_GRID, F2_GRID)
+    if not np.any(mask_reg):
+        raise RuntimeError(f"❌ 可行域为空；请放宽 E 或其他排序约束。")
 
-# 便捷获取标记
-marker_S0 = REGION_STYLES["S"].marker
-marker_BS0 = REGION_STYLES["BS"].marker
-marker_RBS0 = REGION_STYLES["RBS"].marker
-marker_TTBmax = REGION_STYLES["TTB_max"].marker
-print(f"color_S0: {color_S0}, marker_S0: {marker_S0}")
-print(f"color_BS0: {color_BS0}, marker_BS0: {marker_BS0}")
-print(f"color_RBS0: {color_RBS0}, marker_RBS0: {marker_RBS0}")
-print(f"color_TTBmax: {color_TTBmax}, marker_TTBmax: {marker_TTBmax}")
+    # 只考虑可行域内值
+    P1_INSIDE = P1_VALS[mask_reg]
+    P2_INSIDE = P2_VALS[mask_reg]
+    P5_INSIDE = P5_VALS[mask_reg]
+
+    r1_max, r1_min = P1_INSIDE.max(), P1_INSIDE.min()
+    r2_max, r2_min = P2_INSIDE.max(), P2_INSIDE.min()
+    r5_max, r5_min = P5_INSIDE.max(), P5_INSIDE.min()
+
+    # 计算左边界
+    left_boundary_x = np.array([r1_min, r2_min, r5_min])
+    default_upper_limit_x = np.array([(r1_max + r1_min) / 2, (r2_max + r2_min) / 2, (r5_max + r5_min) / 2])
+    upper_limit_y = np.array([20.0, 15.0, 2.0])
+
+    # 加载或计算路径限制
+    mid_path, eqm_limit_x = get_or_compute_path_limits(
+        left_boundary_x=left_boundary_x,
+        upper_limit_x=default_upper_limit_x,
+        upper_limit_y=upper_limit_y,
+        e_value=E,
+        results_dir=results_dir,
+        zeta=ZETA_VALUE
+    )
+
+    # 输出计算结果
+    print(f"左边界X: {left_boundary_x}")
+    print(f"中点路径X (TTB_max_delta): {mid_path}")
+    print(f"上限Y (货币成本): {upper_limit_y}")
+    print(f"平衡线X (TTB_max): {eqm_limit_x}")
+    print(f"使用的zeta值: {ZETA_VALUE}")
+
+    # 更新其他区域掩码
+    mask_reg3 = mask_reg & ((P1_VALS <= mid_path[0]) & (P2_VALS <= mid_path[1]) & (P5_VALS <= mid_path[2]))
+    mask_reg2 = _box_constraints(F1_GRID, F2_GRID) & ((max_path(F1_GRID, F2_GRID) - min_path(F1_GRID, F2_GRID)) <= E)
+    mask_eqm = mask_reg & ((P1_VALS <= eqm_limit_x[0]) & (P2_VALS <= eqm_limit_x[1]) & (P5_VALS <= eqm_limit_x[2]))
+
+    # 获取或生成散点数据
+    s_constraint_points, path_constraint_points, all_constraint_points, tmax_constraint_points = get_or_generate_scatter_points(
+        mask_reg2=mask_reg2,
+        mask_reg=mask_reg,
+        mask_reg3=mask_reg3,
+        mask_eqm=mask_eqm,
+        F1_GRID=F1_GRID,
+        F2_GRID=F2_GRID,
+        e_value=E,
+        num_points=2,
+        results_dir=results_dir
+    )
+
+def _setup_plot_globals():
+    """设置全局绘图样式、颜色和标记。"""
+    global color_S0, color_BS0, color_RBS0, color_TTBmax
+    global marker_S0, marker_BS0, marker_RBS0, marker_TTBmax
+
+    plt.rcParams.update({
+        "font.family": "serif", "font.serif": ["Times New Roman"], "font.size": 11,
+        "text.usetex": True, "text.latex.preamble": r"\usepackage{amsmath}\usepackage{amssymb}",
+        "axes.linewidth": 0.8, "axes.labelsize": 15, "axes.titlesize": 15,
+        "axes.grid": True, "grid.linestyle": ":", "grid.linewidth": 0.5, "grid.alpha": 0.3,
+        "xtick.direction": "in", "ytick.direction": "in",
+        "xtick.major.size": 3.0, "ytick.major.size": 3.0,
+        "xtick.minor.size": 1.5, "ytick.minor.size": 1.5,
+        "xtick.major.width": 0.8, "ytick.major.width": 0.8,
+        "xtick.minor.width": 0.6, "ytick.minor.width": 0.6,
+        "legend.frameon": True, "legend.framealpha": 0.8, "legend.edgecolor": "k",
+        "legend.fancybox": False, "legend.fontsize": 15,
+        "savefig.dpi": 600, "savefig.format": "pdf", "savefig.bbox": "tight", "savefig.pad_inches": 0.05,
+    })
+
+    color_S0 = REGION_STYLES["S"].color
+    color_BS0 = REGION_STYLES["BS"].color
+    color_RBS0 = REGION_STYLES["RBS"].color
+    color_TTBmax = REGION_STYLES["TTB_max"].color
+
+    marker_S0 = REGION_STYLES["S"].marker
+    marker_BS0 = REGION_STYLES["BS"].marker
+    marker_RBS0 = REGION_STYLES["RBS"].marker
+    marker_TTBmax = REGION_STYLES["TTB_max"].marker
+    
+    print(f"color_S0: {color_S0}, marker_S0: {marker_S0}")
+    print(f"color_BS0: {color_BS0}, marker_BS0: {marker_BS0}")
+    print(f"color_RBS0: {color_RBS0}, marker_RBS0: {marker_RBS0}")
+    print(f"color_TTBmax: {color_TTBmax}, marker_TTBmax: {marker_TTBmax}")
+
 # --------------------------- 创建绘图函数 ---------------------------
 
 def create_plot(
@@ -805,6 +752,20 @@ def create_plot(
                                 bbox=dict(boxstyle="round,pad=0.2", fc="white", alpha=0.8, ec="none"),
                             )
                             point_label_idx += 1
+                if plot_num  == 5:
+                    ax.annotate(
+                        "A",
+                        xy=(TTB_max_pts[0, 0], TTB_max_pts[0, 1]),
+                        xytext=(8, 8),
+                        textcoords='offset points',
+                        fontsize=13,
+                        weight='bold',
+                        color='k',
+                        ha='left',
+                        va='bottom',
+                        zorder=20,
+                        bbox=dict(boxstyle="round,pad=0.2", fc="white", alpha=0.8, ec="none"),
+                    )
     
     # 设置轴标签和范围
     ax.set_xlabel(r"$f_1$")
@@ -1056,85 +1017,9 @@ def plot_ttbmax_point_region(F1_GRID, F2_GRID, mask_reg2, mask_reg, mask_reg3, m
 
 def generate_plots_for_e(e_val: int, results_dir: str = "results"):
     """根据给定 ε (zeta) 值重新计算区域并输出全部 6 张图。"""
-    import numpy as _np
+    _prepare_plot_data(float(e_val), results_dir)
 
-    # --- 使用全局变量，后续 create_plot 直接读取 ---
-    global E, ZETA_VALUE
-    global mask_reg, mask_reg2, mask_reg3, mask_eqm
-    global P1_VALS, P2_VALS, P5_VALS
-    global mid_path, eqm_limit_x, left_boundary_x
-    global s_constraint_points, path_constraint_points, all_constraint_points, tmax_constraint_points
-
-    # 更新 epsilon / zeta 值
-    E = float(e_val)
-    ZETA_VALUE = E
-
-    print(f"\n====================  生成 ε = {E} 的区域图  ====================")
-
-    # ---------- Re-compute feasible masks ----------
-    mask_reg = feasible_mask(F1_GRID, F2_GRID)
-    if not _np.any(mask_reg):
-        raise RuntimeError(f"❌ 可行域为空；请检查参数 ε = {E}")
-
-    # 路径成本矩阵
-    P1_VALS = path1(F1_GRID, F2_GRID)
-    P2_VALS = path2(F1_GRID, F2_GRID)
-    P5_VALS = path5(F1_GRID, F2_GRID)
-
-    # 取可行域内的值
-    P1_INSIDE = P1_VALS[mask_reg]
-    P2_INSIDE = P2_VALS[mask_reg]
-    P5_INSIDE = P5_VALS[mask_reg]
-
-    # 最大最小值
-    r1_max, r1_min = P1_INSIDE.max(), P1_INSIDE.min()
-    r2_max, r2_min = P2_INSIDE.max(), P2_INSIDE.min()
-    r5_max, r5_min = P5_INSIDE.max(), P5_INSIDE.min()
-
-    left_boundary_x = _np.array([r1_min, r2_min, r5_min])
-    default_upper_limit_x = _np.array([(r1_max + r1_min) / 2, (r2_max + r2_min) / 2, (r5_max + r5_min) / 2])
-    upper_limit_y = _np.array([20.0, 15.0, 2.0])
-
-    # 计算/读取 mid_path (TTB_max_delta) 与 eqm_limit_x (TTB_max)
-    mid_path, eqm_limit_x = get_or_compute_path_limits(
-        left_boundary_x=left_boundary_x,
-        upper_limit_x=default_upper_limit_x,
-        upper_limit_y=upper_limit_y,
-        e_value=E,
-        results_dir=results_dir,
-        zeta=int(E),
-    )
-
-    # ---------- Re-compute masks with new thresholds ----------
-    mask_reg3 = mask_reg & (
-        (P1_VALS <= mid_path[0]) & (P2_VALS <= mid_path[1]) & (P5_VALS <= mid_path[2])
-    )
-    mask_reg2 = _box_constraints(F1_GRID, F2_GRID) & (
-        (max_path(F1_GRID, F2_GRID) - min_path(F1_GRID, F2_GRID)) <= E
-    )
-    mask_eqm = mask_reg & (
-        (P1_VALS <= eqm_limit_x[0])
-        & (P2_VALS <= eqm_limit_x[1])
-        & (P5_VALS <= eqm_limit_x[2])
-    )
-
-    # ---------- 更新/生成散点 ----------
-    (
-        s_constraint_points,
-        path_constraint_points,
-        all_constraint_points,
-        tmax_constraint_points,
-    ) = get_or_generate_scatter_points(
-        mask_reg2=mask_reg2,
-        mask_reg=mask_reg,
-        mask_reg3=mask_reg3,
-        mask_eqm=mask_eqm,
-        F1_GRID=F1_GRID,
-        F2_GRID=F2_GRID,
-        e_value=E,
-        num_points=2,
-        results_dir=results_dir,
-    )
+    print(f"\n====================  生成 ε = {e_val} 的区域图  ====================")
 
     # ---------- 绘制八张图 ----------
     create_plot(
@@ -1215,7 +1100,34 @@ def generate_plots_for_e(e_val: int, results_dir: str = "results"):
     print(f"✅ ε = {E} 的区域图全部生成完毕\n")
 
 if __name__ == "__main__":
+    # ============================== 基本常量 ==============================
+    RHO: float = 15
+    SIGMA: float = 0.02
+    E: float = 24  # 误差上限 (与 Mathematica 变量 e 对应)
+    EPS: float = 1e-8  # 严格不等式缓冲 (与 Mathematica 变量 eps 对应)
+
+    # 边界条件 (与 box 变量对应)
+    F1_MIN, F1_MAX = 1000.0, 8000.0
+    F2_MIN, F2_MAX = 0.0, 7000.0
+    TOTAL_MAX = 10000.0
+
+    # --------------------------- 网格采样 ---------------------------
+
+    STEP = 10  # 调节步长可提升/降低精度
+    f1_vals = np.arange(F1_MIN, F1_MAX + STEP, STEP)
+    f2_vals = np.arange(F2_MIN, F2_MAX + STEP, STEP)
+    F1_GRID, F2_GRID = np.meshgrid(f1_vals, f2_vals, indexing="ij")
+
+    mask_reg = feasible_mask(F1_GRID, F2_GRID)
+    if not np.any(mask_reg):
+        raise RuntimeError("❌ 可行域为空；请放宽 E 或其他排序约束。")
+    
+    # 为默认 E 值准备数据并设置绘图全局变量
+    _prepare_plot_data(E)
+    _setup_plot_globals()
+
+    # ============================ 链路/路径函数 ===========================
     # 一次性生成多个 ε 值的所有结果图
     for _eps in [8, 16, 24, 32]:
         generate_plots_for_e(_eps)
-    # generate_plots_for_e(24)
+    # generate_plots_for_e(32)

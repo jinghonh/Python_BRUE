@@ -198,7 +198,7 @@ class BRUEMatlabSolver:
         plt.scatter(objectives[:, 0], objectives[:, 1], alpha=0.6, s=5)
         plt.title(f'Objective Space (ζ = {zeta})')
         plt.xlabel('Total Travel Time')
-        plt.ylabel('Total Money Cost')
+        plt.ylabel('Total Monetary Cost')
         plt.grid(True, alpha=0.3)
         plt.show()
 

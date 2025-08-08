@@ -348,7 +348,7 @@ def plot_three_regions_comparison(df, zeta_value, figsize=(10, 8), use_mat_file=
     
     # 设置轴标签和图例
     ax.set_xlabel('Time', fontsize=12)
-    ax.set_ylabel('Money Cost', fontsize=12)
+    ax.set_ylabel('Monetary Cost', fontsize=12)
     ax.grid(True)
     
     # 扩展x轴范围以容纳路径标签
@@ -493,7 +493,7 @@ def plot_comparison_path_costs(zeta_value, figsize=(10, 8)):
 
     # Finalize and save
     ax.set_xlabel('Time', fontsize=12)
-    ax.set_ylabel('Money Cost', fontsize=12)
+    ax.set_ylabel('Monetary Cost', fontsize=12)
     ax.grid(True)
     ax.legend(loc='best', fontsize=10, framealpha=1)
     # 
@@ -773,7 +773,7 @@ def plot_two_regions_path_costs(zeta_value, figsize=(10, 8)):
 
     # 完成并保存
     ax.set_xlabel('Time', fontsize=14)
-    ax.set_ylabel('Money Cost', fontsize=14)
+    ax.set_ylabel('Monetary Cost', fontsize=14)
     ax.grid(True, linestyle='--', alpha=0.7)
     
     # 只使用收集的图例句柄，确保每个区域只有一个图例项
